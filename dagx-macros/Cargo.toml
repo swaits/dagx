@@ -1,0 +1,20 @@
+[package]
+name = "dagx-macros"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.78.0"
+authors = ["Stephen Waits <steve@waits.net>"]
+license = "MIT"
+description = "Procedural macros for dagx"
+repository = "https://github.com/swaits/dagx"
+homepage = "https://github.com/swaits/dagx"
+documentation = "https://docs.rs/dagx-macros"
+readme = "README.md"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+syn = { version = "2", features = ["full", "extra-traits"] }
+quote = "1"
+proc-macro2 = "1"

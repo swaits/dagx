@@ -1,0 +1,40 @@
+[workspace]
+members = ["dagx-macros"]
+
+[package]
+name = "dagx"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.78.0"
+authors = ["Stephen Waits <steve@waits.net>"]
+license = "MIT"
+description = "A minimal, type-safe, runtime-agnostic async DAG executor with compile-time dependency validation"
+repository = "https://github.com/swaits/dagx"
+homepage = "https://github.com/swaits/dagx"
+documentation = "https://docs.rs/dagx"
+readme = "README.md"
+keywords = ["dag", "async", "task", "parallel", "executor"]
+categories = ["asynchronous", "concurrency", "data-structures"]
+exclude = [".claude/", ".jj/", "dagx-spec.md"]
+
+[dependencies]
+futures = "0.3"
+parking_lot = "0.12"
+dagx-macros = { version = "0.1.0", path = "./dagx-macros" }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "time", "sync"] }
+async-std = { version = "1", features = ["attributes"] }
+smol = "2"
+criterion = "0.7"
+# Quirky async runtimes for edge-case testing
+async-executor = "1.13"
+pollster = "0.4"
+futures-executor = { version = "0.3", features = ["thread-pool"] }
+# Comparison benchmarks
+dagrs = { version = "0.5", default-features = false }
+async-trait = "0.1"
+
+[[bench]]
+name = "dagx_bench"
+harness = false
