@@ -17,6 +17,9 @@ keywords = ["dag", "async", "task", "parallel", "executor"]
 categories = ["asynchronous", "concurrency", "data-structures"]
 exclude = [".claude/", ".jj/", "dagx-spec.md"]
 
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(tarpaulin)'] }
+
 [dependencies]
 futures = "0.3"
 parking_lot = "0.12"

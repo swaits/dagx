@@ -304,7 +304,7 @@ async fn test_zigzag_dependencies() -> DagResult<()> {
 }
 
 #[tokio::test]
-#[ignore] // This test is extremely resource intensive
+#[cfg_attr(tarpaulin, ignore)] // This test is extremely resource intensive
 async fn test_10000_level_chain_stress() -> DagResult<()> {
     // Ultimate deep chain test
     let dag = DagRunner::new();

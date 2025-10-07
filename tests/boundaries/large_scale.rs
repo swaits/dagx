@@ -213,7 +213,7 @@ async fn test_10000_node_linear_chain_segments() -> DagResult<()> {
 }
 
 #[tokio::test]
-#[ignore] // This test is very resource intensive
+#[cfg_attr(tarpaulin, ignore)] // This test is very resource intensive
 async fn test_100000_nodes_stress() -> DagResult<()> {
     // Ultimate stress test: 100,000 nodes
     let dag = DagRunner::new();
