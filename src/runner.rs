@@ -435,14 +435,14 @@ impl DagRunner {
                         .await
                         .unwrap_or_else(|panic_payload| {
                             // Convert panic to error
-                            let panic_message = if let Some(s) = panic_payload.downcast_ref::<&str>()
-                            {
-                                s.to_string()
-                            } else if let Some(s) = panic_payload.downcast_ref::<String>() {
-                                s.clone()
-                            } else {
-                                "unknown panic".to_string()
-                            };
+                            let panic_message =
+                                if let Some(s) = panic_payload.downcast_ref::<&str>() {
+                                    s.to_string()
+                                } else if let Some(s) = panic_payload.downcast_ref::<String>() {
+                                    s.clone()
+                                } else {
+                                    "unknown panic".to_string()
+                                };
 
                             #[cfg(feature = "tracing")]
                             error!(

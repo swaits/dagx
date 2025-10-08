@@ -5,6 +5,33 @@ All notable changes to dagx will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.3] - 2025-10-08
+
+[View changes](https://github.com/swaits/dagx/compare/v0.2.2...v0.2.3)
+
+### Added
+
+- **Optional tracing support** via `tracing` feature flag
+  - Zero-cost when disabled (literally 0ns overhead - code removed at compile time)
+  - Structured logging at INFO, DEBUG, TRACE, and ERROR levels
+  - Instrumentation for DAG construction, execution, and error paths
+  - New example: `examples/tracing_example.rs` demonstrating usage
+  - Comprehensive test coverage in `tests/tracing/` for both with/without feature
+  - Follows same pattern as tokio/hyper for performance-critical libraries
+  - Updated documentation in README.md and lib.rs
+
+### Changed
+
+- Improved `examples/04_parallel_computation.rs` to actually prove parallelism
+  - Now compares parallel vs sequential execution with timing measurements
+  - Calculates and displays speedup ratio (e.g., "4.0x faster")
+  - Clarifies difference from basic fan-in pattern in 03_fan_in.rs
+  - Added warnings for debug builds with low speedup
+
+### Fixed
+
+- Fixed broken ASCII diagram in `examples/04_parallel_computation.rs`
+
 ## [0.2.2] - 2025-10-07
 
 [View changes](https://github.com/swaits/dagx/compare/v0.2.1...v0.2.2)

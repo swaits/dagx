@@ -180,10 +180,7 @@ async fn main() -> DagResult<()> {
 
     let speedup = sequential_time.as_secs_f64() / parallel_time.as_secs_f64();
 
-    println!(
-        "Speedup: {:.1}x faster with parallel execution!",
-        speedup
-    );
+    println!("Speedup: {:.1}x faster with parallel execution!", speedup);
     println!("This proves dagx runs tasks on multiple CPU cores simultaneously.");
 
     if speedup > 2.0 {
