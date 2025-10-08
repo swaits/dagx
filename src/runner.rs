@@ -360,19 +360,10 @@ impl DagRunner {
             Result<std::sync::Arc<dyn std::any::Any + Send + Sync>, DagError>,
         )>();
 
-        // Execute layer by layer
-        #[cfg(feature = "tracing")]
-        let mut layer_idx = 0;
-
         for layer in layers {
             #[cfg(feature = "tracing")]
             {
-                debug!(
-                    layer = layer_idx,
-                    task_count = layer.len(),
-                    "executing layer"
-                );
-                layer_idx += 1;
+                debug!(task_count = layer.len(), "executing layer");
             }
             // ============================================================================
             // PERFORMANCE OPTIMIZATION: Inline execution for single-task layers
