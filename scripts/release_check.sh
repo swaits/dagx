@@ -1,12 +1,17 @@
 #!/bin/bash
-# Release Readiness Checker for dagx v0.1.0
+# Release Readiness Checker for dagx
 # This script performs EXHAUSTIVE checks before publishing to crates.io
 
 set -e
 
-echo "========================================"
-echo "dagx v0.1.0 EXHAUSTIVE Release Check"
-echo "========================================"
+# =============================================================================
+# CONFIGURATION
+# =============================================================================
+VERSION="0.2.0"
+
+echo "=================="
+echo "dagx Release Check"
+echo "=================="
 echo ""
 
 # Color codes
@@ -51,7 +56,7 @@ check_pass "Rust version compatible"
 
 echo ""
 echo "→ Checking for uncommitted changes..."
-if ! git diff --quiet || ! git diff --cached --quiet; then
+if jj status 2>&1 | grep -q "Working copy changes:"; then
   check_warn "Uncommitted changes found - you'll need to commit before publishing"
 else
   check_pass "No uncommitted changes"
@@ -136,8 +141,8 @@ check_pass "README.md looks perfect"
 echo ""
 echo "→ Verifying CHANGELOG.md..."
 [ -f CHANGELOG.md ] || check_fail "CHANGELOG.md missing"
-grep -q "0.1.0" CHANGELOG.md || check_fail "CHANGELOG.md doesn't mention v0.1.0"
-check_pass "CHANGELOG.md exists and mentions v0.1.0"
+grep -q "$VERSION" CHANGELOG.md || check_fail "CHANGELOG.md doesn't mention v$VERSION"
+check_pass "CHANGELOG.md exists and mentions v$VERSION"
 
 echo ""
 echo "→ Verifying LICENSE..."
@@ -182,7 +187,7 @@ section "CARGO.TOML METADATA"
 
 echo "→ Checking dagx Cargo.toml..."
 grep -q 'name = "dagx"' Cargo.toml || check_fail "Package name incorrect"
-grep -q 'version = "0.1.0"' Cargo.toml || check_fail "Version not 0.1.0"
+grep -q "version = \"$VERSION\"" Cargo.toml || check_fail "Version not $VERSION"
 grep -q 'edition = "2021"' Cargo.toml || check_fail "Edition not 2021"
 grep -q 'license = "MIT"' Cargo.toml || check_fail "License not MIT"
 grep -q 'description = "A minimal, type-safe' Cargo.toml || check_fail "Description missing"
@@ -197,7 +202,7 @@ check_pass "dagx Cargo.toml metadata complete and correct"
 echo ""
 echo "→ Checking dagx-macros Cargo.toml..."
 grep -q 'name = "dagx-macros"' dagx-macros/Cargo.toml || check_fail "dagx-macros name incorrect"
-grep -q 'version = "0.1.0"' dagx-macros/Cargo.toml || check_fail "dagx-macros version not 0.1.0"
+grep -q "version = \"$VERSION\"" dagx-macros/Cargo.toml || check_fail "dagx-macros version not $VERSION"
 grep -q 'edition = "2021"' dagx-macros/Cargo.toml || check_fail "dagx-macros edition not 2021"
 grep -q 'license = "MIT"' dagx-macros/Cargo.toml || check_fail "dagx-macros license not MIT"
 grep -q 'description = "Procedural macros for dagx"' dagx-macros/Cargo.toml || check_fail "dagx-macros description missing"
@@ -230,8 +235,8 @@ check_pass "dagx-macros is ready to publish"
 echo ""
 echo "→ Testing dagx package (dry-run with --allow-dirty)..."
 echo "  Note: This will fail until dagx-macros is published to crates.io"
-if cargo publish --dry-run --allow-dirty 2>&1 | grep -q "no matching package named \`dagx-macros\`"; then
-  check_warn "dagx package check shows dependency on unpublished dagx-macros (expected)"
+if cargo publish --dry-run --allow-dirty 2>&1 | grep -q "failed to select a version for the requirement.*dagx-macros"; then
+  check_warn "dagx package check shows dependency on unpublished dagx-macros v$VERSION (expected)"
 else
   cargo publish --dry-run --allow-dirty || check_fail "dagx package check failed unexpectedly"
   check_pass "dagx package is ready (dagx-macros must be published first)"
@@ -284,16 +289,15 @@ echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━
 echo -e "${GREEN}✓ ALL CHECKS PASSED!${NC}"
 echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
-echo "dagx v0.1.0 is READY FOR RELEASE!"
+echo "dagx v$VERSION is READY FOR RELEASE!"
 echo ""
 echo -e "${YELLOW}PUBLICATION INSTRUCTIONS:${NC}"
 echo ""
 echo "1. Commit any uncommitted changes:"
-echo "   git add ."
-echo "   git commit -m 'Release v0.1.0'"
+echo "   jj commit -m 'chore: release v$VERSION'"
 echo ""
-echo "2. Tag the release:"
-echo "   git tag -a v0.1.0 -m 'Release v0.1.0'"
+echo "2. Create a bookmark for the release:"
+echo "   jj bookmark create v$VERSION"
 echo ""
 echo "3. Publish dagx-macros FIRST:"
 echo "   cd dagx-macros"
@@ -303,9 +307,8 @@ echo "4. Then publish dagx:"
 echo "   cd .."
 echo "   cargo publish"
 echo ""
-echo "5. Push changes and tag:"
-echo "   git push origin main"
-echo "   git push origin v0.1.0"
+echo "5. Push changes and bookmark:"
+echo "   jj git push"
 echo ""
 echo -e "${BLUE}Note: dagx-macros MUST be published before dagx${NC}"
 echo -e "${BLUE}because dagx depends on dagx-macros from crates.io${NC}"

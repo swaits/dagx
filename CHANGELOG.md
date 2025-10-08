@@ -5,6 +5,53 @@ All notable changes to dagx will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2025-10-08
+
+[View changes](https://github.com/swaits/dagx/compare/v0.1.0...v0.2.0)
+
+### Changed
+
+- **BREAKING**: Updated MSRV (Minimum Supported Rust Version) from 1.78.0 to 1.81.0
+  - Required by updated dependencies: `criterion@0.7.0`, `half@2.6.0`, `rayon@1.11.0`
+  - Updated in both `dagx` and `dagx-macros` crates
+  - Updated all documentation (README.md, CONTRIBUTING.md)
+
+### Added
+
+- Comprehensive test coverage improvements (82.61% → 92.94%)
+  - Added 9 new unit tests for error paths in `ExtractInput` implementations
+  - Added 3 new type conversion tests in `src/types/tests.rs`
+  - Added 1 new trait implementation test in `src/task/tests.rs`
+  - Added 1 new dependency tuple test in `src/deps/tests.rs`
+  - Added 6 new execution path tests in `tests/execution/basic.rs`
+  - Added error handling tests for HashMap, Result, Option, Vec, and Arc types
+  - Added tests for tuple dependency count validation
+  - Improved concurrent run protection test with better synchronization
+- Added `tarpaulin_include` to lint configuration for coverage tooling compatibility
+
+### Fixed
+
+- Fixed GitHub Actions `cargo-audit` workflow
+  - Replaced deprecated `actions-rs/audit-check@v1` with direct `cargo audit` command
+  - Resolved "Resource not accessible by integration" error
+- Fixed clippy warnings in test code
+  - Removed unnecessary borrows in `.depends_on()` calls
+  - Added `#[allow(clippy::clone_on_copy)]` for explicit clone test
+- Marked timing-sensitive and resource-intensive tests with `#[cfg_attr(tarpaulin, ignore)]`
+  - `test_arc_parallel_execution` (timing unreliable under instrumentation)
+  - `test_100000_nodes_stress` (resource intensive)
+  - `test_10000_level_chain_stress` (resource intensive)
+
+### Internal
+
+- Improved test organization following existing patterns in `tests/` directory
+- Enhanced error path coverage for all `ExtractInput` trait implementations
+- Better separation between unit tests and integration tests
+- Refactored `scripts/release_check.sh` to use configurable VERSION variable
+  - Replaced hardcoded version references throughout script
+  - Updated instructions to use `jj` commands instead of `git`
+  - Simplified version bumps for future releases
+
 ## [0.1.0] - 2025-10-05
 
 ### Added
@@ -97,4 +144,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - macOS (compatible)
 - Windows (compatible)
 
-[0.1.0]: https://github.com/swaits/dagx/releases/tag/v0.1.0
+[0.2.0]: https://github.com/swaits/dagx/tree/v0.2.0
+[0.1.0]: https://github.com/swaits/dagx/tree/v0.1.0

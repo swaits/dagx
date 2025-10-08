@@ -3,7 +3,7 @@ members = ["dagx-macros"]
 
 [package]
 name = "dagx"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 rust-version = "1.81"
 authors = ["Stephen Waits <steve@waits.net>"]
@@ -23,7 +23,7 @@ unexpected_cfgs = { level = "warn", check-cfg = ['cfg(tarpaulin)', 'cfg(tarpauli
 [dependencies]
 futures = "0.3"
 parking_lot = "0.12"
-dagx-macros = { version = "0.1.0", path = "./dagx-macros" }
+dagx-macros = { version = "0.2.0", path = "./dagx-macros" }
 
 [dev-dependencies]
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "time", "sync"] }
