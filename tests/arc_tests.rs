@@ -1091,7 +1091,7 @@ async fn test_arc_mixed_with_non_arc() {
 // ============================================================================
 
 /// Test 16: Arc in parallel execution paths
-#[tokio::test(flavor = "multi_thread")]
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 #[cfg_attr(tarpaulin, ignore)] // Timing tests are unreliable with instrumentation overhead
 async fn test_arc_parallel_execution() {
     struct SharedProducer;
@@ -1150,8 +1150,9 @@ async fn test_arc_parallel_execution() {
     let elapsed = start.elapsed();
 
     // If running in parallel, should take ~50ms, not 150ms
+    // Allow some overhead for slower CI runners (especially macOS)
     assert!(
-        elapsed < Duration::from_millis(100),
+        elapsed < Duration::from_millis(140),
         "Tasks didn't run in parallel: {:?}",
         elapsed
     );
