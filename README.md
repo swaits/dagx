@@ -10,6 +10,59 @@ A minimal, type-safe, runtime-agnostic async DAG (Directed Acyclic Graph) execut
 
 **Why dagx?** No custom scheduler—just battle-tested primitives (channels, async/await). Compile-time type safety catches wiring errors before runtime. Works with ANY async runtime (Tokio, async-std, smol). Simple API: `#[task]`, `add_task()`, `depends_on()`—that's it. **4-148x faster than dagrs** across all workloads with sub-microsecond overhead per task.
 
+<!--toc:start-->
+
+- [Features](#features)
+- [Optional Tracing Support](#optional-tracing-support)
+  - [Enabling Tracing](#enabling-tracing)
+  - [Usage Example](#usage-example)
+  - [Log Levels](#log-levels)
+  - [Zero-Cost Guarantee](#zero-cost-guarantee)
+- [Design Philosophy: Primitives as Scheduler](#design-philosophy-primitives-as-scheduler)
+  - [How It Works](#how-it-works)
+  - [The Implementation](#the-implementation)
+  - [Inline Execution Fast-Path](#inline-execution-fast-path)
+  - [Benefits](#benefits)
+  - [The Insight](#the-insight)
+  - [Measured Overhead](#measured-overhead)
+- [Quick Start](#quick-start)
+- [Comparison with Similar Projects](#comparison-with-similar-projects)
+  - [Developer Experience: API Comparison](#developer-experience-api-comparison)
+  - [Quick Comparison](#quick-comparison)
+  - [Performance Benchmarks vs dagrs](#performance-benchmarks-vs-dagrs)
+  - [Detailed Comparison](#detailed-comparison)
+    - [dagrs (Most Mature)](#dagrs-most-mature)
+    - [async_dag (Clean Type Safety)](#asyncdag-clean-type-safety)
+    - [dag-flow (Experimental)](#dag-flow-experimental)
+    - [RenovZ/dag-runner (Simple Edge-Based)](#renovzdag-runner-simple-edge-based)
+    - [tasksitter (Dynamic Workflows)](#tasksitter-dynamic-workflows)
+  - [When to Choose dagx](#when-to-choose-dagx)
+  - [When to Consider Alternatives](#when-to-consider-alternatives)
+- [Core Concepts](#core-concepts)
+  - [Task](#task)
+  - [Task Patterns](#task-patterns)
+  - [DagRunner](#dagrunner)
+  - [TaskHandle](#taskhandle)
+- [Examples](#examples)
+  - [Fan-out Pattern (1 → n)](#fan-out-pattern-1-n)
+  - [Fan-in Pattern (m → 1)](#fan-in-pattern-m-1)
+  - [Many-to-Many Pattern (m ↔ n)](#many-to-many-pattern-m-n)
+- [Type-State Pattern](#type-state-pattern)
+- [Runtime Agnostic](#runtime-agnostic)
+- [Important Limitations](#important-limitations)
+  - [Tasks Cannot Return Bare Tuples](#tasks-cannot-return-bare-tuples)
+- [Examples](#examples)
+  - [Tutorial Examples](#tutorial-examples)
+  - [Reference Examples](#reference-examples)
+- [When to Use dagx](#when-to-use-dagx)
+- [Performance](#performance)
+  - [Performance Characteristics](#performance-characteristics)
+  - [Automatic Arc Wrapping (No Manual Arc Needed!)](#automatic-arc-wrapping-no-manual-arc-needed)
+- [Documentation](#documentation)
+- [License](#license)
+- [Contributing](#contributing)
+<!--toc:end-->
+
 ## Features
 
 - **Compile-time type safety**: Dependencies are validated at compile time through the type system. No `dyn Any`, no downcasting, no runtime type errors.
@@ -58,6 +111,7 @@ fmt()
 - **ERROR**: Panics, cycles, type errors
 
 Run with different levels:
+
 ```bash
 RUST_LOG=dagx=info  cargo run    # High-level execution info
 RUST_LOG=dagx=debug cargo run    # Task and layer details
@@ -69,6 +123,7 @@ See [`examples/tracing_example.rs`](examples/tracing_example.rs) for a complete 
 ### Zero-Cost Guarantee
 
 When the `tracing` feature is disabled (the default), there is **literally 0ns overhead**:
+
 - Logging code is removed at compile time via `#[cfg(feature = "tracing")]`
 - No branches, no function calls, nothing
 - The `tracing` crate isn't even linked
