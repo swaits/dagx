@@ -238,7 +238,13 @@ impl DagRunner {
     ///
     /// # Errors
     ///
-    /// Returns `DagError::CycleDetected` if the DAG contains a cycle.
+    /// - Returns `DagError::ConcurrentExecution` if the DAG is already executing
+    /// - Returns `DagError::TaskPanicked` if any task panics during execution
+    ///
+    /// # Note on Cycles
+    ///
+    /// Cycles are impossible via the public API due to compile-time prevention.
+    /// See the [`crate::cycle_prevention`] module for details.
     ///
     /// # Examples
     ///
