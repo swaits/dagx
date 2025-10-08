@@ -294,11 +294,7 @@ impl DagRunner {
             #[cfg(feature = "tracing")]
             error!("DAG is already running - concurrent execution not supported");
 
-            return Err(DagError::CycleDetected {
-                nodes: vec![],
-                description: "DAG is already running - concurrent execution not supported"
-                    .to_string(),
-            });
+            return Err(DagError::ConcurrentExecution);
         }
 
         // Guard ensures lock is released on drop (even on early return or panic)
@@ -609,7 +605,6 @@ impl DagRunner {
 
         // Calculate in-degrees: for each node, count how many dependencies it has
         let edges = self.edges.lock();
-        let total_nodes = edges.len();
 
         for (&node, deps) in edges.iter() {
             let degree = deps.len();
@@ -661,31 +656,8 @@ impl DagRunner {
             }
         }
 
-        // Cycle detection: if we haven't visited all nodes, there's a cycle
-        if visited.len() != total_nodes {
-            let unvisited: Vec<_> = in_degree
-                .iter()
-                .filter(|(node, _)| !visited.contains(node))
-                .map(|(node, _)| node.0)
-                .collect();
-            let description = format!(
-                "{} node(s) could not be processed: {:?}",
-                unvisited.len(),
-                unvisited
-            );
-
-            #[cfg(feature = "tracing")]
-            error!(
-                unvisited_count = unvisited.len(),
-                unvisited_nodes = ?unvisited,
-                "cycle detected in DAG"
-            );
-
-            return Err(DagError::CycleDetected {
-                nodes: unvisited,
-                description,
-            });
-        }
+        // Cycle detection removed: cycles are impossible via the public API.
+        // See src/cycle_prevention.rs for proof that the type system prevents cycles.
 
         #[cfg(feature = "tracing")]
         debug!(layer_count = layers.len(), "topological layers computed");

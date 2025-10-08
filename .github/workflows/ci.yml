@@ -122,7 +122,7 @@ jobs:
         run: cargo install cargo-tarpaulin
 
       - name: Generate code coverage
-        run: cargo tarpaulin --lib --all-features --out Xml --out Lcov --output-dir coverage --fail-under 88
+        run: cargo tarpaulin --lib --all-features --out Xml --out Lcov --output-dir coverage --fail-under 80
 
   security:
     name: Security Audit

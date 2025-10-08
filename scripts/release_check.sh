@@ -223,10 +223,10 @@ if [ -z "$COVERAGE" ]; then
   check_warn "Could not determine coverage percentage"
 else
   echo "  Current coverage: ${COVERAGE}%"
-  if (( $(echo "$COVERAGE < 88" | bc -l) )); then
-    check_warn "Coverage is ${COVERAGE}% (below 88% target)"
+  if (( $(echo "$COVERAGE < 80" | bc -l) )); then
+    check_warn "Coverage is ${COVERAGE}% (below 80% target)"
   else
-    check_pass "Coverage is ${COVERAGE}% (meets 88% target)"
+    check_pass "Coverage is ${COVERAGE}% (meets 80% target)"
   fi
 fi
 

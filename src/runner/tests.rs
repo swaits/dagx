@@ -168,10 +168,16 @@ async fn test_concurrent_run_protection() {
 
     // The error should be about concurrent execution
     if result1.is_err() {
-        assert!(matches!(result1.unwrap_err(), crate::error::DagError::CycleDetected { ref description, .. } if description.contains("already running")));
+        assert!(matches!(
+            result1.unwrap_err(),
+            crate::error::DagError::ConcurrentExecution
+        ));
     }
     if result2.is_err() {
-        assert!(matches!(result2.unwrap_err(), crate::error::DagError::CycleDetected { ref description, .. } if description.contains("already running")));
+        assert!(matches!(
+            result2.unwrap_err(),
+            crate::error::DagError::ConcurrentExecution
+        ));
     }
 }
 

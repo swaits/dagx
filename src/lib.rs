@@ -5,16 +5,17 @@
 //!
 //! # Features
 //!
+//! - **Compile-time cycle prevention**: The type system makes cycles **impossible**—no runtime
+//!   cycle detection needed! See [`cycle_prevention`] module for detailed explanation and proof.
 //! - **Compile-time type safety**: Dependencies are validated at compile time through the type
 //!   system. The public API is fully type-safe with no runtime type errors. Internal execution
 //!   uses type erasure for heterogeneous task storage, but this is never exposed to users.
 //! - **Runtime-agnostic**: Works with any async runtime (Tokio, async-std, smol, Embassy, etc.)
 //! - **Type-state pattern**: The API guides you with compile-time errors if you wire dependencies
-//!   incorrectly
+//!   incorrectly. This is what prevents cycles at compile time.
 //! - **Optimal execution**: Topological scheduling with maximum safe parallelism
 //! - **Zero-cost abstractions**: Leverages generics and monomorphization for minimal overhead
-//! - **Error handling**: Result-based error handling with [`DagResult<T>`] for cycle detection
-//!   and validation
+//! - **Error handling**: Result-based error handling with [`DagResult<T>`] for validation
 //!
 //! # Quick Start
 //!
@@ -470,7 +471,8 @@
 //! dagx uses [`DagResult<T>`] (an alias for `Result<T, DagError>`) for operations that
 //! can fail:
 //!
-//! - [`DagRunner::run`] returns `DagResult<()>` and can fail if a cycle is detected
+//! - [`DagRunner::run`] returns `DagResult<()>` and can fail if tasks panic or if multiple
+//!   concurrent runs are attempted
 //! - [`DagRunner::get`] returns `DagResult<T>` and can fail if the task hasn't executed or
 //!   the handle is invalid
 //!
@@ -688,7 +690,7 @@
 //! - **INFO**: DAG execution start/completion
 //! - **DEBUG**: Task additions, dependency wiring, layer computation
 //! - **TRACE**: Individual task execution (inline vs spawned), detailed execution flow
-//! - **ERROR**: Panics, cycles, type errors
+//! - **ERROR**: Task panics, concurrent execution attempts
 //!
 //! Control log level with the `RUST_LOG` environment variable:
 //!
@@ -717,6 +719,7 @@
 
 // Module declarations
 mod builder;
+pub mod cycle_prevention;
 mod deps;
 mod error;
 mod extract;

@@ -5,11 +5,6 @@
 /// Errors that can occur during DAG construction and execution
 #[derive(Debug, Clone, PartialEq)]
 pub enum DagError {
-    /// A cycle was detected in the DAG
-    CycleDetected {
-        nodes: Vec<usize>,
-        description: String,
-    },
     /// Invalid dependency: task does not exist
     InvalidDependency { task_id: usize },
     /// Type mismatch in task dependencies
@@ -24,22 +19,13 @@ pub enum DagError {
     },
     /// Result not found for task
     ResultNotFound { task_id: usize },
+    /// Attempted to run the DAG while it's already running
+    ConcurrentExecution,
 }
 
 impl std::fmt::Display for DagError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            DagError::CycleDetected { nodes, description } => {
-                write!(
-                    f,
-                    "Cycle detected in DAG: {}\n\
-                     Nodes involved: {:?}\n\
-                     \n\
-                     A DAG cannot have cycles. Review your dependency graph to identify \
-                     and remove circular dependencies.",
-                    description, nodes
-                )
-            }
             DagError::InvalidDependency { task_id } => {
                 write!(
                     f,
@@ -79,6 +65,14 @@ impl std::fmt::Display for DagError {
                      \n\
                      Call dag.run() before accessing results with get().",
                     task_id
+                )
+            }
+            DagError::ConcurrentExecution => {
+                write!(
+                    f,
+                    "DAG is already running - concurrent execution not supported.\n\
+                     \n\
+                     Wait for the current execution to complete before starting another."
                 )
             }
         }

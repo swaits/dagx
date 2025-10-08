@@ -45,20 +45,6 @@ fn test_dag_error_display_task_panicked() {
 }
 
 #[test]
-fn test_dag_error_display_cycle_detected() {
-    let err = DagError::CycleDetected {
-        nodes: vec![1, 2, 3, 1],
-        description: "A->B->C->A".to_string(),
-    };
-    let display = format!("{}", err);
-
-    assert!(display.contains("Cycle detected"));
-    assert!(display.contains("A->B->C->A"));
-    assert!(display.contains("[1, 2, 3, 1]"));
-    assert!(display.contains("cannot have cycles"));
-}
-
-#[test]
 fn test_dag_error_display_result_not_found() {
     let err = DagError::ResultNotFound { task_id: 7 };
     let display = format!("{}", err);
@@ -66,6 +52,16 @@ fn test_dag_error_display_result_not_found() {
     assert!(display.contains("Result not found"));
     assert!(display.contains("task #7"));
     assert!(display.contains("Call dag.run()"));
+}
+
+#[test]
+fn test_dag_error_display_concurrent_execution() {
+    let err = DagError::ConcurrentExecution;
+    let display = format!("{}", err);
+
+    assert!(display.contains("already running"));
+    assert!(display.contains("concurrent execution not supported"));
+    assert!(display.contains("Wait for the current execution"));
 }
 
 #[test]
