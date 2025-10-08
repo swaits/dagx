@@ -7,7 +7,7 @@ set -e
 # =============================================================================
 # CONFIGURATION
 # =============================================================================
-VERSION="0.2.1"
+VERSION="0.2.2"
 
 echo "=================="
 echo "dagx Release Check"
@@ -136,6 +136,9 @@ grep -q "# dagx" README.md || check_fail "README.md title incorrect"
 grep -q "https://crates.io/crates/dagx" README.md || check_fail "README.md crates.io badge incorrect"
 grep -q "https://docs.rs/dagx" README.md || check_fail "README.md docs.rs badge incorrect"
 grep -q "https://github.com/swaits/dagx" README.md || check_fail "README.md GitHub URL incorrect"
+# Extract major.minor version (e.g., "0.2.1" -> "0.2")
+MAJOR_MINOR=$(echo "$VERSION" | cut -d'.' -f1-2)
+grep -q "dagx = \"$MAJOR_MINOR\"" README.md || check_fail "README.md dependency version not \"$MAJOR_MINOR\" (found: $(grep 'dagx = ' README.md | head -1))"
 check_pass "README.md looks perfect"
 
 echo ""
