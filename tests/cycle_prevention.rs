@@ -58,7 +58,7 @@ fn test_handle_is_immutable_reference() {
     // TaskHandle is Copy/Clone - just an ID wrapper
     let _copy1 = handle;
     let _copy2 = handle;
-    let _copy3 = handle.clone();
+    let _copy3 = handle;
 
     // But TaskHandle has NO methods to modify the DAG
     // There's no way to add dependencies to it
@@ -108,7 +108,7 @@ fn test_ordering_prevents_cycles() {
 
     // Let's create a valid DAG instead: A→B (B depends on A)
     let a_handle: TaskHandle<i32> = a_builder.into(); // A has no deps (unit input)
-    let _b_handle = b_builder.depends_on(&a_handle);
+    let _b_handle = b_builder.depends_on(a_handle);
     // Now we could try: a_handle.depends_on(&b_handle)?
     // But TaskHandle has no such method!
 }
