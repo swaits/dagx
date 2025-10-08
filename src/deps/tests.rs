@@ -12,6 +12,7 @@ struct TestTask {
 
 #[crate::task]
 impl TestTask {
+    #[cfg(not(tarpaulin_include))]
     async fn run(&self) -> i32 {
         self.value
     }
@@ -22,6 +23,7 @@ struct TestTaskWithInput;
 #[crate::task]
 impl TestTaskWithInput {
     #[allow(dead_code)]
+    #[cfg(not(tarpaulin_include))]
     async fn run(input: &i32) -> i32 {
         input * 2
     }
@@ -195,4 +197,20 @@ fn test_deps_tuple_large_tuples() {
     for (i, node_id) in node_ids.iter().enumerate().take(8) {
         assert_eq!(*node_id, NodeId(i));
     }
+}
+
+#[test]
+fn test_deps_handle_ref_explicit() {
+    // Test explicit &TaskHandle DepsTuple impl (line 27-28 in deps.rs)
+    let handle: TaskHandle<i32> = TaskHandle {
+        id: NodeId(77),
+        _phantom: std::marker::PhantomData,
+    };
+
+    // Create a reference and explicitly call to_node_ids
+    let handle_ref = &handle;
+    let node_ids = DepsTuple::<i32>::to_node_ids(handle_ref);
+
+    assert_eq!(node_ids.len(), 1);
+    assert_eq!(node_ids[0], NodeId(77));
 }

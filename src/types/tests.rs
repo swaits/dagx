@@ -1,5 +1,6 @@
 //! Unit tests for types module
 
+use crate::task::Task;
 use crate::types::{NodeId, TaskHandle};
 use std::marker::PhantomData;
 
@@ -95,4 +96,55 @@ fn test_task_handle_with_different_types() {
     let _ = int_handle;
     let _ = string_handle;
     let _ = vec_handle;
+}
+
+#[test]
+fn test_task_handle_explicit_clone() {
+    // Test explicit .clone() call to cover line 47-48
+    let handle: TaskHandle<i32> = TaskHandle {
+        id: NodeId(42),
+        _phantom: PhantomData,
+    };
+
+    #[allow(clippy::clone_on_copy)]
+    let cloned = handle.clone();
+    assert_eq!(handle.id.0, cloned.id.0);
+    assert_eq!(cloned.id.0, 42);
+}
+
+#[test]
+fn test_task_builder_from_conversion() {
+    use crate::runner::DagRunner;
+
+    // Test From<TaskBuilder> for TaskHandle (line 69-74)
+    struct SimpleTask;
+    #[crate::task]
+    impl SimpleTask {
+        async fn run(&self) -> i32 {
+            42
+        }
+    }
+
+    let dag = DagRunner::new();
+    let builder = dag.add_task(SimpleTask);
+    let builder_id = builder.id;
+
+    // This conversion uses the From implementation
+    let handle: TaskHandle<i32> = builder.into();
+    assert_eq!(handle.id, builder_id);
+}
+
+#[test]
+fn test_task_handle_ref_from_conversion() {
+    // Test From<&TaskHandle<T>> for TaskHandle<T> (line 90-93)
+    let handle: TaskHandle<String> = TaskHandle {
+        id: NodeId(123),
+        _phantom: PhantomData,
+    };
+
+    let handle_ref = &handle;
+    let converted: TaskHandle<String> = handle_ref.into();
+
+    assert_eq!(converted.id.0, 123);
+    assert_eq!(handle.id, converted.id);
 }

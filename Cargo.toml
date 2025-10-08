@@ -18,7 +18,7 @@ categories = ["asynchronous", "concurrency", "data-structures"]
 exclude = [".claude/", ".jj/", "dagx-spec.md"]
 
 [lints.rust]
-unexpected_cfgs = { level = "warn", check-cfg = ['cfg(tarpaulin)'] }
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(tarpaulin)', 'cfg(tarpaulin_include)'] }
 
 [dependencies]
 futures = "0.3"

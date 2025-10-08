@@ -11,6 +11,7 @@ struct TestTask {
 
 #[crate::task]
 impl TestTask {
+    #[cfg(not(tarpaulin_include))]
     async fn run(&self) -> i32 {
         self.value
     }
@@ -20,6 +21,7 @@ struct TestTaskWithInput;
 
 #[crate::task]
 impl TestTaskWithInput {
+    #[cfg(not(tarpaulin_include))]
     async fn run(input: &i32) -> i32 {
         input * 2
     }

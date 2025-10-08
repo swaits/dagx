@@ -162,3 +162,188 @@ async fn test_multiple_sinks() {
     assert_eq!(dag.get(sink1).unwrap(), 21); // (10 * 2) + 1
     assert_eq!(dag.get(sink2).unwrap(), 45); // (10 + 5) * 3
 }
+
+#[tokio::test]
+async fn test_single_task_inline_path() {
+    // Test single-task layer inline execution path (line 367-410 in runner.rs)
+    let dag = DagRunner::new();
+
+    // Single task in its own layer
+    let t1 = dag.add_task(task_fn(|_: ()| async { 10 }));
+    let t2 = dag
+        .add_task(task_fn(|x: i32| async move { x * 2 }))
+        .depends_on(&t1);
+    let t3 = dag
+        .add_task(task_fn(|x: i32| async move { x + 5 }))
+        .depends_on(t2);
+
+    dag.run(|fut| {
+        tokio::spawn(fut);
+    })
+    .await
+    .unwrap();
+
+    assert_eq!(dag.get(t3).unwrap(), 25); // (10 * 2) + 5
+}
+
+#[tokio::test]
+async fn test_multi_task_spawn_path() {
+    // Test multi-task layer spawn path (line 411-456 in runner.rs)
+    let dag = DagRunner::new();
+
+    let source = dag.add_task(task_fn(|_: ()| async { 100 }));
+
+    // Create multiple tasks in the same layer (all depend on source)
+    let t1 = dag
+        .add_task(task_fn(|x: i32| async move { x + 1 }))
+        .depends_on(&source);
+    let t2 = dag
+        .add_task(task_fn(|x: i32| async move { x + 2 }))
+        .depends_on(&source);
+    let t3 = dag
+        .add_task(task_fn(|x: i32| async move { x + 3 }))
+        .depends_on(&source);
+
+    dag.run(|fut| {
+        tokio::spawn(fut);
+    })
+    .await
+    .unwrap();
+
+    assert_eq!(dag.get(t1).unwrap(), 101);
+    assert_eq!(dag.get(t2).unwrap(), 102);
+    assert_eq!(dag.get(t3).unwrap(), 103);
+}
+
+#[tokio::test]
+async fn test_producer_consumer_channels() {
+    // Test channel creation and management (lines 301-337 in runner.rs)
+    let dag = DagRunner::new();
+
+    // Producer
+    let producer = dag.add_task(task_fn(|_: ()| async { vec![1, 2, 3, 4, 5] }));
+
+    // Consumer
+    let consumer = dag
+        .add_task(task_fn(
+            |data: Vec<i32>| async move { data.iter().sum::<i32>() },
+        ))
+        .depends_on(&producer);
+
+    dag.run(|fut| {
+        tokio::spawn(fut);
+    })
+    .await
+    .unwrap();
+
+    assert_eq!(dag.get(consumer).unwrap(), 15);
+}
+
+#[tokio::test]
+async fn test_multi_consumer_fanout() {
+    // Test fanout with multiple consumers from one producer (channel creation)
+    let dag = DagRunner::new();
+
+    let producer = dag.add_task(task_fn(|_: ()| async { 42 }));
+
+    // Multiple consumers
+    let c1 = dag
+        .add_task(task_fn(|x: i32| async move { x * 2 }))
+        .depends_on(&producer);
+    let c2 = dag
+        .add_task(task_fn(|x: i32| async move { x + 10 }))
+        .depends_on(&producer);
+    let c3 = dag
+        .add_task(task_fn(|x: i32| async move { x - 5 }))
+        .depends_on(&producer);
+
+    dag.run(|fut| {
+        tokio::spawn(fut);
+    })
+    .await
+    .unwrap();
+
+    assert_eq!(dag.get(c1).unwrap(), 84);
+    assert_eq!(dag.get(c2).unwrap(), 52);
+    assert_eq!(dag.get(c3).unwrap(), 37);
+}
+
+#[tokio::test]
+async fn test_compute_layers_with_dependents_tracking() {
+    // Test layer computation with dependent tracking (lines 590-600 in runner.rs)
+    let dag = DagRunner::new();
+
+    // Create diamond pattern to ensure dependents are tracked correctly
+    let source = dag.add_task(task_fn(|_: ()| async { 1 }));
+
+    let left = dag
+        .add_task(task_fn(|x: i32| async move { x + 1 }))
+        .depends_on(&source);
+    let right = dag
+        .add_task(task_fn(|x: i32| async move { x + 2 }))
+        .depends_on(&source);
+
+    let sink = dag
+        .add_task(task_fn(|(l, r): (i32, i32)| async move { l + r }))
+        .depends_on((&left, &right));
+
+    dag.run(|fut| {
+        tokio::spawn(fut);
+    })
+    .await
+    .unwrap();
+
+    assert_eq!(dag.get(sink).unwrap(), 5); // (1+1) + (1+2) = 5
+}
+
+#[tokio::test]
+async fn test_layer_execution_order() {
+    // Test that layers execute in correct topological order
+    use parking_lot::Mutex;
+    use std::sync::Arc;
+
+    let execution_order = Arc::new(Mutex::new(Vec::new()));
+
+    let dag = DagRunner::new();
+
+    let order1 = execution_order.clone();
+    let t1 = dag.add_task(task_fn(move |_: ()| {
+        let order = order1.clone();
+        async move {
+            order.lock().push(1);
+            1
+        }
+    }));
+
+    let order2 = execution_order.clone();
+    let t2 = dag
+        .add_task(task_fn(move |x: i32| {
+            let order = order2.clone();
+            async move {
+                order.lock().push(2);
+                x + 1
+            }
+        }))
+        .depends_on(&t1);
+
+    let order3 = execution_order.clone();
+    let t3 = dag
+        .add_task(task_fn(move |x: i32| {
+            let order = order3.clone();
+            async move {
+                order.lock().push(3);
+                x + 1
+            }
+        }))
+        .depends_on(t2);
+
+    dag.run(|fut| {
+        tokio::spawn(fut);
+    })
+    .await
+    .unwrap();
+
+    let order = execution_order.lock().clone();
+    assert_eq!(order, vec![1, 2, 3]);
+    assert_eq!(dag.get(t3).unwrap(), 3);
+}

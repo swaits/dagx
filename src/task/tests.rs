@@ -100,8 +100,6 @@ async fn test_custom_task_implementation() {
 fn assert_task_bounds<T: Task>() {
     // This function just checks that T implements Task with the right bounds
     fn assert_send<T: Send>() {}
-    #[allow(dead_code)]
-    fn assert_send_future<F: Future + Send>(_: &F) {}
 
     // These should compile if bounds are correct
     assert_send::<T>();
@@ -152,4 +150,16 @@ async fn test_task_fn_with_option_type() {
     });
 
     assert_eq!(task.run(5).await, Some(10));
+}
+
+#[tokio::test]
+async fn test_task_fn_explicit_trait_call() {
+    // Test explicit Task trait method call to cover line 121
+    use crate::task::Task;
+
+    let task = task_fn(|x: i32| async move { x * 3 });
+
+    // Explicitly call the Task trait's run method
+    let result = Task::run(task, 10).await;
+    assert_eq!(result, 30);
 }

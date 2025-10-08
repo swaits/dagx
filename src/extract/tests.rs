@@ -17,6 +17,7 @@ struct TestTask {
 #[crate::task]
 #[allow(dead_code)]
 impl TestTask {
+    #[cfg(not(tarpaulin_include))]
     async fn run(&self) -> i32 {
         self.value
     }
@@ -28,6 +29,7 @@ struct TestTaskWithInput;
 #[crate::task]
 #[allow(dead_code)]
 impl TestTaskWithInput {
+    #[cfg(not(tarpaulin_include))]
     async fn run(input: &i32) -> i32 {
         input * 2
     }
@@ -291,4 +293,118 @@ async fn test_extract_arc_type() {
     let result = Arc::<String>::extract_from_channels(deps).await;
     assert!(result.is_ok());
     assert_eq!(*result.unwrap(), *test_arc_clone);
+}
+
+// Error path tests for ExtractInput implementations
+use std::collections::HashMap;
+
+#[tokio::test]
+async fn test_hashmap_extract_wrong_dependency_count() {
+    let deps = vec![
+        Box::new(oneshot::channel::<Arc<HashMap<String, i32>>>().1) as Box<dyn Any + Send>,
+        Box::new(oneshot::channel::<Arc<HashMap<String, i32>>>().1) as Box<dyn Any + Send>,
+    ];
+
+    let result = HashMap::<String, i32>::extract_from_channels(deps).await;
+    assert!(result.is_err());
+    assert!(result.unwrap_err().contains("Expected 1 dependency, got 2"));
+}
+
+#[tokio::test]
+async fn test_hashmap_extract_type_mismatch() {
+    let (tx, rx) = oneshot::channel::<Arc<String>>();
+    tokio::spawn(async move {
+        let _ = tx.send(Arc::new("wrong type".to_string()));
+    });
+
+    let deps = vec![Box::new(rx) as Box<dyn Any + Send>];
+    let result = HashMap::<String, i32>::extract_from_channels(deps).await;
+    assert!(result.is_err());
+    assert!(result.unwrap_err().contains("Type mismatch"));
+}
+
+#[tokio::test]
+async fn test_hashmap_extract_channel_closed() {
+    let (tx, rx) = oneshot::channel::<Arc<HashMap<String, i32>>>();
+    drop(tx);
+
+    let deps = vec![Box::new(rx) as Box<dyn Any + Send>];
+    let result = HashMap::<String, i32>::extract_from_channels(deps).await;
+    assert!(result.is_err());
+    assert!(result.unwrap_err().contains("Channel closed"));
+}
+
+#[tokio::test]
+async fn test_result_extract_downcast_failure() {
+    let (tx, rx) = oneshot::channel::<Arc<String>>();
+    tokio::spawn(async move {
+        let _ = tx.send(Arc::new("wrong".to_string()));
+    });
+
+    let deps = vec![Box::new(rx) as Box<dyn Any + Send>];
+    let result = Result::<i32, String>::extract_from_channels(deps).await;
+    assert!(result.is_err());
+    assert!(result.unwrap_err().contains("Type mismatch"));
+}
+
+#[tokio::test]
+async fn test_option_extract_downcast_failure() {
+    let (tx, rx) = oneshot::channel::<Arc<String>>();
+    tokio::spawn(async move {
+        let _ = tx.send(Arc::new("wrong".to_string()));
+    });
+
+    let deps = vec![Box::new(rx) as Box<dyn Any + Send>];
+    let result = Option::<i32>::extract_from_channels(deps).await;
+    assert!(result.is_err());
+    assert!(result.unwrap_err().contains("Type mismatch"));
+}
+
+#[tokio::test]
+async fn test_vec_extract_downcast_failure() {
+    let (tx, rx) = oneshot::channel::<Arc<String>>();
+    tokio::spawn(async move {
+        let _ = tx.send(Arc::new("wrong".to_string()));
+    });
+
+    let deps = vec![Box::new(rx) as Box<dyn Any + Send>];
+    let result = Vec::<i32>::extract_from_channels(deps).await;
+    assert!(result.is_err());
+    assert!(result.unwrap_err().contains("Type mismatch"));
+}
+
+#[tokio::test]
+async fn test_arc_extract_wrong_dependency_count() {
+    let deps = vec![];
+    let result = Arc::<i32>::extract_from_channels(deps).await;
+    assert!(result.is_err());
+    assert!(result.unwrap_err().contains("Expected 1 dependency, got 0"));
+}
+
+#[tokio::test]
+async fn test_arc_extract_downcast_failure() {
+    let (tx, rx) = oneshot::channel::<Arc<String>>();
+    tokio::spawn(async move {
+        let _ = tx.send(Arc::new("wrong".to_string()));
+    });
+
+    let deps = vec![Box::new(rx) as Box<dyn Any + Send>];
+    let result = Arc::<i32>::extract_from_channels(deps).await;
+    assert!(result.is_err());
+    assert!(result.unwrap_err().contains("Type mismatch"));
+}
+
+#[tokio::test]
+async fn test_tuple_wrong_dependency_count() {
+    let deps = vec![
+        Box::new(oneshot::channel::<Arc<i32>>().1) as Box<dyn Any + Send>,
+        Box::new(oneshot::channel::<Arc<i32>>().1) as Box<dyn Any + Send>,
+        Box::new(oneshot::channel::<Arc<i32>>().1) as Box<dyn Any + Send>,
+    ];
+
+    let result = <(i32, i32)>::extract_from_channels(deps).await;
+    assert!(result.is_err());
+    assert!(result
+        .unwrap_err()
+        .contains("Expected 2 dependencies, got 3"));
 }

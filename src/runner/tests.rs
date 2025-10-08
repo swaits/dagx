@@ -115,8 +115,14 @@ async fn test_concurrent_run_protection() {
     let dag1 = Arc::clone(&dag);
     let dag2 = Arc::clone(&dag);
 
+    // Use a barrier to ensure both runs start at exactly the same time
+    let barrier = Arc::new(tokio::sync::Barrier::new(2));
+    let barrier1 = barrier.clone();
+    let barrier2 = barrier.clone();
+
     // Start two runs concurrently
     let handle1 = tokio::spawn(async move {
+        barrier1.wait().await;
         dag1.run(|fut| {
             tokio::spawn(fut);
         })
@@ -124,20 +130,27 @@ async fn test_concurrent_run_protection() {
     });
 
     let handle2 = tokio::spawn(async move {
-        // Give the first run a head start
-        sleep(Duration::from_millis(10)).await;
+        barrier2.wait().await;
         dag2.run(|fut| {
             tokio::spawn(fut);
         })
         .await
     });
 
-    // First should succeed, second should fail (concurrent execution not supported)
+    // One should succeed, one should fail (concurrent execution not supported)
     let result1 = handle1.await.unwrap();
     let result2 = handle2.await.unwrap();
 
-    assert!(result1.is_ok());
-    assert!(result2.is_err()); // Concurrent run() returns error
+    // Exactly one should be ok, one should be err
+    assert!(result1.is_ok() != result2.is_ok());
+
+    // The error should be about concurrent execution
+    if result1.is_err() {
+        matches!(result1.unwrap_err(), crate::error::DagError::CycleDetected { description, .. } if description.contains("already running"));
+    }
+    if result2.is_err() {
+        matches!(result2.unwrap_err(), crate::error::DagError::CycleDetected { description, .. } if description.contains("already running"));
+    }
 }
 
 #[test]
@@ -177,15 +190,6 @@ async fn test_multiple_get_calls() {
     assert_eq!(result1, 100);
     assert_eq!(result2, 100);
     assert_eq!(result3, 100);
-}
-
-struct TaskWithDep;
-#[crate::task]
-impl TaskWithDep {
-    #[allow(dead_code)]
-    async fn run(input: &i32) -> i32 {
-        input * 2
-    }
 }
 
 #[tokio::test]
