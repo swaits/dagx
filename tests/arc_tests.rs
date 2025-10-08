@@ -1091,7 +1091,7 @@ async fn test_arc_mixed_with_non_arc() {
 // ============================================================================
 
 /// Test 16: Arc in parallel execution paths
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 #[cfg_attr(tarpaulin, ignore)] // Timing tests are unreliable with instrumentation overhead
 async fn test_arc_parallel_execution() {
     struct SharedProducer;
