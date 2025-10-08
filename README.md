@@ -4,7 +4,7 @@
 [![Documentation](https://docs.rs/dagx/badge.svg)](https://docs.rs/dagx)
 [![Build Status](https://github.com/swaits/dagx/workflows/CI/badge.svg)](https://github.com/swaits/dagx/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Rust Version](https://img.shields.io/badge/rust-1.78.0+-blue.svg)](https://www.rust-lang.org)
+[![Rust Version](https://img.shields.io/badge/rust-1.81+-blue.svg)](https://www.rust-lang.org)
 
 A minimal, type-safe, runtime-agnostic async DAG (Directed Acyclic Graph) executor with compile-time dependency validation and true parallel execution.
 

@@ -21,7 +21,7 @@ cargo clippy -- -D warnings
 ## Development Setup
 
 **Prerequisites:**
-- Rust 1.78+ (edition 2021)
+- Rust 1.81+ (edition 2021)
 - Git
 
 **Optional tools:**

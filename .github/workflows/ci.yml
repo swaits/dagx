@@ -50,7 +50,7 @@ jobs:
         rust: [stable, nightly]
         include:
           - os: ubuntu-latest
-            rust: "1.78.0"  # MSRV
+            rust: "1.81"  # MSRV
         exclude:
           - rust: nightly
 

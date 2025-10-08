@@ -2,7 +2,7 @@
 name = "dagx-macros"
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.78.0"
+rust-version = "1.81"
 authors = ["Stephen Waits <steve@waits.net>"]
 license = "MIT"
 description = "Procedural macros for dagx"
