@@ -5,7 +5,9 @@ All notable changes to dagx will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.3.0] - 2025-10-08
+
+[View changes](https://github.com/swaits/dagx/compare/v0.2.3...v0.3.0)
 
 ### Added
 
@@ -13,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Comprehensive documentation with `compile_fail` tests proving cycles are impossible
   - New integration test suite `tests/cycle_prevention.rs` demonstrating type-state pattern
   - Documents how the type system prevents cycles at compile-time (zero runtime cost)
+  - Added prominent documentation section in README.md explaining the feature
 
 - **New `DagError::ConcurrentExecution` variant**
   - Replaces misuse of `CycleDetected` for concurrent run protection
@@ -23,14 +26,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Removed `DagError::CycleDetected` error variant**
   - Cycles are provably impossible via the public API due to type-state pattern
   - Removed 24 lines of unreachable cycle detection code from `runner.rs`
-  - Migration: If you were handling `DagError::CycleDetected`, remove that match arm
+  - **Migration**: If you were handling `DagError::CycleDetected`, remove that match arm
   - This error could never occur in practice, so no runtime behavior changes
 
 ### Changed
 
+- **Documentation improvements**
+  - Added comprehensive "Compile-Time Cycle Prevention" section to README.md
+  - Updated lib.rs documentation to highlight cycle prevention as first feature
+  - Fixed rustdoc links in `src/cycle_prevention.rs`
+  - Updated all error documentation references (removed cycle detection)
+  - Added code examples demonstrating type-state pattern
+  - Updated tagline to emphasize compile-time cycle prevention
+
 - **Test coverage improvements**
   - Added `#[cfg(not(tarpaulin_include))]` to untestable type alias
-  - Coverage at ~83% after removing dead code
+  - Coverage at ~83% after removing dead code (target set to 80%)
   - Remaining uncovered lines are primarily tracing macros and unreachable error paths
 
 - **Enhanced CI configuration** (`.github/workflows/ci.yml`)
@@ -39,14 +50,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - New cargo check job for all feature combinations
   - Lint (clippy) now runs on all feature combinations
   - Doc generation for all feature combinations
-  - Coverage threshold lowered to 83% (accounts for removal of dead code and tracing macros)
+  - Coverage threshold set to 80% (accounts for tracing macros and unreachable error paths)
 
 - **Release check script improvements** (`scripts/release_check.sh`)
   - Now reads MSRV from `Cargo.toml` instead of hardcoded version
   - Uses `cargo msrv verify` for all feature combinations
   - Tests all feature combinations (no-default, all, default)
   - Runs clippy, check, and tests on all feature combos
-  - Includes coverage verification with 83% threshold
+  - Includes coverage verification with 80% threshold
+
+### Fixed
+
+- **Clippy lints in test code**
+  - Removed unnecessary `.clone()` call on `Copy` type in `tests/cycle_prevention.rs`
+  - Removed unnecessary borrow in test dependency wiring
+
+- **Flaky timing test on macOS CI**
+  - Increased timeout threshold from 140ms to 200ms in `test_arc_parallel_execution`
+  - macOS CI runners are significantly slower than Linux/Windows
+  - 200ms threshold still proves parallelism while accounting for CI variability
 
 ## [0.2.3] - 2025-10-08
 
@@ -233,6 +255,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - macOS (compatible)
 - Windows (compatible)
 
+[0.3.0]: https://github.com/swaits/dagx/tree/v0.3.0
+[0.2.3]: https://github.com/swaits/dagx/tree/v0.2.3
 [0.2.2]: https://github.com/swaits/dagx/tree/v0.2.2
 [0.2.1]: https://github.com/swaits/dagx/tree/v0.2.1
 [0.2.0]: https://github.com/swaits/dagx/tree/v0.2.0

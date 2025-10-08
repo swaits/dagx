@@ -167,7 +167,7 @@ dagx provides optional observability through the `tracing` crate with **zero run
 
 ```toml
 [dependencies]
-dagx = { version = "0.2", features = ["tracing"] }
+dagx = { version = "0.3", features = ["tracing"] }
 tracing-subscriber = "0.3"
 ```
 
@@ -335,7 +335,7 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-dagx = "0.2"
+dagx = "0.3"
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 ```
 
