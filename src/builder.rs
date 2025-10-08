@@ -8,6 +8,9 @@ use crate::runner::DagRunner;
 use crate::task::Task;
 use crate::types::{NodeId, TaskHandle};
 
+#[cfg(feature = "tracing")]
+use tracing::debug;
+
 /// Marker trait to identify the unit type at compile time.
 ///
 /// This is used to enforce that tasks with non-unit inputs MUST call `.depends_on()`,
@@ -131,6 +134,14 @@ impl<'a, Tk: Task, Deps> TaskBuilder<'a, Tk, Deps> {
     {
         // Register dependencies in the DAG
         let dep_ids = deps.to_node_ids();
+
+        #[cfg(feature = "tracing")]
+        debug!(
+            task_id = self.id.0,
+            dependency_ids = ?dep_ids.iter().map(|id| id.0).collect::<Vec<_>>(),
+            dependency_count = dep_ids.len(),
+            "wiring task dependencies"
+        );
 
         let mut edges = self.dag.edges.lock();
         let mut dependents = self.dag.dependents.lock();

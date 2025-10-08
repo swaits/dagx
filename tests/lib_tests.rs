@@ -17,4 +17,5 @@ mod performance;
 mod runtimes;
 mod task_patterns;
 mod timing;
+mod tracing;
 mod type_safety;

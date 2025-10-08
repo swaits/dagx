@@ -655,6 +655,63 @@
 //! Run `cargo bench` to see comprehensive benchmarks including basic operations, scaling
 //! characteristics, common patterns (fan-out, diamond), and realistic workloads.
 //!
+//! # Optional Tracing Support
+//!
+//! dagx provides optional observability through the `tracing` crate with **zero runtime overhead
+//! when disabled**. The tracing instrumentation is conditionally compiled using feature flags.
+//!
+//! ## Enabling Tracing
+//!
+//! Add the `tracing` feature to your `Cargo.toml`:
+//!
+//! ```toml
+//! [dependencies]
+//! dagx = { version = "0.2", features = ["tracing"] }
+//! tracing-subscriber = "0.3"
+//! ```
+//!
+//! Then initialize a tracing subscriber in your application:
+//!
+//! ```no_run
+//! use tracing_subscriber::{fmt, EnvFilter};
+//!
+//! fmt()
+//!     .with_env_filter(
+//!         EnvFilter::try_from_default_env()
+//!             .unwrap_or_else(|_| EnvFilter::new("dagx=info"))
+//!     )
+//!     .init();
+//! ```
+//!
+//! ## Log Levels
+//!
+//! - **INFO**: DAG execution start/completion
+//! - **DEBUG**: Task additions, dependency wiring, layer computation
+//! - **TRACE**: Individual task execution (inline vs spawned), detailed execution flow
+//! - **ERROR**: Panics, cycles, type errors
+//!
+//! Control log level with the `RUST_LOG` environment variable:
+//!
+//! ```bash
+//! RUST_LOG=dagx=info  cargo run    # High-level execution info
+//! RUST_LOG=dagx=debug cargo run    # Task and layer details
+//! RUST_LOG=dagx=trace cargo run    # All execution details
+//! ```
+//!
+//! ## Zero-Cost Guarantee
+//!
+//! When the `tracing` feature is disabled (the default), there is **literally 0ns overhead**:
+//! - Logging code is removed at compile time via `#[cfg(feature = "tracing")]`
+//! - No branches, no function calls, nothing in the compiled binary
+//! - The `tracing` crate isn't even linked
+//! - Benchmarks verify identical performance with/without the feature
+//!
+//! This follows the same zero-cost pattern used by Tokio, Hyper, and other performance-critical
+//! Rust async libraries.
+//!
+//! See [`examples/tracing_example.rs`](https://github.com/swaits/dagx/blob/main/examples/tracing_example.rs)
+//! for a complete working example.
+//!
 
 #![allow(private_bounds, private_interfaces)]
 

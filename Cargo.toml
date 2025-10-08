@@ -17,6 +17,10 @@ keywords = ["dag", "async", "task", "parallel", "executor"]
 categories = ["asynchronous", "concurrency", "data-structures"]
 exclude = [".claude/", ".jj/", "dagx-spec.md"]
 
+[features]
+default = []
+tracing = ["dep:tracing"]
+
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(tarpaulin)', 'cfg(tarpaulin_include)'] }
 
@@ -24,6 +28,7 @@ unexpected_cfgs = { level = "warn", check-cfg = ['cfg(tarpaulin)', 'cfg(tarpauli
 futures = "0.3"
 parking_lot = "0.12"
 dagx-macros = { version = "0.2.2", path = "./dagx-macros" }
+tracing = { version = "0.1", optional = true }
 
 [dev-dependencies]
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "time", "sync"] }
@@ -37,6 +42,8 @@ futures-executor = { version = "0.3", features = ["thread-pool"] }
 # Comparison benchmarks
 dagrs = { version = "0.5", default-features = false }
 async-trait = "0.1"
+# Tracing support for tests and examples
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 
 [[bench]]
 name = "dagx_bench"

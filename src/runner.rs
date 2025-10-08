@@ -17,6 +17,9 @@ use futures::future::BoxFuture;
 use futures::{FutureExt, StreamExt};
 use parking_lot::Mutex;
 
+#[cfg(feature = "tracing")]
+use tracing::{debug, error, info, trace};
+
 use crate::builder::TaskBuilder;
 use crate::error::{DagError, DagResult};
 use crate::extract::ExtractInput;
@@ -197,6 +200,14 @@ impl DagRunner {
         Tk::Output: 'static + Clone,
     {
         let id = self.alloc_id();
+
+        #[cfg(feature = "tracing")]
+        debug!(
+            task_id = id.0,
+            task_type = std::any::type_name::<Tk>(),
+            "adding task to DAG"
+        );
+
         let node = TypedNode::new(id, task);
         self.nodes.lock().push(Some(Box::new(node)));
         self.edges.lock().insert(id, Vec::new());
@@ -266,10 +277,13 @@ impl DagRunner {
     /// This eliminates Mutex contention on outputs and enables true streaming execution.
     /// Type erasure occurs only at the ExecutableNode trait boundary - channels are created
     /// with full type information and type-erased just before passing to execute_with_channels.
+    #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, spawner)))]
     pub async fn run<S>(&self, spawner: S) -> DagResult<()>
     where
         S: Fn(BoxFuture<'static, ()>),
     {
+        #[cfg(feature = "tracing")]
+        info!("starting DAG execution");
         // Acquire run lock to prevent concurrent executions
         // Use atomic compare_exchange to check if already running
         if self
@@ -277,6 +291,9 @@ impl DagRunner {
             .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
             .is_err()
         {
+            #[cfg(feature = "tracing")]
+            error!("DAG is already running - concurrent execution not supported");
+
             return Err(DagError::CycleDetected {
                 nodes: vec![],
                 description: "DAG is already running - concurrent execution not supported"
@@ -291,6 +308,13 @@ impl DagRunner {
 
         // Build topological layers
         let layers = self.compute_layers()?;
+
+        #[cfg(feature = "tracing")]
+        debug!(
+            layer_count = layers.len(),
+            total_tasks = layers.iter().map(|l| l.len()).sum::<usize>(),
+            "computed topological layers"
+        );
 
         let edges = self.edges.lock().clone();
 
@@ -337,7 +361,19 @@ impl DagRunner {
         )>();
 
         // Execute layer by layer
+        #[cfg(feature = "tracing")]
+        let mut layer_idx = 0;
+
         for layer in layers {
+            #[cfg(feature = "tracing")]
+            {
+                debug!(
+                    layer = layer_idx,
+                    task_count = layer.len(),
+                    "executing layer"
+                );
+                layer_idx += 1;
+            }
             // ============================================================================
             // PERFORMANCE OPTIMIZATION: Inline execution for single-task layers
             // ============================================================================
@@ -366,6 +402,13 @@ impl DagRunner {
             // ============================================================================
             if layer.len() == 1 {
                 let node_id = layer[0];
+
+                #[cfg(feature = "tracing")]
+                trace!(
+                    task_id = node_id.0,
+                    "executing task inline (single-task layer optimization)"
+                );
+
                 let out_tx = output_tx.clone();
 
                 // Take ownership of the node
@@ -392,16 +435,25 @@ impl DagRunner {
                         .await
                         .unwrap_or_else(|panic_payload| {
                             // Convert panic to error
+                            let panic_message = if let Some(s) = panic_payload.downcast_ref::<&str>()
+                            {
+                                s.to_string()
+                            } else if let Some(s) = panic_payload.downcast_ref::<String>() {
+                                s.clone()
+                            } else {
+                                "unknown panic".to_string()
+                            };
+
+                            #[cfg(feature = "tracing")]
+                            error!(
+                                task_id = node_id.0,
+                                panic_message = %panic_message,
+                                "task panicked during inline execution"
+                            );
+
                             Err(DagError::TaskPanicked {
                                 task_id: node_id.0,
-                                panic_message: if let Some(s) = panic_payload.downcast_ref::<&str>()
-                                {
-                                    s.to_string()
-                                } else if let Some(s) = panic_payload.downcast_ref::<String>() {
-                                    s.clone()
-                                } else {
-                                    "unknown panic".to_string()
-                                },
+                                panic_message,
                             })
                         });
 
@@ -415,6 +467,8 @@ impl DagRunner {
 
                 // Spawn each task in this layer
                 for &node_id in &layer {
+                    #[cfg(feature = "tracing")]
+                    trace!(task_id = node_id.0, "spawning task");
                     let mut task_tx = tx.clone();
                     let out_tx = output_tx.clone();
 
@@ -480,8 +534,13 @@ impl DagRunner {
 
         // Return first error if any
         if let Some(err) = first_error {
+            #[cfg(feature = "tracing")]
+            error!(?err, "DAG execution failed");
             return Err(err);
         }
+
+        #[cfg(feature = "tracing")]
+        info!("DAG execution completed successfully");
 
         Ok(())
     }
@@ -551,6 +610,9 @@ impl DagRunner {
     }
 
     fn compute_layers(&self) -> DagResult<Vec<Vec<NodeId>>> {
+        #[cfg(feature = "tracing")]
+        debug!("computing topological layers");
+
         let mut in_degree: HashMap<NodeId, usize> = HashMap::new();
         let mut layers = Vec::new();
 
@@ -620,11 +682,22 @@ impl DagRunner {
                 unvisited.len(),
                 unvisited
             );
+
+            #[cfg(feature = "tracing")]
+            error!(
+                unvisited_count = unvisited.len(),
+                unvisited_nodes = ?unvisited,
+                "cycle detected in DAG"
+            );
+
             return Err(DagError::CycleDetected {
                 nodes: unvisited,
                 description,
             });
         }
+
+        #[cfg(feature = "tracing")]
+        debug!(layer_count = layers.len(), "topological layers computed");
 
         Ok(layers)
     }
