@@ -5,6 +5,25 @@ use crate::runner::DagRunner;
 use crate::task::Task;
 use crate::types::TaskHandle;
 
+// Initialize tracing subscriber for tests (idempotent)
+#[cfg(feature = "tracing")]
+fn init_tracing() {
+    use std::sync::Once;
+    static INIT: Once = Once::new();
+    INIT.call_once(|| {
+        tracing_subscriber::fmt()
+            .with_test_writer()
+            .with_max_level(tracing::Level::TRACE)
+            .try_init()
+            .ok();
+    });
+}
+
+#[cfg(not(feature = "tracing"))]
+fn init_tracing() {
+    // No-op when tracing is disabled
+}
+
 struct TestTask {
     value: i32,
 }
@@ -54,6 +73,7 @@ fn test_is_unit_type_trait() {
 
 #[test]
 fn test_task_builder_depends_on_returns_handle() {
+    init_tracing();
     let dag = DagRunner::new();
 
     let source = dag.add_task(TestTask { value: 10 });
@@ -80,6 +100,7 @@ fn test_task_builder_chain() {
 
 #[test]
 fn test_multiple_dependencies() {
+    init_tracing();
     struct AddTask;
 
     #[crate::task]

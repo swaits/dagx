@@ -88,6 +88,7 @@ impl std::fmt::Display for DagError {
 impl std::error::Error for DagError {}
 
 /// Result type for DAG operations
+#[cfg(not(tarpaulin_include))]
 pub type DagResult<T> = Result<T, DagError>;
 
 #[cfg(test)]

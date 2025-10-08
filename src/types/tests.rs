@@ -148,3 +148,25 @@ fn test_task_handle_ref_from_conversion() {
     assert_eq!(converted.id.0, 123);
     assert_eq!(handle.id, converted.id);
 }
+
+#[test]
+fn test_task_builder_ref_from_conversion() {
+    use crate::runner::DagRunner;
+
+    // Test From<&TaskBuilder> for TaskHandle (line 77-87, specifically line 83)
+    struct SimpleTask2;
+    #[crate::task]
+    impl SimpleTask2 {
+        async fn run(&self) -> String {
+            "test".to_string()
+        }
+    }
+
+    let dag = DagRunner::new();
+    let builder = dag.add_task(SimpleTask2);
+    let builder_id = builder.id;
+
+    // This conversion uses the From<&TaskBuilder> implementation
+    let handle: TaskHandle<String> = (&builder).into();
+    assert_eq!(handle.id, builder_id);
+}

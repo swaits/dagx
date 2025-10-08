@@ -50,8 +50,8 @@ section "PRE-FLIGHT CHECKS"
 echo "→ Checking Rust version..."
 RUST_VERSION=$(rustc --version | awk '{print $2}')
 echo "  Current: $RUST_VERSION"
-REQUIRED_VERSION="1.85.0"
-echo "  Required (MSRV): $REQUIRED_VERSION"
+MSRV=$(grep '^rust-version' Cargo.toml | cut -d'"' -f2)
+echo "  Required (MSRV from Cargo.toml): $MSRV"
 check_pass "Rust version compatible"
 
 echo ""
@@ -96,6 +96,60 @@ else
 fi
 
 # =============================================================================
+# MSRV VERIFICATION
+# =============================================================================
+
+section "MSRV VERIFICATION"
+
+echo "→ Verifying MSRV with no features..."
+cargo msrv verify --no-default-features || check_fail "MSRV check failed (no features)"
+check_pass "MSRV verified (no features)"
+
+echo ""
+echo "→ Verifying MSRV with all features..."
+cargo msrv verify --all-features || check_fail "MSRV check failed (all features)"
+check_pass "MSRV verified (all features)"
+
+echo ""
+echo "→ Verifying MSRV with default features..."
+cargo msrv verify || check_fail "MSRV check failed (default features)"
+check_pass "MSRV verified (default features)"
+
+# =============================================================================
+# FEATURE COMBINATION TESTING
+# =============================================================================
+
+section "FEATURE COMBINATION TESTING"
+
+echo "→ Testing with no features..."
+cargo test --lib --no-default-features || check_fail "Tests failed (no features)"
+check_pass "Tests pass (no features)"
+
+echo ""
+echo "→ Testing with all features..."
+cargo test --lib --all-features || check_fail "Tests failed (all features)"
+check_pass "Tests pass (all features)"
+
+echo ""
+echo "→ Testing with default features..."
+cargo test --lib || check_fail "Tests failed (default features)"
+check_pass "Tests pass (default features)"
+
+echo ""
+echo "→ Clippy with all feature combinations..."
+cargo clippy --all-targets --no-default-features -- -D warnings || check_fail "Clippy failed (no features)"
+cargo clippy --all-targets --all-features -- -D warnings || check_fail "Clippy failed (all features)"
+cargo clippy --all-targets -- -D warnings || check_fail "Clippy failed (default features)"
+check_pass "Clippy clean across all feature combinations"
+
+echo ""
+echo "→ Cargo check with all feature combinations..."
+cargo check --no-default-features || check_fail "Check failed (no features)"
+cargo check --all-features || check_fail "Check failed (all features)"
+cargo check || check_fail "Check failed (default features)"
+check_pass "Cargo check passes across all feature combinations"
+
+# =============================================================================
 # TESTING
 # =============================================================================
 
@@ -106,14 +160,18 @@ cargo test --lib || check_fail "Library unit tests failed"
 check_pass "Library unit tests pass (70 tests)"
 
 echo ""
-echo "→ Running integration tests..."
-cargo test --test '*' 2>&1 | grep "test result" || check_fail "Integration tests failed"
-check_pass "Integration tests pass (280+ tests total)"
+echo "→ Running integration tests with all feature combinations..."
+cargo test --test '*' --no-default-features || check_fail "Integration tests failed (no features)"
+cargo test --test '*' --all-features || check_fail "Integration tests failed (all features)"
+cargo test --test '*' || check_fail "Integration tests failed (default features)"
+check_pass "Integration tests pass across all feature combinations (280+ tests total)"
 
 echo ""
-echo "→ Running doc tests..."
-cargo test --doc || check_fail "Doc tests failed"
-check_pass "Doc tests pass"
+echo "→ Running doc tests with all features..."
+cargo test --doc --all-features || check_fail "Doc tests failed (all features)"
+cargo test --doc --no-default-features || check_fail "Doc tests failed (no features)"
+cargo test --doc || check_fail "Doc tests failed (default features)"
+check_pass "Doc tests pass across all feature combinations"
 
 # =============================================================================
 # DOCUMENTATION
@@ -152,6 +210,25 @@ echo "→ Verifying LICENSE..."
 [ -f LICENSE ] || check_fail "LICENSE missing"
 [ -f dagx-macros/LICENSE ] || check_fail "dagx-macros/LICENSE missing"
 check_pass "LICENSE files present in both crates"
+
+# =============================================================================
+# COVERAGE CHECK
+# =============================================================================
+
+section "COVERAGE CHECK"
+
+echo "→ Running coverage analysis..."
+COVERAGE=$(cargo tarpaulin --lib --all-features --out Stdout 2>&1 | grep -oP '^\d+\.\d+%' | head -1 | sed 's/%//')
+if [ -z "$COVERAGE" ]; then
+  check_warn "Could not determine coverage percentage"
+else
+  echo "  Current coverage: ${COVERAGE}%"
+  if (( $(echo "$COVERAGE < 88" | bc -l) )); then
+    check_warn "Coverage is ${COVERAGE}% (below 88% target)"
+  else
+    check_pass "Coverage is ${COVERAGE}% (meets 88% target)"
+  fi
+fi
 
 # =============================================================================
 # BUILD VERIFICATION
