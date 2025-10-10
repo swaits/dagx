@@ -7,7 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
+## [0.3.1] - 2025-10-10
+
+[View changes](https://github.com/swaits/dagx/compare/v0.3.0...v0.3.1)
+
+### Fixed
 
 - **Custom types now work automatically!** The `#[task]` macro now generates inline `extract_and_run()`
   methods with type-specific extraction logic. This means **ANY type** implementing `Clone + Send + Sync + 'static`
@@ -282,6 +286,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - macOS (compatible)
 - Windows (compatible)
 
+[0.3.1]: https://github.com/swaits/dagx/tree/v0.3.1
 [0.3.0]: https://github.com/swaits/dagx/tree/v0.3.0
 [0.2.3]: https://github.com/swaits/dagx/tree/v0.2.3
 [0.2.2]: https://github.com/swaits/dagx/tree/v0.2.2
