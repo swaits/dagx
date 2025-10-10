@@ -95,3 +95,6 @@ impl<T> From<&TaskHandle<T>> for TaskHandle<T> {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod coverage_tests;

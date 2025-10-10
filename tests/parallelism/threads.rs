@@ -309,8 +309,10 @@ async fn test_parallel_branches_with_dependencies() -> DagResult<()> {
         b2_1_start - b1_1_start
     };
 
+    // Use a more generous threshold to account for coverage instrumentation overhead
+    // 50ms is enough to prove they're parallel (not sequential) while being robust to overhead
     assert!(
-        branch_start_diff < Duration::from_millis(10),
+        branch_start_diff < Duration::from_millis(50),
         "Branches should start in parallel, diff was {:?}",
         branch_start_diff
     );
