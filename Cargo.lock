@@ -434,7 +434,7 @@ dependencies = [
 
 [[package]]
 name = "dagx"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "async-executor",
  "async-std",
@@ -454,7 +454,7 @@ dependencies = [
 
 [[package]]
 name = "dagx-macros"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "proc-macro2",
  "quote",
