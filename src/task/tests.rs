@@ -83,6 +83,17 @@ impl Task for CustomTask {
             self.state
         })
     }
+
+    #[allow(refining_impl_trait)]
+    fn extract_and_run(
+        self,
+        _receivers: Vec<Box<dyn std::any::Any + Send>>,
+    ) -> Pin<Box<dyn Future<Output = Result<Self::Output, String>> + Send>> {
+        Box::pin(async move {
+            // This is a test helper - just return an error
+            Err("extract_and_run not implemented for CustomTask (test helper)".to_string())
+        })
+    }
 }
 
 #[tokio::test]

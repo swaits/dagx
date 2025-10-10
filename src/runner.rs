@@ -22,7 +22,6 @@ use tracing::{debug, error, info, trace};
 
 use crate::builder::TaskBuilder;
 use crate::error::{DagError, DagResult};
-use crate::extract::ExtractInput;
 use crate::node::{ExecutableNode, TypedNode};
 use crate::task::Task;
 use crate::types::{NodeId, Pending, TaskHandle};
@@ -196,7 +195,7 @@ impl DagRunner {
     pub fn add_task<Tk>(&self, task: Tk) -> TaskBuilder<'_, Tk, Pending>
     where
         Tk: Task + 'static,
-        Tk::Input: 'static + Clone + ExtractInput,
+        Tk::Input: 'static + Clone,
         Tk::Output: 'static + Clone,
     {
         let id = self.alloc_id();

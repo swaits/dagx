@@ -93,6 +93,17 @@ pub trait Task: Send {
     type Output: Send + Sync; // Sync required for Arc-wrapping and cross-thread sharing
 
     fn run(self, input: Self::Input) -> impl Future<Output = Self::Output> + Send;
+
+    /// Internal method: Extract input from type-erased channels and execute the task.
+    ///
+    /// This method is implemented automatically by the #[task] macro with inline
+    /// extraction logic based on the task's parameter signature. This allows ANY
+    /// type to work without requiring trait implementations.
+    #[doc(hidden)]
+    fn extract_and_run(
+        self,
+        receivers: Vec<Box<dyn std::any::Any + Send>>,
+    ) -> impl Future<Output = Result<Self::Output, String>> + Send;
 }
 
 /// Convenience function to create a task from a closure.
@@ -104,7 +115,7 @@ pub fn task_fn<I, O, Fut, F>(f: F) -> impl Task<Input = I, Output = O>
 where
     F: FnMut(I) -> Fut + Send + 'static,
     Fut: Future<Output = O> + Send + 'static,
-    I: Send + 'static,
+    I: Send + crate::extract::ExtractInput + 'static,
     O: Send + Sync + 'static,
 {
     struct TaskFn<I, O, Fut, F>
@@ -122,7 +133,7 @@ where
     where
         F: FnMut(I) -> Fut + Send,
         Fut: Future<Output = O> + Send,
-        I: Send,
+        I: Send + crate::extract::ExtractInput,
         O: Send + Sync,
     {
         type Input = I;
@@ -130,6 +141,18 @@ where
 
         async fn run(mut self, input: I) -> O {
             (self.f)(input).await
+        }
+
+        async fn extract_and_run(
+            self,
+            receivers: Vec<Box<dyn std::any::Any + Send>>,
+        ) -> Result<Self::Output, String> {
+            // For task_fn, we use ExtractInput since we don't have macro-generated extraction
+            let input = I::extract_from_channels(receivers)
+                .await
+                .map_err(|e| format!("Failed to extract input: {}", e))?;
+
+            Ok(self.run(input).await)
         }
     }
 

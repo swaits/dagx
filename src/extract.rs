@@ -28,6 +28,11 @@ use futures::channel::oneshot;
 ///
 /// Type erasure occurs only at the ExecutableNode trait boundary - by the time
 /// we're in ExtractInput, we know the concrete type and can safely downcast.
+///
+/// NOTE: This trait is now primarily used by the internal `task_fn` test helper.
+/// The `#[task]` macro generates inline extraction logic via `extract_and_run()`,
+/// which allows ANY type to work without requiring ExtractInput implementations.
+#[allow(dead_code)]
 pub(crate) trait ExtractInput: Sized + Clone {
     fn extract_from_channels(
         receivers: Vec<Box<dyn Any + Send>>,

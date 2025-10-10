@@ -323,6 +323,112 @@ pub fn task(_attr: TokenStream, item: TokenStream) -> TokenStream {
         .iter()
         .any(|arg| matches!(arg, FnArg::Receiver(_)));
 
+    // Generate extract_and_run implementation based on parameter count
+    let extract_and_run_impl = match params.len() {
+        0 => {
+            // Zero parameters - no extraction needed
+            quote! {
+                fn extract_and_run(
+                    self,
+                    _receivers: Vec<Box<dyn std::any::Any + Send>>,
+                ) -> impl std::future::Future<Output = Result<Self::Output, String>> + Send {
+                    async move {
+                        let input = ();
+                        Ok(self.run(input).await)
+                    }
+                }
+            }
+        }
+        1 => {
+            // Single parameter
+            let param_type = &params[0].1;
+            quote! {
+                fn extract_and_run(
+                    self,
+                    mut receivers: Vec<Box<dyn std::any::Any + Send>>,
+                ) -> impl std::future::Future<Output = Result<Self::Output, String>> + Send {
+                    async move {
+                        use futures::channel::oneshot;
+                        use std::sync::Arc;
+
+                        if receivers.len() != 1 {
+                            return Err(format!("Expected 1 dependency, got {}", receivers.len()));
+                        }
+
+                        let rx = *receivers.pop()
+                            .unwrap()
+                            .downcast::<oneshot::Receiver<Arc<#param_type>>>()
+                            .map_err(|_| format!("Type mismatch: expected Arc<{}>", std::any::type_name::<#param_type>()))?;
+
+                        let arc_value = rx.await
+                            .map_err(|_| "Channel closed before receiving value".to_string())?;
+
+                        let input = (*arc_value).clone();
+                        Ok(self.run(input).await)
+                    }
+                }
+            }
+        }
+        _ => {
+            // Multiple parameters
+            let param_count = params.len();
+            let param_types: Vec<_> = params.iter().map(|(_, ty)| ty).collect();
+            let indices: Vec<_> = (0..param_count).collect();
+
+            // Generate unique receiver variable names
+            let rx_vars: Vec<_> = (0..param_count)
+                .map(|i| syn::Ident::new(&format!("rx_{}", i), proc_macro2::Span::call_site()))
+                .collect();
+
+            // Create syn::Index for tuple field access (avoids the suffix warning)
+            let syn_indices: Vec<_> = (0..param_count).map(syn::Index::from).collect();
+
+            quote! {
+                fn extract_and_run(
+                    self,
+                    receivers: Vec<Box<dyn std::any::Any + Send>>,
+                ) -> impl std::future::Future<Output = Result<Self::Output, String>> + Send {
+                    async move {
+                        use futures::channel::oneshot;
+                        use std::sync::Arc;
+
+                        let expected_count = #param_count;
+                        if receivers.len() != expected_count {
+                            return Err(format!("Expected {} dependencies, got {}", expected_count, receivers.len()));
+                        }
+
+                        let mut iter = receivers.into_iter();
+
+                        // Extract each receiver
+                        #(
+                            let #rx_vars = *iter.next()
+                                .ok_or_else(|| format!("Missing receiver at index {}", #indices))?
+                                .downcast::<oneshot::Receiver<Arc<#param_types>>>()
+                                .map_err(|_| format!("Type mismatch at index {}: expected Arc<{}>",
+                                    #indices, std::any::type_name::<#param_types>()))?;
+                        )*
+
+                        // Await all channels concurrently
+                        let arc_results = futures::join!(
+                            #(
+                                async move {
+                                    #rx_vars.await.map_err(|_| format!("Channel {} closed", #indices))
+                                }
+                            ),*
+                        );
+
+                        // Clone inner values and build tuple
+                        let input = (#(
+                            (*arc_results.#syn_indices?).clone()
+                        ),*);
+
+                        Ok(self.run(input).await)
+                    }
+                }
+            }
+        }
+    };
+
     // Generate the Task trait implementation based on whether we have self and async/sync
     let expanded = if has_self_receiver {
         // Stateful task - consumes self but delegates to a method that borrows
@@ -337,6 +443,8 @@ pub fn task(_attr: TokenStream, item: TokenStream) -> TokenStream {
                         let #param_destructure = input;
                         self.run_impl(#param_refs).await
                     }
+
+                    #extract_and_run_impl
                 }
 
                 impl #struct_name {
@@ -354,6 +462,8 @@ pub fn task(_attr: TokenStream, item: TokenStream) -> TokenStream {
                         let #param_destructure = input;
                         self.run_impl(#param_refs)
                     }
+
+                    #extract_and_run_impl
                 }
 
                 impl #struct_name {
@@ -374,6 +484,8 @@ pub fn task(_attr: TokenStream, item: TokenStream) -> TokenStream {
                         let #param_destructure = input;
                         Self::run_impl(#param_refs).await
                     }
+
+                    #extract_and_run_impl
                 }
 
                 impl #struct_name {
@@ -392,6 +504,8 @@ pub fn task(_attr: TokenStream, item: TokenStream) -> TokenStream {
                         let #param_destructure = input;
                         Self::run_impl(#param_refs)
                     }
+
+                    #extract_and_run_impl
                 }
 
                 impl #struct_name {
