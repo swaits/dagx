@@ -12,9 +12,14 @@ use syn::{parse_macro_input, FnArg, ImplItem, ItemImpl, Pat, PatType, ReturnType
 /// Apply this to an `impl` block containing a `run()` method (sync or async). The macro:
 /// - Derives `Input` and `Output` types from the `run()` signature
 /// - Automatically implements the `Task` trait
+/// - **Generates type-specific extraction logic** - works with ANY type (Clone + Send + Sync)!
 /// - Supports both sync and async run methods
 /// - Supports stateless (no self) and stateful (&self, &mut self) tasks
 /// - Handles various input patterns (no inputs, single input, multiple inputs)
+///
+/// **Key Feature**: Custom types work automatically without implementing any traits!
+/// The macro generates inline extraction logic in `extract_and_run()` specific to your
+/// task's parameter types. Just derive `Clone` on your types and they'll work seamlessly.
 ///
 /// # Task Patterns
 ///

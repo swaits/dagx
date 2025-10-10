@@ -5,6 +5,33 @@ All notable changes to dagx will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Custom types now work automatically!** The `#[task]` macro now generates inline `extract_and_run()`
+  methods with type-specific extraction logic. This means **ANY type** implementing `Clone + Send + Sync + 'static`
+  works automatically without implementing any special traits.
+  - Previously, only types with `ExtractInput` implementations worked (primitives, String, Vec, HashMap, etc.)
+  - Now, custom user types work seamlessly - just derive `Clone` and you're good to go!
+  - No `ExtractInput` trait implementation needed for custom types
+  - Nested structs, collections of custom types, and complex type hierarchies all work out of the box
+  - New example: `examples/custom_types.rs` demonstrating custom types flowing through a DAG
+
+### Changed
+
+- **Documentation improvements**
+  - Updated README.md to highlight custom type support as a key feature
+  - Added "Custom Types" section to Core Concepts with examples
+  - Added `custom_types.rs` to the examples list
+  - Updated feature list to emphasize "Works with ANY type"
+
+### Internal
+
+- `ExtractInput` trait is now only used by the internal `task_fn` test helper
+- The `#[task]` macro generates custom extraction logic per task, bypassing `ExtractInput` entirely
+- This architectural change enables ANY type to work without requiring trait implementations
+
 ## [0.3.0] - 2025-10-08
 
 [View changes](https://github.com/swaits/dagx/compare/v0.2.3...v0.3.0)

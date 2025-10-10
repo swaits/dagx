@@ -114,6 +114,7 @@ See [design philosophy](docs/DESIGN_PHILOSOPHY.md) for details.
 
 - **Compile-time cycle prevention**: Type system makes cycles impossible — no runtime checks
 - **Compile-time type safety**: Dependencies validated at compile time, no runtime type errors
+- **Works with ANY type**: Custom types work automatically — just `Clone + Send + Sync`, no trait implementations needed
 - **Runtime-agnostic**: Works with Tokio, async-std, smol, or any async runtime
 - **True parallelism**: Tasks spawn to multiple threads for genuine parallel execution
 - **Type-state pattern**: API prevents incorrect wiring through compile-time errors
@@ -186,6 +187,36 @@ let task = dag.add_task(my_task).depends_on(&upstream);
 let task = dag.add_task(my_task).depends_on((&upstream1, &upstream2));
 ```
 
+### Custom Types
+
+**dagx works with ANY type automatically!** As long as your type implements `Clone + Send + Sync + 'static`, it works seamlessly:
+
+```rust
+#[derive(Clone)]  // Just derive Clone!
+struct User {
+    name: String,
+    age: u32,
+}
+
+#[task]
+impl CreateUser {
+    async fn run(&self) -> User {
+        User { name: "Alice".to_string(), age: 30 }
+    }
+}
+
+#[task]
+impl ProcessUser {
+    async fn run(user: &User) -> String {
+        format!("{} is {} years old", user.name, user.age)
+    }
+}
+```
+
+**No trait implementations needed!** The `#[task]` macro generates type-specific extraction logic automatically. This includes nested structs, collections, enums, and any other type you define.
+
+See [`custom_types.rs`](examples/custom_types.rs) for a complete example with nested custom types.
+
 ### Runtime Agnostic
 
 dagx works with any async runtime. Provide a spawner function to `run()`:
@@ -228,6 +259,7 @@ Real-world patterns:
 - [`circuit_breaker.rs`](examples/circuit_breaker.rs) - Circuit breaker pattern for resilient systems
 - [`complex_dag.rs`](examples/complex_dag.rs) - Multi-layer workflows with complex dependencies
 - [`conditional_workflow.rs`](examples/conditional_workflow.rs) - Conditional execution with Result types
+- [`custom_types.rs`](examples/custom_types.rs) - Using your own custom types (no trait implementations needed!)
 - [`data_pipeline.rs`](examples/data_pipeline.rs) - ETL data processing pipeline
 - [`debug_tracing.rs`](examples/debug_tracing.rs) - Debug metadata and task naming
 - [`error_handling.rs`](examples/error_handling.rs) - Error propagation and recovery
@@ -237,7 +269,7 @@ Real-world patterns:
 - [`timeout.rs`](examples/timeout.rs) - Managing task timeouts
 - [`tracing_example.rs`](examples/tracing_example.rs) - Observability with tracing support
 
-Run any example: `cargo run --example data_pipeline`
+Run any example: `cargo run --example custom_types`
 
 ## Advanced Topics
 

@@ -10,6 +10,9 @@
 //! - **Compile-time type safety**: Dependencies are validated at compile time through the type
 //!   system. The public API is fully type-safe with no runtime type errors. Internal execution
 //!   uses type erasure for heterogeneous task storage, but this is never exposed to users.
+//! - **Works with ANY type**: Custom types work automatically with the `#[task]` macro—just
+//!   implement `Clone + Send + Sync`, no trait implementations needed! The macro generates
+//!   type-specific extraction logic for seamless integration.
 //! - **Runtime-agnostic**: Works with any async runtime (Tokio, async-std, smol, Embassy, etc.)
 //! - **Type-state pattern**: The API guides you with compile-time errors if you wire dependencies
 //!   incorrectly. This is what prevents cycles at compile time.
@@ -432,6 +435,53 @@
 //! assert_eq!(dag.get(total).unwrap(), 20);
 //! # };
 //! ```
+//!
+//! ## Custom Types
+//!
+//! **dagx works with ANY type automatically!** As long as your type implements `Clone + Send + Sync + 'static`,
+//! the `#[task]` macro generates the necessary extraction logic:
+//!
+//! ```no_run
+//! use dagx::{task, DagRunner, Task};
+//!
+//! // Just derive Clone - that's all you need!
+//! #[derive(Clone)]
+//! struct User {
+//!     name: String,
+//!     age: u32,
+//! }
+//!
+//! struct CreateUser;
+//! #[task]
+//! impl CreateUser {
+//!     async fn run() -> User {
+//!         User { name: "Alice".to_string(), age: 30 }
+//!     }
+//! }
+//!
+//! struct FormatUser;
+//! #[task]
+//! impl FormatUser {
+//!     async fn run(user: &User) -> String {
+//!         format!("{} is {} years old", user.name, user.age)
+//!     }
+//! }
+//!
+//! # async {
+//! let dag = DagRunner::new();
+//!
+//! let user = dag.add_task(CreateUser);
+//! let formatted = dag.add_task(FormatUser).depends_on(&user);
+//!
+//! dag.run(|fut| { tokio::spawn(fut); }).await.unwrap();
+//!
+//! assert_eq!(dag.get(formatted).unwrap(), "Alice is 30 years old");
+//! # };
+//! ```
+//!
+//! **No trait implementations needed!** Works with nested structs, collections, enums, and any
+//! other custom type. See [`examples/custom_types.rs`](https://github.com/swaits/dagx/blob/main/examples/custom_types.rs)
+//! for a complete example with complex nested types.
 //!
 //! # Runtime Agnostic
 //!

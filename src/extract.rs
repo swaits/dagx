@@ -1,15 +1,28 @@
 //! Input extraction for task dependencies via oneshot channels.
 //!
-//! This module handles extracting typed inputs from task dependencies via oneshot channels.
+//! # Legacy Trait for Internal Use Only
+//!
+//! **NOTE**: This module is now primarily for internal use. The `ExtractInput` trait is only
+//! used by the internal `task_fn` test helper function.
+//!
+//! **For regular tasks**: The `#[task]` macro generates inline `extract_and_run()` methods with
+//! type-specific extraction logic. This means **ANY type** implementing `Clone + Send + Sync`
+//! works automatically without needing `ExtractInput` implementations!
 //!
 //! # How it works
 //!
 //! When a task executes, it needs to extract its inputs from type-erased oneshot receivers.
 //! Outputs are wrapped in Arc for efficient fanout (cheap Arc clones instead of data clones).
-//! This module provides the ExtractInput trait with implementations for:
-//! - `()` for tasks with no dependencies
-//! - Common types (`i32`, `String`, etc.) for tasks with a single dependency
-//! - `(A, B, ...)` tuples for tasks with multiple dependencies (awaited concurrently)
+//!
+//! **Modern approach (via `#[task]` macro)**:
+//! - The macro generates custom extraction logic inline in `extract_and_run()`
+//! - Works with ANY type (just needs `Clone + Send + Sync`)
+//! - No trait implementations needed!
+//!
+//! **Legacy approach (via `ExtractInput` trait)**:
+//! - Used only by the internal `task_fn` test helper
+//! - Provides implementations for primitives, standard types, and tuples
+//! - Requires explicit trait implementations for custom types (not recommended)
 //!
 //! # Why macros?
 //!

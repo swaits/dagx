@@ -8,7 +8,11 @@ use std::future::Future;
 /// A unit of async work with typed inputs and outputs.
 ///
 /// Use the [`task`](crate::task) macro to implement this trait. The macro automatically
-/// derives `Input` and `Output` types from your `run()` method signature.
+/// derives `Input` and `Output` types from your `run()` method signature and generates
+/// type-specific extraction logic in `extract_and_run()`.
+///
+/// **Custom types work automatically!** As long as your output type implements
+/// `Clone + Send + Sync + 'static`, the macro handles everything. No trait implementations needed!
 ///
 /// # Task Patterns
 ///
