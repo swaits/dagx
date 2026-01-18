@@ -3,6 +3,7 @@ use crate::common::task_fn;
 
 use crate::common::tasks::Counter;
 use dagx::*;
+use futures::FutureExt;
 
 #[tokio::test]
 async fn test_result_type() {
@@ -13,11 +14,9 @@ async fn test_result_type() {
         Err::<i32, String>("error".to_string())
     }));
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await
-    .unwrap();
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        .await
+        .unwrap();
 
     assert_eq!(dag.get(success_task).unwrap(), Ok(42));
     assert_eq!(dag.get(error_task).unwrap(), Err("error".to_string()));
@@ -30,10 +29,7 @@ async fn test_dag_result_type_works() {
 
     // Test that DagResult<()> works with ? operator pattern
     async fn run_dag(dag: &DagRunner) -> DagResult<()> {
-        dag.run(|fut| {
-            tokio::spawn(fut);
-        })
-        .await?;
+        dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
         Ok(())
     }
 
@@ -68,7 +64,7 @@ async fn test_error_messages_are_helpful() {
     let err_msg = format!("{}", result.unwrap_err());
     assert!(err_msg.contains("Result not found"));
     assert!(err_msg.contains("task #0")); // Task ID
-    assert!(err_msg.contains("Call dag.run()"));
+    assert!(err_msg.contains("Call dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))"));
 }
 
 #[tokio::test]
@@ -77,11 +73,7 @@ async fn test_successful_execution_returns_ok() {
     let task = dag.add_task(task_fn(|_: ()| async { 42 }));
 
     // Should return Ok(())
-    let result = dag
-        .run(|fut| {
-            tokio::spawn(fut);
-        })
-        .await;
+    let result = dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await;
     assert!(result.is_ok());
 
     // Should be able to get value
@@ -95,11 +87,9 @@ async fn test_stateful_tasks() {
     let input = dag.add_task(task_fn(|_: ()| async { 5 }));
     let counter = dag.add_task(Counter::new(10)).depends_on(&input);
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await
-    .unwrap();
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        .await
+        .unwrap();
 
     assert_eq!(dag.get(counter).unwrap(), 15); // 10 + 5
 }
@@ -117,11 +107,9 @@ async fn test_task_fn_with_captured_state() {
         .add_task(task_fn(move |x: i32| async move { x * multiplier }))
         .depends_on(&base);
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await
-    .unwrap();
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        .await
+        .unwrap();
 
     assert_eq!(dag.get(scaled).unwrap(), 35);
 }

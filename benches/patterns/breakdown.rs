@@ -2,6 +2,7 @@
 
 use criterion::Criterion;
 use dagx::{task_fn, DagRunner};
+use futures::FutureExt;
 
 pub fn bench_10k_breakdown(c: &mut Criterion) {
     let rt = tokio::runtime::Runtime::new().unwrap();
@@ -26,11 +27,9 @@ pub fn bench_10k_breakdown(c: &mut Criterion) {
                 for i in 0..10_000 {
                     dag.add_task(task_fn(move |_: ()| async move { i }));
                 }
-                dag.run(|fut| {
-                    tokio::spawn(fut);
-                })
-                .await
-                .unwrap();
+                dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+                    .await
+                    .unwrap();
             })
         });
     });
@@ -45,11 +44,9 @@ pub fn bench_10k_breakdown(c: &mut Criterion) {
 
         b.iter(|| {
             rt.block_on(async {
-                dag.run(|fut| {
-                    tokio::spawn(fut);
-                })
-                .await
-                .unwrap();
+                dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+                    .await
+                    .unwrap();
             })
         });
     });

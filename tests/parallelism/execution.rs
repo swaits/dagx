@@ -2,6 +2,7 @@
 
 use crate::common::task_fn;
 use dagx::{DagResult, DagRunner};
+use futures::FutureExt;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use tokio::time::sleep;
@@ -62,10 +63,7 @@ async fn test_layers_execute_in_parallel() -> DagResult<()> {
         .depends_on((&layer1[0], &layer1[1], &layer1[2]))
     };
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await?;
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 
     assert_eq!(dag.get(final_task)?, 33); // (0+1) + (10+1) + (20+1)
 
@@ -185,10 +183,7 @@ async fn test_completion_order_matches_dependencies() -> DagResult<()> {
         .depends_on(c)
     };
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await?;
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 
     assert_eq!(dag.get(d)?, 6); // (1 + 2) * 2
 
@@ -271,10 +266,7 @@ async fn test_dependent_tasks_respect_ordering() -> DagResult<()> {
         .depends_on(c)
     };
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await?;
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 
     // Verify results
     assert_eq!(dag.get(a)?, 1);
@@ -344,10 +336,7 @@ async fn test_independent_tasks_dont_wait() -> DagResult<()> {
         }))
     };
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await?;
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 
     // Check results
     assert_eq!(dag.get(fast1)?, "fast1");

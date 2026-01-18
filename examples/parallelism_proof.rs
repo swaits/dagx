@@ -48,6 +48,7 @@
 //! ```
 
 use dagx::{task, DagRunner, Task};
+use futures::FutureExt;
 use std::time::{Duration, Instant};
 use tokio::time::sleep;
 
@@ -86,11 +87,9 @@ async fn main() {
 
     // Measure execution time
     let start = Instant::now();
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await
-    .unwrap();
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        .await
+        .unwrap();
     let elapsed = start.elapsed();
 
     // Verify all tasks completed correctly

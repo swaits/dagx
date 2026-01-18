@@ -56,6 +56,7 @@ impl<'a> Drop for RunGuard<'a> {
 ///
 /// ```no_run
 /// # use dagx::{task, DagRunner, Task};
+/// # use futures::FutureExt;
 /// // Task with state constructed via ::new()
 /// struct LoadValue { value: i32 }
 ///
@@ -84,7 +85,7 @@ impl<'a> Drop for RunGuard<'a> {
 /// let y = dag.add_task(LoadValue::new(3));
 /// let sum = dag.add_task(Add).depends_on((&x, &y));
 ///
-/// dag.run().await.unwrap();
+/// dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await.unwrap();
 ///
 /// assert_eq!(dag.get(sum).unwrap(), 5);
 /// # };
@@ -149,6 +150,7 @@ impl DagRunner {
     ///
     /// ```no_run
     /// # use dagx::{task, DagRunner, Task};
+    /// # use futures::FutureExt;
     /// // Task with state - shows you construct with specific value
     /// struct LoadValue {
     ///     initial: i32,
@@ -190,7 +192,7 @@ impl DagRunner {
     /// // Construct task with offset of 1
     /// let inc = dag.add_task(AddOffset::new(1)).depends_on(&base);
     ///
-    /// dag.run().await.unwrap();
+    /// dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await.unwrap();
     /// assert_eq!(dag.get(&inc).unwrap(), 11);
     /// # };
     /// ```
@@ -254,6 +256,7 @@ impl DagRunner {
     ///
     /// ```
     /// # use dagx::{task, DagRunner, Task};
+    /// # use futures::FutureExt;
     /// // Tuple struct
     /// struct Value(i32);
     ///
@@ -277,7 +280,7 @@ impl DagRunner {
     /// let b = dag.add_task(Value(2));
     /// let sum = dag.add_task(Add).depends_on((&a, &b));
     ///
-    /// dag.run().await.unwrap(); // Executes all tasks
+    /// dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await.unwrap(); // Executes all tasks
     /// # };
     /// ```
     #[inline]
@@ -527,6 +530,7 @@ impl DagRunner {
     ///
     /// ```no_run
     /// # use dagx::{task, DagRunner, Task};
+    /// # use futures::FutureExt;
     /// struct Configuration {
     ///     setting: i32,
     /// }
@@ -548,7 +552,7 @@ impl DagRunner {
     /// // Construct task with specific setting value
     /// let task = dag.add_task(Configuration::new(42));
     ///
-    /// dag.run().await.unwrap();
+    /// dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await.unwrap();
     ///
     /// assert_eq!(dag.get(task).unwrap(), 42);
     /// # };

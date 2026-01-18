@@ -24,7 +24,7 @@
 //!
 //! **2. DAG-Level Timeout** - Entire workflow with timeout
 //! ```rust
-//! match timeout(dag_timeout, dag.run(spawner)).await {
+//! match timeout(dag_timeout, dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await {
 //!     Ok(result) => { /* DAG completed */ },
 //!     Err(_) => { /* DAG timed out */ },
 //! }
@@ -99,6 +99,7 @@
 //! ```
 
 use dagx::{task, DagRunner, Task};
+use futures::FutureExt;
 use tokio::time::{sleep, timeout, Duration};
 
 // Fast task that completes quickly
@@ -177,11 +178,9 @@ async fn main() {
             timeout_ms: 500,
         });
 
-        dag.run(|fut| {
-            tokio::spawn(fut);
-        })
-        .await
-        .unwrap();
+        dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+            .await
+            .unwrap();
 
         println!("Fast task: {:?}", dag.get(fast).unwrap());
         println!("Timed task: {:?}\n", dag.get(timed).unwrap());
@@ -199,11 +198,9 @@ async fn main() {
 
         let processed = dag.add_task(ProcessResult).depends_on(&timed);
 
-        dag.run(|fut| {
-            tokio::spawn(fut);
-        })
-        .await
-        .unwrap();
+        dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+            .await
+            .unwrap();
 
         println!("Result: {}\n", dag.get(processed).unwrap());
     }
@@ -228,11 +225,9 @@ async fn main() {
             timeout_ms: 200,
         });
 
-        dag.run(|fut| {
-            tokio::spawn(fut);
-        })
-        .await
-        .unwrap();
+        dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+            .await
+            .unwrap();
 
         println!("Fast task 1: {:?}", dag.get(fast1).unwrap());
         println!("Fast task 2: {:?}", dag.get(fast2).unwrap());
@@ -254,11 +249,9 @@ async fn main() {
         let processed1 = dag.add_task(ProcessResult).depends_on(&source);
         let processed2 = dag.add_task(ProcessResult).depends_on(&source);
 
-        dag.run(|fut| {
-            tokio::spawn(fut);
-        })
-        .await
-        .unwrap();
+        dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+            .await
+            .unwrap();
 
         println!("Processed 1: {}", dag.get(processed1).unwrap());
         println!("Processed 2: {}\n", dag.get(processed2).unwrap());
@@ -277,9 +270,7 @@ async fn main() {
         let dag_timeout = Duration::from_millis(500);
         match timeout(
             dag_timeout,
-            dag.run(|fut| {
-                tokio::spawn(fut);
-            }),
+            dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)),
         )
         .await
         {

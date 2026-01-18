@@ -153,6 +153,7 @@
 //! ```
 
 use dagx::{task, DagRunner, Task};
+use futures::FutureExt;
 use tokio::time::{sleep, Duration};
 
 // Retry strategy configuration
@@ -355,11 +356,9 @@ async fn main() {
             ],
         ));
 
-        dag.run(|fut| {
-            tokio::spawn(fut);
-        })
-        .await
-        .unwrap();
+        dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+            .await
+            .unwrap();
 
         println!("Result: {:?}\n", dag.get(api_call).unwrap());
     }
@@ -379,11 +378,9 @@ async fn main() {
             ],
         ));
 
-        dag.run(|fut| {
-            tokio::spawn(fut);
-        })
-        .await
-        .unwrap();
+        dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+            .await
+            .unwrap();
 
         println!("Result: {:?}\n", dag.get(api_call).unwrap());
     }
@@ -407,11 +404,9 @@ async fn main() {
             ],
         ));
 
-        dag.run(|fut| {
-            tokio::spawn(fut);
-        })
-        .await
-        .unwrap();
+        dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+            .await
+            .unwrap();
 
         println!("Result: {:?}\n", dag.get(api_call).unwrap());
     }
@@ -428,11 +423,9 @@ async fn main() {
             vec![ApiError::AuthenticationFailed],
         ));
 
-        dag.run(|fut| {
-            tokio::spawn(fut);
-        })
-        .await
-        .unwrap();
+        dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+            .await
+            .unwrap();
 
         println!("Result: {:?}\n", dag.get(api_call).unwrap());
     }
@@ -457,11 +450,9 @@ async fn main() {
             ],
         ));
 
-        dag.run(|fut| {
-            tokio::spawn(fut);
-        })
-        .await
-        .unwrap();
+        dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+            .await
+            .unwrap();
 
         println!("Result: {:?}\n", dag.get(api_call).unwrap());
     }

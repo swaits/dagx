@@ -4,6 +4,7 @@
 
 use crate::types::TaskHandle;
 use crate::{task, DagRunner, Task};
+use futures::FutureExt;
 
 #[tokio::test]
 async fn test_unit_type_taskbuilder_to_handle_conversion() {
@@ -31,11 +32,9 @@ async fn test_unit_type_taskbuilder_to_handle_conversion() {
     // specifically covering line 71
     let handle: TaskHandle<i32> = builder.into();
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await
-    .unwrap();
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        .await
+        .unwrap();
 
     // Verify the task ran and we can get its output
     assert_eq!(dag.get(handle).unwrap(), 42);
@@ -81,11 +80,9 @@ async fn test_unit_type_conversion_with_multiple_tasks() {
     let second_handle: TaskHandle<i32> = second_builder.into();
     let third_handle: TaskHandle<bool> = third_builder.into();
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await
-    .unwrap();
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        .await
+        .unwrap();
 
     // Verify all outputs
     assert_eq!(dag.get(first_handle).unwrap(), "first");
@@ -122,11 +119,9 @@ async fn test_unit_struct_with_state() {
     // Explicit conversion - triggers line 71
     let handle: TaskHandle<i32> = builder.into();
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await
-    .unwrap();
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        .await
+        .unwrap();
 
     assert_eq!(dag.get(handle).unwrap(), 42);
 }
@@ -151,11 +146,9 @@ async fn test_taskbuilder_conversion_assignment() {
     let handle: TaskHandle<Vec<i32>> = builder.into();
     let id = handle.id;
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await
-    .unwrap();
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        .await
+        .unwrap();
 
     let result = dag.get(handle).unwrap();
     assert_eq!(result, vec![1, 2, 3]);
@@ -197,11 +190,9 @@ async fn test_mixed_unit_and_dependent_tasks() {
     // Doubler needs dependencies, so we use it differently
     let doubler = dag.add_task(Doubler).depends_on(source_handle);
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await
-    .unwrap();
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        .await
+        .unwrap();
 
     assert_eq!(dag.get(source_handle).unwrap(), 10);
     assert_eq!(dag.get(doubler).unwrap(), 20);

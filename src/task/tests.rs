@@ -3,6 +3,7 @@
 use crate::task::{task_fn, Task};
 use std::future::Future;
 use std::pin::Pin;
+use std::sync::Arc;
 
 // Test the task_fn function and TaskFn struct
 #[tokio::test]
@@ -87,7 +88,7 @@ impl Task for CustomTask {
     #[allow(refining_impl_trait)]
     fn extract_and_run(
         self,
-        _receivers: Vec<Box<dyn std::any::Any + Send>>,
+        _dependencies: Vec<Arc<dyn std::any::Any + Send + Sync>>,
     ) -> Pin<Box<dyn Future<Output = Result<Self::Output, String>> + Send>> {
         Box::pin(async move {
             // This is a test helper - just return an error

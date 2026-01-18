@@ -3,6 +3,7 @@
 //! Long sequential chain: 100 tasks in sequence
 
 use criterion::Criterion;
+use futures::FutureExt;
 
 pub fn bench_deep_chain(c: &mut Criterion) {
     let rt = tokio::runtime::Runtime::new().unwrap();
@@ -27,11 +28,9 @@ pub fn bench_deep_chain(c: &mut Criterion) {
                         .depends_on(prev);
                 }
 
-                dag.run(|fut| {
-                    tokio::spawn(fut);
-                })
-                .await
-                .unwrap();
+                dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+                    .await
+                    .unwrap();
                 dag.get(prev).unwrap()
             })
         });

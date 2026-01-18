@@ -2,6 +2,7 @@
 
 use crate::common::task_fn;
 use dagx::DagRunner;
+use futures::FutureExt;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
@@ -23,11 +24,9 @@ async fn test_memory_usage_10000_nodes() {
     println!("Memory for 10k nodes: ~{} bytes", build_memory);
 
     // Execute
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await
-    .unwrap();
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        .await
+        .unwrap();
 
     let after_exec = memory_usage_hint();
     let exec_memory = after_exec.saturating_sub(after_build);

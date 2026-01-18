@@ -2,6 +2,7 @@
 
 use crate::common::task_fn;
 use dagx::{DagResult, DagRunner};
+use futures::FutureExt;
 use std::sync::{Arc, Mutex};
 
 #[tokio::test]
@@ -81,10 +82,7 @@ async fn test_dependency_resolution_order() -> DagResult<()> {
         .depends_on(d)
     };
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await?;
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 
     assert_eq!(dag.get(e)?, 5);
 
@@ -118,10 +116,7 @@ async fn test_transitive_dependencies() -> DagResult<()> {
         .add_task(task_fn(|x: i32| async move { x + 5 }))
         .depends_on(b);
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await?;
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 
     assert_eq!(dag.get(&a)?, 10);
     assert_eq!(dag.get(b)?, 20);
@@ -144,10 +139,7 @@ async fn test_deep_chain_50_levels() -> DagResult<()> {
         handles.push(next);
     }
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await?;
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 
     assert_eq!(dag.get(handles.last().unwrap())?, 50);
     Ok(())
@@ -166,10 +158,7 @@ async fn test_deep_chain_200_levels() -> DagResult<()> {
             .depends_on(current);
     }
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await?;
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 
     assert_eq!(dag.get(current)?, 201);
     Ok(())

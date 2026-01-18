@@ -1,23 +1,24 @@
 // Basic execution tests for DagRunner
 use crate::common::task_fn;
+use futures::FutureExt;
 
 use dagx::*;
 
 #[tokio::test]
 async fn test_empty_dag() {
     let dag = DagRunner::new();
-    dag.run()
-    .await
-    .unwrap(); // Should complete without error
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        .await
+        .unwrap(); // Should complete without error
 }
 
 #[tokio::test]
 async fn test_single_task() {
     let dag = DagRunner::new();
     let task = dag.add_task(task_fn(|_: ()| async { 42 }));
-    dag.run()
-    .await
-    .unwrap();
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        .await
+        .unwrap();
     assert_eq!(dag.get(task).unwrap(), 42);
 }
 
@@ -39,9 +40,9 @@ async fn test_deep_chain() {
         .add_task(task_fn(|x: i32| async move { x + 1 }))
         .depends_on(d);
 
-    dag.run()
-    .await
-    .unwrap();
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        .await
+        .unwrap();
 
     // Note: a, b, c, d are not sinks (they have dependents in the chain)
     // Only e is a sink and can be retrieved
@@ -56,9 +57,9 @@ async fn test_wide_parallel() {
         .map(|i| dag.add_task(task_fn(move |_: ()| async move { i * 2 })))
         .collect();
 
-    dag.run()
-    .await
-    .unwrap();
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        .await
+        .unwrap();
 
     for (i, task) in tasks.iter().enumerate() {
         assert_eq!(dag.get(task).unwrap(), i * 2);
@@ -80,9 +81,9 @@ async fn test_diamond_dependency() {
         .add_task(task_fn(|(x, y): (i32, i32)| async move { x + y }))
         .depends_on((&b, &c));
 
-    dag.run()
-    .await
-    .unwrap();
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        .await
+        .unwrap();
 
     // Note: a, b, and c are not sinks (they have dependents)
     // Only d is a sink and can be retrieved
@@ -108,9 +109,9 @@ async fn test_different_output_types() {
         }
     }));
 
-    dag.run()
-    .await
-    .unwrap();
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        .await
+        .unwrap();
 
     assert_eq!(&dag.get(string_task).unwrap(), "hello");
     assert_eq!(dag.get(vec_task).unwrap(), vec![1, 2, 3]);
@@ -141,9 +142,9 @@ async fn test_multiple_sinks() {
         .add_task(task_fn(|x: i32| async move { x * 3 }))
         .depends_on(branch2);
 
-    dag.run()
-    .await
-    .unwrap(); // Should wait for both sinks
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        .await
+        .unwrap(); // Should wait for both sinks
 
     assert_eq!(dag.get(sink1).unwrap(), 21); // (10 * 2) + 1
     assert_eq!(dag.get(sink2).unwrap(), 45); // (10 + 5) * 3
@@ -163,9 +164,9 @@ async fn test_single_task_inline_path() {
         .add_task(task_fn(|x: i32| async move { x + 5 }))
         .depends_on(t2);
 
-    dag.run()
-    .await
-    .unwrap();
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        .await
+        .unwrap();
 
     assert_eq!(dag.get(t3).unwrap(), 25); // (10 * 2) + 5
 }
@@ -188,9 +189,9 @@ async fn test_multi_task_spawn_path() {
         .add_task(task_fn(|x: i32| async move { x + 3 }))
         .depends_on(&source);
 
-    dag.run()
-    .await
-    .unwrap();
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        .await
+        .unwrap();
 
     assert_eq!(dag.get(t1).unwrap(), 101);
     assert_eq!(dag.get(t2).unwrap(), 102);
@@ -212,9 +213,9 @@ async fn test_producer_consumer_channels() {
         ))
         .depends_on(&producer);
 
-    dag.run()
-    .await
-    .unwrap();
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        .await
+        .unwrap();
 
     assert_eq!(dag.get(consumer).unwrap(), 15);
 }
@@ -237,9 +238,9 @@ async fn test_multi_consumer_fanout() {
         .add_task(task_fn(|x: i32| async move { x - 5 }))
         .depends_on(&producer);
 
-    dag.run()
-    .await
-    .unwrap();
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        .await
+        .unwrap();
 
     assert_eq!(dag.get(c1).unwrap(), 84);
     assert_eq!(dag.get(c2).unwrap(), 52);
@@ -265,9 +266,9 @@ async fn test_compute_layers_with_dependents_tracking() {
         .add_task(task_fn(|(l, r): (i32, i32)| async move { l + r }))
         .depends_on((&left, &right));
 
-    dag.run()
-    .await
-    .unwrap();
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        .await
+        .unwrap();
 
     assert_eq!(dag.get(sink).unwrap(), 5); // (1+1) + (1+2) = 5
 }
@@ -313,9 +314,9 @@ async fn test_layer_execution_order() {
         }))
         .depends_on(t2);
 
-    dag.run()
-    .await
-    .unwrap();
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        .await
+        .unwrap();
 
     let order = execution_order.lock().clone();
     assert_eq!(order, vec![1, 2, 3]);

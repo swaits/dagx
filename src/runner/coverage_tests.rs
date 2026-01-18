@@ -6,6 +6,7 @@ use crate::error::DagError;
 use crate::runner::DagRunner;
 use crate::task::Task;
 use crate::types::TaskHandle;
+use futures::FutureExt;
 use std::collections::HashMap;
 
 #[tokio::test]
@@ -20,11 +21,9 @@ async fn test_get_type_mismatch_error() {
     // Task outputs i32
     let source = dag.add_task(task_fn(|_: ()| async { 42i32 }));
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await
-    .unwrap();
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        .await
+        .unwrap();
 
     // Try to get as String - TYPE MISMATCH!
     // Create a handle with the same ID but wrong type
@@ -56,11 +55,9 @@ async fn test_get_type_mismatch_i32_to_vec() {
     // Task outputs i32
     let int_task = dag.add_task(task_fn(|_: ()| async { 123i32 }));
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await
-    .unwrap();
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        .await
+        .unwrap();
 
     // Try to get as Vec<u8>
     let wrong_handle: TaskHandle<Vec<u8>> = TaskHandle {
@@ -102,11 +99,9 @@ async fn test_get_type_mismatch_struct_to_hashmap() {
     let dag = DagRunner::new();
     let task_handle = dag.add_task(CustomTask);
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await
-    .unwrap();
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        .await
+        .unwrap();
 
     // Try to get as HashMap
     let wrong_handle: TaskHandle<HashMap<String, i32>> = TaskHandle {
@@ -136,11 +131,9 @@ async fn test_get_type_mismatch_vec_different_types() {
     // Task outputs Vec<i32>
     let vec_task = dag.add_task(task_fn(|_: ()| async { vec![1, 2, 3] }));
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await
-    .unwrap();
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        .await
+        .unwrap();
 
     // Try to get as Vec<String>
     let wrong_handle: TaskHandle<Vec<String>> = TaskHandle {
@@ -170,11 +163,9 @@ async fn test_get_type_mismatch_option_types() {
     // Task outputs Option<i32>
     let opt_task = dag.add_task(task_fn(|_: ()| async { Some(42) }));
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await
-    .unwrap();
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        .await
+        .unwrap();
 
     // Try to get as Option<String>
     let wrong_handle: TaskHandle<Option<String>> = TaskHandle {
@@ -206,11 +197,9 @@ async fn test_multiple_type_mismatches_same_dag() {
     let string_task = dag.add_task(task_fn(|_: ()| async { "hello".to_string() }));
     let bool_task = dag.add_task(task_fn(|_: ()| async { true }));
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await
-    .unwrap();
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        .await
+        .unwrap();
 
     // Try to get int_task as String
     let wrong_int_handle: TaskHandle<String> = TaskHandle {

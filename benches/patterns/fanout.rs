@@ -2,6 +2,7 @@
 
 use criterion::Criterion;
 use dagx::{task_fn, DagRunner};
+use futures::FutureExt;
 
 pub fn bench_fanout(c: &mut Criterion) {
     let rt = tokio::runtime::Runtime::new().unwrap();
@@ -18,11 +19,9 @@ pub fn bench_fanout(c: &mut Criterion) {
                         .depends_on(&source);
                 }
 
-                dag.run(|fut| {
-                    tokio::spawn(fut);
-                })
-                .await
-                .unwrap();
+                dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+                    .await
+                    .unwrap();
             })
         });
     });
@@ -45,11 +44,9 @@ pub fn bench_fanout(c: &mut Criterion) {
                     .depends_on(&source);
                 }
 
-                dag.run(|fut| {
-                    tokio::spawn(fut);
-                })
-                .await
-                .unwrap();
+                dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+                    .await
+                    .unwrap();
             })
         });
     });
@@ -72,11 +69,9 @@ pub fn bench_fanout(c: &mut Criterion) {
                         .depends_on(&source);
                 }
 
-                dag.run(|fut| {
-                    tokio::spawn(fut);
-                })
-                .await
-                .unwrap();
+                dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+                    .await
+                    .unwrap();
             })
         });
     });

@@ -15,6 +15,8 @@
 
 use crate::common::task_fn;
 use dagx::DagRunner;
+use futures::task::SpawnExt;
+use futures_executor::ThreadPool;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
@@ -36,11 +38,7 @@ fn test_async_executor_basic() {
             .add_task(task_fn(|(a, b): (i32, i32)| async move { a + b }))
             .depends_on((&x, &y));
 
-        dag.run(|fut| {
-            executor.spawn(fut).detach();
-        })
-        .await
-        .unwrap();
+        dag.run(|fut| executor.spawn(fut)).await.unwrap();
 
         assert_eq!(dag.get(sum).unwrap(), 30);
     };
@@ -70,11 +68,7 @@ fn test_async_executor_complex_dag() {
             .add_task(task_fn(|(l, r): (i32, i32)| async move { l + r }))
             .depends_on((&left, &right));
 
-        dag.run(|fut| {
-            executor.spawn(fut).detach();
-        })
-        .await
-        .unwrap();
+        dag.run(|fut| executor.spawn(fut)).await.unwrap();
 
         assert_eq!(dag.get(sink).unwrap(), 25); // (5*2) + (5*3) = 25
     };
@@ -104,11 +98,7 @@ fn test_async_executor_parallel_tasks() {
             })
             .collect();
 
-        dag.run(|fut| {
-            executor.spawn(fut).detach();
-        })
-        .await
-        .unwrap();
+        dag.run(|fut| executor.spawn(fut)).await.unwrap();
 
         // All tasks should have run
         assert_eq!(counter.load(Ordering::SeqCst), 10);
@@ -132,11 +122,7 @@ fn test_async_executor_with_local_spawn() {
 
         let x = dag.add_task(task_fn(|_: ()| async { 42 }));
 
-        dag.run(|fut| {
-            executor.spawn(fut).detach();
-        })
-        .await
-        .unwrap();
+        dag.run(|fut| executor.spawn(fut)).await.unwrap();
 
         assert_eq!(dag.get(x).unwrap(), 42);
     };
@@ -163,11 +149,7 @@ fn test_async_executor_deep_chain() {
                 .depends_on(current);
         }
 
-        dag.run(|fut| {
-            executor.spawn(fut).detach();
-        })
-        .await
-        .unwrap();
+        dag.run(|fut| executor.spawn(fut)).await.unwrap();
 
         assert_eq!(dag.get(current).unwrap(), 50);
     };
@@ -190,13 +172,9 @@ fn test_pollster_basic() {
             .add_task(task_fn(|x: i32| async move { x * 2 }))
             .depends_on(&x);
 
-        dag.run(|fut| {
-            // pollster blocks, so we need to spawn on a different executor
-            // Use futures::executor for spawning
-            futures_executor::block_on(fut);
-        })
-        .await
-        .unwrap();
+        dag.run(|fut| async { pollster::block_on(fut) })
+            .await
+            .unwrap();
 
         assert_eq!(dag.get(doubled).unwrap(), 200);
     });
@@ -217,11 +195,9 @@ fn test_pollster_complex() {
             })
             .collect();
 
-        dag.run(|fut| {
-            futures_executor::block_on(fut);
-        })
-        .await
-        .unwrap();
+        dag.run(|fut| async { pollster::block_on(fut) })
+            .await
+            .unwrap();
 
         for (i, task) in tasks.iter().enumerate() {
             assert_eq!(dag.get(task).unwrap(), 7 * i as i32);
@@ -237,11 +213,9 @@ fn test_pollster_error_handling() {
         // Task that returns Result
         let task = dag.add_task(task_fn(|_: ()| async { Ok::<i32, String>(42) }));
 
-        dag.run(|fut| {
-            futures_executor::block_on(fut);
-        })
-        .await
-        .unwrap();
+        dag.run(|fut| async { pollster::block_on(fut) })
+            .await
+            .unwrap();
 
         assert_eq!(dag.get(task).unwrap(), Ok(42));
     });
@@ -262,13 +236,11 @@ fn test_futures_executor_basic() {
             .add_task(task_fn(|(a, b): (i32, i32)| async move { a * b }))
             .depends_on((&x, &y));
 
-        dag.run(|fut| {
-            // Use ThreadPool for spawning
-            let pool = futures_executor::ThreadPool::new().unwrap();
-            pool.spawn_ok(fut);
-        })
-        .await
-        .unwrap();
+        let spawner = ThreadPool::new().unwrap();
+
+        dag.run(|fut| spawner.spawn_with_handle(fut).unwrap())
+            .await
+            .unwrap();
 
         assert_eq!(dag.get(product).unwrap(), 375); // 15 * 25
     });
@@ -276,8 +248,8 @@ fn test_futures_executor_basic() {
 
 #[test]
 fn test_futures_executor_threadpool() {
-    let pool = std::sync::Arc::new(futures_executor::ThreadPool::new().unwrap());
-    let pool_clone = pool.clone();
+    let pool = futures_executor::ThreadPool::new().unwrap();
+    let spawner = pool.clone();
 
     pool.spawn_ok(async move {
         let dag = DagRunner::new();
@@ -287,11 +259,9 @@ fn test_futures_executor_threadpool() {
             .map(|i| dag.add_task(task_fn(move |_: ()| async move { i * i })))
             .collect();
 
-        dag.run(|fut| {
-            pool_clone.spawn_ok(fut);
-        })
-        .await
-        .unwrap();
+        dag.run(|fut| spawner.spawn_with_handle(fut).unwrap())
+            .await
+            .unwrap();
 
         for (i, task) in tasks.iter().enumerate() {
             assert_eq!(dag.get(task).unwrap(), (i * i) as i32);
@@ -325,12 +295,11 @@ fn test_futures_executor_diamond_pattern() {
             .add_task(task_fn(|(x, y): (i32, i32)| async move { x * y }))
             .depends_on((&b, &c));
 
-        let pool = futures_executor::ThreadPool::new().unwrap();
-        dag.run(|fut| {
-            pool.spawn_ok(fut);
-        })
-        .await
-        .unwrap();
+        let spawner = ThreadPool::new().unwrap();
+
+        dag.run(|fut| spawner.spawn_with_handle(fut).unwrap())
+            .await
+            .unwrap();
 
         assert_eq!(dag.get(d).unwrap(), 60); // (8+2) * (8-2) = 10 * 6
     });
@@ -350,7 +319,7 @@ fn test_all_runtimes_compatibility() {
         executor.run(async {
             let dag = DagRunner::new();
             let x = dag.add_task(task_fn(|_: ()| async { 123 }));
-            dag.run(|fut| executor.spawn(fut).detach()).await.unwrap();
+            dag.run(|fut| executor.spawn(fut)).await.unwrap();
             assert_eq!(dag.get(x).unwrap(), 123);
         });
     }
@@ -360,7 +329,9 @@ fn test_all_runtimes_compatibility() {
         pollster::block_on(async {
             let dag = DagRunner::new();
             let x = dag.add_task(task_fn(|_: ()| async { 123 }));
-            dag.run(futures_executor::block_on).await.unwrap();
+            dag.run(|fut| async { pollster::block_on(fut) })
+                .await
+                .unwrap();
             assert_eq!(dag.get(x).unwrap(), 123);
         });
     }
@@ -370,8 +341,10 @@ fn test_all_runtimes_compatibility() {
         futures_executor::block_on(async {
             let dag = DagRunner::new();
             let x = dag.add_task(task_fn(|_: ()| async { 123 }));
-            let pool = futures_executor::ThreadPool::new().unwrap();
-            dag.run(|fut| pool.spawn_ok(fut)).await.unwrap();
+            let spawner = ThreadPool::new().unwrap();
+            dag.run(|fut| spawner.spawn_with_handle(fut).unwrap())
+                .await
+                .unwrap();
             std::thread::sleep(std::time::Duration::from_millis(10));
             assert_eq!(dag.get(x).unwrap(), 123);
         });
@@ -393,11 +366,7 @@ fn test_runtime_edge_cases() {
             42
         }));
 
-        dag.run(|fut| {
-            executor.spawn(fut).detach();
-        })
-        .await
-        .unwrap();
+        dag.run(|fut| executor.spawn(fut)).await.unwrap();
 
         assert_eq!(dag.get(x).unwrap(), 42);
     });
@@ -424,11 +393,7 @@ fn test_async_executor_stress() {
             })
             .collect();
 
-        dag.run(|fut| {
-            executor.spawn(fut).detach();
-        })
-        .await
-        .unwrap();
+        dag.run(|fut| executor.spawn(fut)).await.unwrap();
 
         for (i, task) in tasks.iter().enumerate() {
             assert_eq!(dag.get(task).unwrap(), i as i32);
@@ -443,13 +408,9 @@ fn test_pollster_nested_blocks() {
         let dag1 = DagRunner::new();
         let x = dag1.add_task(task_fn(|_: ()| async { 10 }));
 
-        dag1.run(|fut| {
-            pollster::block_on(async {
-                futures_executor::block_on(fut);
-            });
-        })
-        .await
-        .unwrap();
+        dag1.run(|fut| async { pollster::block_on(fut) })
+            .await
+            .unwrap();
 
         assert_eq!(dag1.get(x).unwrap(), 10);
     });
@@ -459,19 +420,16 @@ fn test_pollster_nested_blocks() {
 fn test_futures_executor_multi_pool() {
     // Test with multiple thread pools
     let pool1 = futures_executor::ThreadPool::new().unwrap();
-    let pool2 = futures_executor::ThreadPool::new().unwrap();
+    let spawner = pool1.clone();
 
     pool1.spawn_ok(async move {
         let dag = DagRunner::new();
 
         let x = dag.add_task(task_fn(|_: ()| async { 50 }));
 
-        dag.run(|fut| {
-            // Spawn on different pool
-            pool2.spawn_ok(fut);
-        })
-        .await
-        .unwrap();
+        dag.run(|fut| spawner.spawn_with_handle(fut).unwrap())
+            .await
+            .unwrap();
 
         std::thread::sleep(std::time::Duration::from_millis(50));
         assert_eq!(dag.get(x).unwrap(), 50);
@@ -507,11 +465,7 @@ fn test_sync_tasks_on_async_executor() {
         let y = dag.add_task(task_fn(|_: ()| async { 7 }));
         let sum = dag.add_task(SyncAdd).depends_on((&x, &y));
 
-        dag.run(|fut| {
-            executor.spawn(fut).detach();
-        })
-        .await
-        .unwrap();
+        dag.run(|fut| executor.spawn(fut)).await.unwrap();
 
         assert_eq!(dag.get(sum).unwrap(), 12);
     });
@@ -536,11 +490,9 @@ fn test_sync_tasks_on_pollster() {
         let x = dag.add_task(task_fn(|_: ()| async { 21 }));
         let doubled = dag.add_task(SyncDouble).depends_on(&x);
 
-        dag.run(|fut| {
-            futures_executor::block_on(fut);
-        })
-        .await
-        .unwrap();
+        dag.run(|fut| async { pollster::block_on(fut) })
+            .await
+            .unwrap();
 
         assert_eq!(dag.get(doubled).unwrap(), 42);
     });

@@ -2,6 +2,7 @@
 
 use crate::common::task_fn;
 use dagx::{DagResult, DagRunner};
+use futures::FutureExt;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
@@ -44,10 +45,7 @@ async fn test_butterfly_network() -> DagResult<()> {
             .depends_on((&layer1[3], &layer1[7])),
     ];
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await?;
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 
     // Verify some outputs exist
     for task in &layer2 {
@@ -100,10 +98,7 @@ async fn test_recursive_butterfly() -> DagResult<()> {
 
     let outputs = build_butterfly(&dag, inputs);
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await?;
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 
     assert_eq!(outputs.len(), 4);
     for output in outputs {
@@ -143,10 +138,7 @@ async fn test_benes_network() -> DagResult<()> {
             .depends_on((&stage1[1], &stage1[3])),
     ];
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await?;
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 
     for output in outputs {
         let _ = dag.get(output)?;
@@ -209,10 +201,7 @@ async fn test_shuffle_exchange_network() -> DagResult<()> {
         })
         .collect();
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await?;
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 
     assert_eq!(counter.load(Ordering::Relaxed), 8);
 

@@ -34,6 +34,7 @@
 //!
 
 use dagx::{task, DagRunner, Task};
+use futures::FutureExt;
 use tracing_subscriber::{fmt, EnvFilter};
 
 // Simple source task
@@ -95,11 +96,9 @@ async fn main() {
         // Layer 2: Combine results
         let result = dag.add_task(Add).depends_on((&left, &right));
 
-        dag.run(|fut| {
-            tokio::spawn(fut);
-        })
-        .await
-        .unwrap();
+        dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+            .await
+            .unwrap();
 
         println!("\nResult: {}", dag.get(result).unwrap());
         println!("(Expected: 10+10 = 20, 10*10 = 100, 20+100 = 120)\n");
@@ -118,11 +117,9 @@ async fn main() {
         let c = dag.add_task(Multiply).depends_on((&b, &b));
         let d = dag.add_task(Add).depends_on((&c, &c));
 
-        dag.run(|fut| {
-            tokio::spawn(fut);
-        })
-        .await
-        .unwrap();
+        dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+            .await
+            .unwrap();
 
         println!("\nResult: {}", dag.get(d).unwrap());
         println!("(Expected: 1+1 = 2, 2*2 = 4, 4+4 = 8)\n");
@@ -149,11 +146,9 @@ async fn main() {
         let sum_all = dag.add_task(Add).depends_on((&sum12, &sum23));
         let final_result = dag.add_task(Add).depends_on((&sum_all, &sum34));
 
-        dag.run(|fut| {
-            tokio::spawn(fut);
-        })
-        .await
-        .unwrap();
+        dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+            .await
+            .unwrap();
 
         println!("\nResult: {}", dag.get(final_result).unwrap());
         println!("(Expected: (1+2)+(2+3) = 8, 8+(3+4) = 15)\n");

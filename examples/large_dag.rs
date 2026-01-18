@@ -110,6 +110,7 @@
 //! ```
 
 use dagx::{task, DagRunner, Task};
+use futures::FutureExt;
 use std::time::Instant;
 
 // Simple computation task
@@ -181,11 +182,9 @@ async fn main() {
         println!("  Build time: {:?}", build_time);
 
         let exec_start = Instant::now();
-        dag.run(|fut| {
-            tokio::spawn(fut);
-        })
-        .await
-        .unwrap();
+        dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+            .await
+            .unwrap();
         let exec_time = exec_start.elapsed();
 
         println!("  Execution time: {:?}", exec_time);
@@ -223,11 +222,9 @@ async fn main() {
         println!("  Build time: {:?}", build_time);
 
         let exec_start = Instant::now();
-        dag.run(|fut| {
-            tokio::spawn(fut);
-        })
-        .await
-        .unwrap();
+        dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+            .await
+            .unwrap();
         let exec_time = exec_start.elapsed();
 
         println!("  Execution time: {:?}", exec_time);
@@ -276,11 +273,9 @@ async fn main() {
         println!("  Tree depth: {}", level);
 
         let exec_start = Instant::now();
-        dag.run(|fut| {
-            tokio::spawn(fut);
-        })
-        .await
-        .unwrap();
+        dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+            .await
+            .unwrap();
         let exec_time = exec_start.elapsed();
 
         println!("  Execution time: {:?}", exec_time);
@@ -336,11 +331,9 @@ async fn main() {
         println!("  Build time: {:?}", build_time);
 
         let exec_start = Instant::now();
-        dag.run(|fut| {
-            tokio::spawn(fut);
-        })
-        .await
-        .unwrap();
+        dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+            .await
+            .unwrap();
         let exec_time = exec_start.elapsed();
 
         println!("  Execution time: {:?}", exec_time);
@@ -362,11 +355,9 @@ async fn main() {
             .map(|i| dag.add_task(FormatNumber { id: i }))
             .collect();
 
-        dag.run(|fut| {
-            tokio::spawn(fut);
-        })
-        .await
-        .unwrap();
+        dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+            .await
+            .unwrap();
 
         // Verify results are accessible
         let i32_sum: i32 = small_tasks

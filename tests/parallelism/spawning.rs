@@ -2,6 +2,7 @@
 
 use crate::common::task_fn;
 use dagx::{DagResult, DagRunner};
+use futures::FutureExt;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::sync::Mutex;
@@ -31,7 +32,7 @@ async fn test_spawner_actually_spawns_tasks() -> DagResult<()> {
         .collect();
 
     // Custom spawner that counts invocations
-    dag.run().await?;
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 
     // Verify all tasks were spawned
     for (i, task) in tasks.iter().enumerate() {
@@ -77,10 +78,7 @@ async fn test_tasks_not_running_inline() -> DagResult<()> {
         })
         .collect();
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await?;
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 
     // Verify results
     for (i, task) in tasks.iter().enumerate() {

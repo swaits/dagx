@@ -2,6 +2,7 @@
 
 use crate::common::task_fn;
 use dagx::{DagResult, DagRunner};
+use futures::FutureExt;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
@@ -59,10 +60,7 @@ async fn test_workflow_with_conditional_paths() -> DagResult<()> {
         }))
         .depends_on(combine);
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await?;
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 
     assert_eq!(dag.get(process)?, 84);
     let result = dag.get(final_result)?;
@@ -140,10 +138,7 @@ async fn test_map_reduce_pattern() -> DagResult<()> {
         ))
         .depends_on((&reducers[0], &reducers[1], &reducers[2], &reducers[3]));
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await?;
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 
     let result = dag.get(final_task)?;
     assert!(result > 0);
@@ -200,10 +195,7 @@ async fn test_pipeline_with_feedback() -> DagResult<()> {
         }))
         .depends_on(stage3);
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await?;
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 
     assert_eq!(dag.get(stage1)?, 2);
     assert_eq!(dag.get(stage3)?, 12);
@@ -247,10 +239,7 @@ async fn test_scatter_gather_pattern() -> DagResult<()> {
         ))
         .depends_on((&workers[0], &workers[1], &workers[2], &workers[3]));
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await?;
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 
     // Sum of 10+20+30+40+50+60+70+80 = 360
     assert_eq!(dag.get(gather)?, 360);
@@ -339,10 +328,7 @@ async fn test_fork_join_with_barriers() -> DagResult<()> {
         }))
         .depends_on(barrier);
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await?;
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 
     let _ = dag.get(join)?;
     assert_eq!(phase_counter.load(Ordering::SeqCst), 2);

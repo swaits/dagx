@@ -2,6 +2,7 @@
 
 use criterion::{BenchmarkId, Criterion};
 use dagx::{task_fn, DagRunner};
+use futures::FutureExt;
 
 pub fn bench_etl_pipeline(c: &mut Criterion) {
     let rt = tokio::runtime::Runtime::new().unwrap();
@@ -90,9 +91,7 @@ pub fn bench_etl_pipeline(c: &mut Criterion) {
                         ))
                         .depends_on((&validate, &scores, &names));
 
-                        dag.run(|fut| {
-                            tokio::spawn(fut);
-                        })
+                dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
                         .await
                         .unwrap();
                     })

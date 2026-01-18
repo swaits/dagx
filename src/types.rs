@@ -6,9 +6,9 @@
 use crate::builder::{IsUnitType, TaskBuilder};
 use crate::task::Task;
 
-/// Opaque node identifier (internal use)
+/// Opaque node identifier
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub(crate) struct NodeId(pub usize);
+pub struct NodeId(pub usize);
 
 /// Opaque, typed token for a node's output.
 ///
@@ -23,6 +23,7 @@ pub(crate) struct NodeId(pub usize);
 ///
 /// ```no_run
 /// # use dagx::{task, DagRunner, Task};
+/// # use futures::FutureExt;
 /// # struct LoadValue { value: i32 }
 /// # impl LoadValue { pub fn new(v: i32) -> Self { Self { value: v } } }
 /// # #[task]
@@ -33,7 +34,7 @@ pub(crate) struct NodeId(pub usize);
 /// let dag = DagRunner::new();
 /// let node = dag.add_task(LoadValue::new(42));
 ///
-/// dag.run().await.unwrap();
+/// dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await.unwrap();
 ///
 /// assert_eq!(dag.get(node).unwrap(), 42);
 /// # };

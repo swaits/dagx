@@ -3,6 +3,7 @@
 //! Classic diamond: A → B,C → D
 
 use criterion::Criterion;
+use futures::FutureExt;
 
 pub fn bench_diamond_pattern(c: &mut Criterion) {
     let rt = tokio::runtime::Runtime::new().unwrap();
@@ -27,11 +28,9 @@ pub fn bench_diamond_pattern(c: &mut Criterion) {
                     .add_task(task_fn(|(x, y): (i32, i32)| async move { x + y }))
                     .depends_on((&b, &c));
 
-                dag.run(|fut| {
-                    tokio::spawn(fut);
-                })
-                .await
-                .unwrap();
+                dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+                    .await
+                    .unwrap();
                 dag.get(d).unwrap()
             })
         });

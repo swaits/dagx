@@ -3,6 +3,7 @@ use crate::common::task_fn;
 // Comprehensive test showing all three patterns working together
 
 use dagx::*;
+use futures::FutureExt;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
@@ -52,11 +53,9 @@ async fn test_all_three_task_patterns() {
     // Pattern 3: Mutable accumulation
     let accumulated = dag.add_task(MutableAccumulator(10)).depends_on(doubled); // 10 + 16 = 26
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await
-    .unwrap();
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        .await
+        .unwrap();
 
     assert_eq!(dag.get(sum).unwrap(), 8);
     assert_eq!(dag.get(doubled).unwrap(), 16);
@@ -97,11 +96,9 @@ async fn test_parallel_execution() {
         }
     }));
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await
-    .unwrap();
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        .await
+        .unwrap();
 
     // All three tasks should have run
     assert_eq!(counter.load(Ordering::SeqCst), 3);
@@ -120,11 +117,9 @@ async fn test_task_fn_with_captured_state() {
         .add_task(task_fn(move |x: i32| async move { x * multiplier }))
         .depends_on(&base);
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await
-    .unwrap();
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        .await
+        .unwrap();
 
     assert_eq!(dag.get(scaled).unwrap(), 35);
 }

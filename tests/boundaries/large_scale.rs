@@ -2,6 +2,7 @@
 
 use crate::common::task_fn;
 use dagx::{DagResult, DagRunner};
+use futures::FutureExt;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
@@ -25,10 +26,7 @@ async fn test_10000_independent_tasks() -> DagResult<()> {
         })
         .collect();
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await?;
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 
     // Verify all tasks completed
     assert_eq!(counter.load(Ordering::Relaxed), 10_000);
@@ -103,10 +101,7 @@ async fn test_5000_node_pyramid() -> DagResult<()> {
         .add_task(task_fn(|(a, b): (i32, i32)| async move { a + b }))
         .depends_on((&current_layer[0], &current_layer[1]));
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await?;
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 
     // We created 1024 ones and 1024 zeros at the bottom
     // The sum should propagate up to 1024
@@ -139,10 +134,7 @@ async fn test_wide_dag_1000_sources_1000_sinks() -> DagResult<()> {
         })
         .collect();
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await?;
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 
     // Verify some sinks completed correctly
     let result0 = dag.get(sinks[0])?;
@@ -195,10 +187,7 @@ async fn test_10000_node_linear_chain_segments() -> DagResult<()> {
         chain_ends.push(current);
     }
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await?;
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 
     // All 10,000 tasks should have executed
     assert_eq!(counter.load(Ordering::Relaxed), 10_000);
@@ -239,10 +228,7 @@ async fn test_100000_nodes_stress() -> DagResult<()> {
             .collect();
     }
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await?;
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 
     assert_eq!(completed.load(Ordering::Relaxed), 100_000);
     Ok(())

@@ -2,6 +2,7 @@
 
 use criterion::{BenchmarkId, Criterion};
 use dagx::{task_fn, DagRunner};
+use futures::FutureExt;
 use std::hint::black_box;
 
 pub fn bench_memory_efficiency(c: &mut Criterion) {
@@ -38,11 +39,9 @@ pub fn bench_memory_efficiency(c: &mut Criterion) {
                             .depends_on(&source);
                         }
 
-                        dag.run(|fut| {
-                            tokio::spawn(fut);
-                        })
-                        .await
-                        .unwrap();
+                        dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+                            .await
+                            .unwrap();
                     })
                 });
             },

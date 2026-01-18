@@ -1,5 +1,6 @@
 // Type safety tests for TaskHandle
 use crate::common::task_fn;
+use futures::FutureExt;
 // These tests verify dagx's compile-time type safety guarantees.
 // Tests cover both runtime behavior (wrong types return None) and
 // compile-time checking (type mismatches fail to compile).
@@ -15,11 +16,9 @@ async fn test_get_with_wrong_type_returns_none() {
     let int_task = dag.add_task(task_fn(|_: ()| async { 42i32 }));
 
     // Run DAG
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await
-    .unwrap();
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        .await
+        .unwrap();
 
     // Verify correct type works
     assert_eq!(dag.get(&int_task), Ok(42i32));
@@ -38,11 +37,9 @@ async fn test_handle_preserves_type() {
     let string_task = dag.add_task(task_fn(|_: ()| async { "hello".to_string() }));
     let int_task = dag.add_task(task_fn(|_: ()| async { 42i32 }));
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await
-    .unwrap();
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        .await
+        .unwrap();
 
     // Get with correct types
     assert_eq!(dag.get(&string_task).unwrap(), "hello".to_string());
@@ -66,11 +63,9 @@ async fn test_type_safety_handle_reuse() {
         .add_task(task_fn(|x: i32| async move { x * 3 }))
         .depends_on(&source);
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await
-    .unwrap();
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        .await
+        .unwrap();
 
     assert_eq!(dag.get(double).unwrap(), 200);
     assert_eq!(dag.get(triple).unwrap(), 300);
