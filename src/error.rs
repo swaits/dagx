@@ -63,7 +63,7 @@ impl std::fmt::Display for DagError {
                     f,
                     "Result not found for task #{}.\n\
                      \n\
-                     Call dag.run() before accessing results with get().",
+                     Call dag.run().",
                     task_id
                 )
             }

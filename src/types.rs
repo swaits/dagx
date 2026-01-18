@@ -33,7 +33,7 @@ pub(crate) struct NodeId(pub usize);
 /// let dag = DagRunner::new();
 /// let node = dag.add_task(LoadValue::new(42));
 ///
-/// dag.run(|fut| { tokio::spawn(fut); }).await.unwrap();
+/// dag.run().await.unwrap();
 ///
 /// assert_eq!(dag.get(node).unwrap(), 42);
 /// # };

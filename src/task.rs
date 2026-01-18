@@ -3,7 +3,7 @@
 //! This module defines the core Task trait that all DAG nodes must implement,
 //! along with convenience functions for creating tasks from closures.
 
-use std::future::Future;
+use std::{future::Future, sync::Arc};
 
 /// A unit of async work with typed inputs and outputs.
 ///
@@ -106,7 +106,7 @@ pub trait Task: Send {
     #[doc(hidden)]
     fn extract_and_run(
         self,
-        receivers: Vec<Box<dyn std::any::Any + Send>>,
+        dependencies: Vec<Arc<dyn std::any::Any + Send + Sync>>,
     ) -> impl Future<Output = Result<Self::Output, String>> + Send;
 }
 
@@ -149,10 +149,10 @@ where
 
         async fn extract_and_run(
             self,
-            receivers: Vec<Box<dyn std::any::Any + Send>>,
+            dependencies: Vec<Arc<dyn std::any::Any + Send + Sync>>,
         ) -> Result<Self::Output, String> {
             // For task_fn, we use ExtractInput since we don't have macro-generated extraction
-            let input = I::extract_from_channels(receivers)
+            let input = I::extract_from_deps(dependencies)
                 .await
                 .map_err(|e| format!("Failed to extract input: {}", e))?;
 

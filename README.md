@@ -38,7 +38,7 @@ See [how it works](docs/CYCLE_PREVENTION.md).
 
 ```rust
 let sum = dag.add_task(Add).depends_on((&x, &y));
-dag.run(|fut| tokio::spawn(fut)).await?;
+dag.run().await?;
 ```
 
 That's it. No trait boilerplate, no manual channels, no node IDs.
@@ -90,7 +90,7 @@ async fn main() {
     let sum = dag.add_task(Add).depends_on((&x, &y));
 
     // Execute with true parallelism
-    dag.run(|fut| { tokio::spawn(fut); }).await.unwrap();
+    dag.run().await.unwrap();
 
     // Retrieve results
     assert_eq!(dag.get(sum).unwrap(), 5);
@@ -223,13 +223,13 @@ dagx works with any async runtime. Provide a spawner function to `run()`:
 
 ```rust
 // With Tokio
-dag.run(|fut| { tokio::spawn(fut); }).await.unwrap();
+dag.run().await.unwrap();
 
 // With async-std
-dag.run(|fut| { async_std::task::spawn(fut); }).await.unwrap();
+dag.run().await.unwrap();
 
 // With smol
-dag.run(|fut| { smol::spawn(fut).detach(); }).await.unwrap();
+dag.run().await.unwrap();
 ```
 
 ## Tutorials & Examples

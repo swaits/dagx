@@ -19,7 +19,7 @@ let dag = DagRunner::new();
 let x = dag.add_task(Value(2));
 let y = dag.add_task(Value(3));
 let sum = dag.add_task(Add).depends_on((&x, &y));
-dag.run(|fut| tokio::spawn(fut)).await?;
+dag.run().await?;
 ```
 
 **dagrs** (Complex: traits + channels + IDs + manual wiring):

@@ -13,7 +13,7 @@ let a = dag.add_task(TaskA);
 let b = dag.add_task(TaskB);
 a.depends_on(b);
 b.depends_on(a);  // Compiles fine...
-dag.run().await?;  // ❌ Error: "Cycle detected!" (at runtime)
+dag.run()
 ```
 
 **dagx prevents this at compile time:**

@@ -5,6 +5,7 @@
 //!
 //! Uses Mutex for interior mutability to enable builder pattern (`&self` instead of `&mut self`).
 
+use std::any::Any;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::panic::AssertUnwindSafe;
 use std::sync::{
@@ -12,9 +13,9 @@ use std::sync::{
     Arc,
 };
 
-use futures::channel::mpsc;
-use futures::future::BoxFuture;
-use futures::{FutureExt, StreamExt};
+use dashmap::DashMap;
+use futures::stream::FuturesUnordered;
+use futures::{FutureExt, StreamExt, TryFutureExt};
 use parking_lot::Mutex;
 
 #[cfg(feature = "tracing")]
@@ -82,7 +83,7 @@ impl<'a> Drop for RunGuard<'a> {
 /// let y = dag.add_task(LoadValue::new(3));
 /// let sum = dag.add_task(Add).depends_on((&x, &y));
 ///
-/// dag.run(|fut| { tokio::spawn(fut); }).await.unwrap();
+/// dag.run().await.unwrap();
 ///
 /// assert_eq!(dag.get(sum).unwrap(), 5);
 /// # };
@@ -95,7 +96,7 @@ impl<'a> Drop for RunGuard<'a> {
 /// Outputs are Arc-wrapped and stored separately for retrieval via get().
 /// Arc enables efficient sharing during fanout without cloning data.
 pub struct DagRunner {
-    pub(crate) nodes: Mutex<Vec<Option<Box<dyn ExecutableNode>>>>,
+    pub(crate) nodes: Mutex<Vec<Option<Box<dyn ExecutableNode + Sync>>>>,
     pub(crate) outputs: Mutex<HashMap<NodeId, std::sync::Arc<dyn std::any::Any + Send + Sync>>>,
     pub(crate) edges: Mutex<HashMap<NodeId, Vec<NodeId>>>, // node -> dependencies
     pub(crate) dependents: Mutex<HashMap<NodeId, Vec<NodeId>>>, // node -> tasks that depend on it
@@ -188,13 +189,13 @@ impl DagRunner {
     /// // Construct task with offset of 1
     /// let inc = dag.add_task(AddOffset::new(1)).depends_on(&base);
     ///
-    /// dag.run(|fut| { tokio::spawn(fut); }).await.unwrap();
+    /// dag.run().await.unwrap();
     /// assert_eq!(dag.get(&inc).unwrap(), 11);
     /// # };
     /// ```
     pub fn add_task<Tk>(&self, task: Tk) -> TaskBuilder<'_, Tk, Pending>
     where
-        Tk: Task + 'static,
+        Tk: Task + Sync + 'static,
         Tk::Input: 'static + Clone,
         Tk::Output: 'static + Clone,
     {
@@ -272,7 +273,7 @@ impl DagRunner {
     /// let b = dag.add_task(Value(2));
     /// let sum = dag.add_task(Add).depends_on((&a, &b));
     ///
-    /// dag.run(|fut| { tokio::spawn(fut); }).await.unwrap(); // Executes all tasks
+    /// dag.run().await.unwrap(); // Executes all tasks
     /// # };
     /// ```
     ///
@@ -283,11 +284,8 @@ impl DagRunner {
     /// Type erasure occurs only at the ExecutableNode trait boundary - channels are created
     /// with full type information and type-erased just before passing to execute_with_channels.
     #[inline]
-    #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, spawner)))]
-    pub async fn run<S>(&self, spawner: S) -> DagResult<()>
-    where
-        S: Fn(BoxFuture<'static, ()>),
-    {
+    #[cfg_attr(feature = "tracing", tracing::instrument(skip(self)))]
+    pub async fn run(&self) -> DagResult<()> {
         #[cfg(feature = "tracing")]
         info!("starting DAG execution");
         // Acquire run lock to prevent concurrent executions
@@ -320,47 +318,8 @@ impl DagRunner {
 
         let edges = self.edges.lock().clone();
 
-        // Create all channels upfront
-        // Map: (producer_id, consumer_id) -> receiver index
-        // We store receivers in a Vec per consumer to maintain order
-        let mut consumer_receivers: HashMap<NodeId, Vec<Box<dyn std::any::Any + Send>>> =
-            HashMap::new();
-        let mut producer_senders: HashMap<NodeId, Vec<Box<dyn std::any::Any + Send>>> =
-            HashMap::new();
-
-        // Create channels for each producer-consumer relationship
-        // We need to lock nodes temporarily to call create_output_channels
-        {
-            let nodes_lock = self.nodes.lock();
-
-            for (consumer_id, producer_ids) in &edges {
-                for &producer_id in producer_ids {
-                    // Get the producer node (it's still in the vector at this point)
-                    if let Some(Some(producer_node)) = nodes_lock.get(producer_id.0) {
-                        // Ask the producer to create ONE channel for this consumer
-                        let (mut senders, mut receivers) = producer_node.create_output_channels(1);
-
-                        // Store the sender for the producer
-                        producer_senders
-                            .entry(producer_id)
-                            .or_default()
-                            .push(senders.pop().unwrap());
-
-                        // Store the receiver for the consumer (order matters!)
-                        consumer_receivers
-                            .entry(*consumer_id)
-                            .or_default()
-                            .push(receivers.pop().unwrap());
-                    }
-                }
-            }
-        }
-
-        // Create a channel to collect Arc-wrapped outputs from all tasks
-        let (output_tx, mut output_rx) = mpsc::unbounded::<(
-            NodeId,
-            Result<std::sync::Arc<dyn std::any::Any + Send + Sync>, DagError>,
-        )>();
+        let outputs: DashMap<NodeId, Arc<dyn Any + Send + Sync>> = DashMap::new();
+        let mut first_error = None;
 
         for layer in layers {
             #[cfg(feature = "tracing")]
@@ -402,8 +361,6 @@ impl DagRunner {
                     "executing task inline (single-task layer optimization)"
                 );
 
-                let out_tx = output_tx.clone();
-
                 // Take ownership of the node
                 let node = {
                     let mut nodes_lock = self.nodes.lock();
@@ -411,11 +368,11 @@ impl DagRunner {
                 };
 
                 if let Some(node) = node {
-                    // Take the receivers for this consumer
-                    let receivers = consumer_receivers.remove(&node_id).unwrap_or_default();
-
-                    // Take the senders for this producer
-                    let senders = producer_senders.remove(&node_id).unwrap_or_default();
+                    let dependencies: Vec<_> = edges[&node_id]
+                        .iter()
+                        .flat_map(|dep| outputs.get(dep))
+                        .map(|value| value.clone())
+                        .collect();
 
                     // Execute inline with panic handling.
                     //
@@ -423,7 +380,7 @@ impl DagRunner {
                     // DagError::TaskPanicked, matching the behavior of async runtimes when
                     // they spawn tasks. This guarantees consistent error handling whether
                     // a task executes inline (single-task layer) or spawned (multi-task layer).
-                    let result = AssertUnwindSafe(node.execute_with_channels(receivers, senders))
+                    let result = AssertUnwindSafe(node.execute_with_deps(dependencies))
                         .catch_unwind()
                         .await
                         .unwrap_or_else(|panic_payload| {
@@ -451,79 +408,94 @@ impl DagRunner {
                         });
 
                     // Send the output (ignore send errors - receiver may be dropped)
-                    let _ = out_tx.unbounded_send((node_id, result));
+                    match result {
+                        Ok(output) => {
+                            outputs.insert(node_id, output);
+                        }
+                        Err(e) => {
+                            first_error.get_or_insert(e);
+                        }
+                    }
                 }
             } else {
                 // Slow path: Multiple tasks require spawning and coordination
-                // Create a channel to track task completion for this layer
-                let (tx, mut rx) = mpsc::channel::<()>(layer.len());
-
                 // Spawn each task in this layer
-                for &node_id in &layer {
-                    #[cfg(feature = "tracing")]
-                    trace!(task_id = node_id.0, "spawning task");
-                    let mut task_tx = tx.clone();
-                    let out_tx = output_tx.clone();
+                let outputs = &outputs;
+                let mut futures: FuturesUnordered<_> = FuturesUnordered::new();
+                layer
+                    .into_iter()
+                    .flat_map(|node_id| {
+                        #[cfg(feature = "tracing")]
+                        trace!(task_id = node_id.0, "spawning task");
 
-                    // Take ownership of the node
-                    let node = {
-                        let mut nodes_lock = self.nodes.lock();
-                        nodes_lock[node_id.0].take()
-                    };
-
-                    if let Some(node) = node {
-                        // Take the receivers for this consumer
-                        let receivers = consumer_receivers.remove(&node_id).unwrap_or_default();
-
-                        // Take the senders for this producer
-                        let senders = producer_senders.remove(&node_id).unwrap_or_default();
-
-                        // Create a 'static future by taking ownership
-                        let inner_future = async move {
-                            let task_future = node.execute_with_channels(receivers, senders);
-
-                            let result = task_future.await;
-
-                            // Send the output (ignore send errors - receiver may be dropped)
-                            let _ = out_tx.unbounded_send((node_id, result));
-
-                            // Signal completion (ignore send errors - receiver may be dropped)
-                            let _ = task_tx.try_send(());
+                        // Take ownership of the node
+                        let node = {
+                            let mut nodes_lock = self.nodes.lock();
+                            nodes_lock[node_id.0].take()
                         };
+                        if let Some(node) = node {
+                            let dependencies: Vec<_> = edges[&node_id]
+                                .iter()
+                                .flat_map(|dep| outputs.get(dep))
+                                .map(|value| value.clone())
+                                .collect();
 
-                        // Spawn the task using the provided spawner
-                        spawner(Box::pin(inner_future));
+                            // Spawn the task using the provided spawner
+                            let inner_future = async move {
+                                let result = node.execute_with_deps(dependencies).await?;
+                                outputs.insert(node_id, result);
+                                Ok(())
+                            };
+
+                            Some(
+                                AssertUnwindSafe(Box::pin(inner_future))
+                                    .catch_unwind()
+                                    .unwrap_or_else(move |panic_payload| {
+                                        // Convert panic to error
+                                        let panic_message =
+                                            if let Some(s) = panic_payload.downcast_ref::<&str>() {
+                                                s.to_string()
+                                            } else if let Some(s) =
+                                                panic_payload.downcast_ref::<String>()
+                                            {
+                                                s.clone()
+                                            } else {
+                                                "unknown panic".to_string()
+                                            };
+
+                                        #[cfg(feature = "tracing")]
+                                        error!(
+                                            task_id = node_id.0,
+                                            panic_message = %panic_message,
+                                            "task panicked during inline execution"
+                                        );
+
+                                        Err(DagError::TaskPanicked {
+                                            task_id: node_id.0,
+                                            panic_message,
+                                        })
+                                    }),
+                            )
+                        } else {
+                            None
+                        }
+                    })
+                    .for_each(|fut| futures.push(fut));
+
+                while let Some(out) = futures.next().await {
+                    if let Err(e) = out {
+                        first_error.get_or_insert(e);
                     }
                 }
-
-                // Drop the original sender so the channel closes when all tasks complete
-                drop(tx);
-
-                // Wait for all tasks in this layer to complete
-                while rx.next().await.is_some() {}
-            }
-        }
-
-        // Drop the output sender so the channel closes
-        drop(output_tx);
-
-        // Collect all outputs and check for errors
-        let mut collected = Vec::new();
-        let mut first_error = None;
-        while let Some((node_id, result)) = output_rx.next().await {
-            match result {
-                Ok(output) => collected.push((node_id, output)),
-                Err(e) if first_error.is_none() => first_error = Some(e),
-                Err(_) => {} // Ignore subsequent errors
             }
         }
 
         // Insert all successful outputs (avoiding holding lock across await)
-        let mut outputs = self.outputs.lock();
-        for (node_id, output) in collected {
-            outputs.insert(node_id, output);
+        let mut outputs_lock = self.outputs.lock();
+        for (node_id, output) in outputs {
+            outputs_lock.insert(node_id, output);
         }
-        drop(outputs);
+        drop(outputs_lock);
 
         // Return first error if any
         if let Some(err) = first_error {
@@ -575,7 +547,7 @@ impl DagRunner {
     /// // Construct task with specific setting value
     /// let task = dag.add_task(Configuration::new(42));
     ///
-    /// dag.run(|fut| { tokio::spawn(fut); }).await.unwrap();
+    /// dag.run().await.unwrap();
     ///
     /// assert_eq!(dag.get(task).unwrap(), 42);
     /// # };
