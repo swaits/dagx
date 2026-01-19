@@ -55,7 +55,7 @@
 //! Expected: Categories: [low, invalid, high]
 //! ```
 
-use dagx::{task, DagResult, DagRunner, Task};
+use dagx::{task, DagResult, DagRunner};
 use futures::FutureExt;
 
 // Task that validates and processes input

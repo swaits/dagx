@@ -114,7 +114,7 @@
 //!   FulfillOrder: 30ms
 //! ```
 
-use dagx::{task, DagRunner, Task};
+use dagx::{task, DagRunner};
 use futures::FutureExt;
 use std::time::Instant;
 use tokio::time::{sleep, Duration};

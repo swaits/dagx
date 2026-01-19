@@ -9,7 +9,7 @@
 //!
 //! These tests serve as both validation and documentation for proper Arc usage.
 
-use dagx::{task, DagRunner, Task};
+use dagx::{task, DagRunner};
 use futures::FutureExt;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;

@@ -109,7 +109,7 @@
 //!   - Memory overhead is minimal (~ 200 bytes per task)
 //! ```
 
-use dagx::{task, DagRunner, Task};
+use dagx::{task, DagRunner};
 use futures::FutureExt;
 use std::time::Instant;
 

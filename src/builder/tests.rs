@@ -2,7 +2,6 @@
 
 use crate::builder::IsUnitType;
 use crate::runner::DagRunner;
-use crate::task::Task;
 use crate::types::TaskHandle;
 
 // Initialize tracing subscriber for tests (idempotent)

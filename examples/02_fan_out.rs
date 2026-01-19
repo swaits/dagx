@@ -55,7 +55,7 @@
 //!   Squared: 100
 //! ```
 
-use dagx::{task, DagRunner, Task};
+use dagx::{task, DagRunner};
 use futures::FutureExt;
 
 // Source task with a value field

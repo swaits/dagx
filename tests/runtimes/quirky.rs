@@ -444,8 +444,6 @@ fn test_futures_executor_multi_pool() {
 
 #[test]
 fn test_sync_tasks_on_async_executor() {
-    use dagx::Task;
-
     struct SyncAdd;
 
     #[dagx::task]
@@ -473,8 +471,6 @@ fn test_sync_tasks_on_async_executor() {
 
 #[test]
 fn test_sync_tasks_on_pollster() {
-    use dagx::Task;
-
     struct SyncDouble;
 
     #[dagx::task]

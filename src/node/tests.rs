@@ -3,7 +3,6 @@
 use std::sync::Arc;
 
 use crate::node::{ExecutableNode, TypedNode};
-use crate::task::Task;
 use crate::types::NodeId;
 
 // Simple test task

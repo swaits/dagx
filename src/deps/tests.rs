@@ -2,7 +2,6 @@
 
 use crate::deps::DepsTuple;
 use crate::runner::DagRunner;
-use crate::task::Task;
 use crate::types::{NodeId, TaskHandle};
 
 // Test task for dependency testing

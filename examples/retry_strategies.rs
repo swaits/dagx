@@ -152,7 +152,7 @@
 //! Result: Err("Retry exhausted after 3 attempts: Connection timeout")
 //! ```
 
-use dagx::{task, DagRunner, Task};
+use dagx::{task, DagRunner};
 use futures::FutureExt;
 use tokio::time::{sleep, Duration};
 

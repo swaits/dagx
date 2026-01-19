@@ -279,16 +279,7 @@ pub fn task(_attr: TokenStream, item: TokenStream) -> TokenStream {
 
     // Extract return type
     let output_type = match &run_method.sig.output {
-        ReturnType::Default => {
-            return syn::Error::new_spanned(
-                &run_method.sig,
-                "run() method must have an explicit return type\n\n\
-                 Specify the output type: async fn run(...) -> OutputType\n\
-                 For tasks that don't return a value, use '-> ()'.",
-            )
-            .to_compile_error()
-            .into();
-        }
+        ReturnType::Default => syn::parse_quote!(()),
         ReturnType::Type(_, ty) => ty.clone(),
     };
 
@@ -421,7 +412,7 @@ pub fn task(_attr: TokenStream, item: TokenStream) -> TokenStream {
         if is_async {
             // Async with self
             quote! {
-                impl Task for #struct_name {
+                impl ::dagx::Task for #struct_name {
                     type Input = #input_type;
                     type Output = #output_type;
 
@@ -440,7 +431,7 @@ pub fn task(_attr: TokenStream, item: TokenStream) -> TokenStream {
         } else {
             // Sync with self - wrap in async block
             quote! {
-                impl Task for #struct_name {
+                impl ::dagx::Task for #struct_name {
                     type Input = #input_type;
                     type Output = #output_type;
 
@@ -462,7 +453,7 @@ pub fn task(_attr: TokenStream, item: TokenStream) -> TokenStream {
         if is_async {
             // Async stateless
             quote! {
-                impl Task for #struct_name {
+                impl ::dagx::Task for #struct_name {
                     type Input = #input_type;
                     type Output = #output_type;
 
@@ -482,7 +473,7 @@ pub fn task(_attr: TokenStream, item: TokenStream) -> TokenStream {
         } else {
             // Sync stateless
             quote! {
-                impl Task for #struct_name {
+                impl ::dagx::Task for #struct_name {
                     type Input = #input_type;
                     type Output = #output_type;
 

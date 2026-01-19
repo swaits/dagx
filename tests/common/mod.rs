@@ -7,7 +7,7 @@ pub use dagx::task_fn;
 // Re-export commonly used test structs
 #[allow(dead_code)]
 pub mod tasks {
-    use dagx::{task, Task};
+    use dagx::task;
 
     // Simple seed task with mutable state
     pub struct Seed {

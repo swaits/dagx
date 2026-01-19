@@ -47,7 +47,7 @@
 //!        This proves TRUE PARALLEL EXECUTION!
 //! ```
 
-use dagx::{task, DagRunner, Task};
+use dagx::{task, DagRunner};
 use futures::FutureExt;
 use std::time::{Duration, Instant};
 use tokio::time::sleep;

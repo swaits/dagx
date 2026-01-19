@@ -1,7 +1,8 @@
 //! Tests for timing and speedup verification
 
 use crate::common::task_fn;
-use dagx::{DagResult, DagRunner, Task};
+
+use dagx::{DagResult, DagRunner};
 use futures::FutureExt;
 use std::sync::Arc;
 use std::sync::Mutex;

@@ -167,7 +167,6 @@ async fn test_task_fn_with_option_type() {
 #[tokio::test]
 async fn test_task_fn_explicit_trait_call() {
     // Test explicit Task trait method call to cover line 121
-    use crate::task::Task;
 
     let task = task_fn(|x: i32| async move { x * 3 });
 

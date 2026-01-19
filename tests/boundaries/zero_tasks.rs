@@ -1,7 +1,7 @@
 //! Tests for empty DAGs and minimal task configurations
 
 use crate::common::task_fn;
-use dagx::{task, DagResult, DagRunner, Task};
+use dagx::{task, DagResult, DagRunner};
 use futures::FutureExt;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;

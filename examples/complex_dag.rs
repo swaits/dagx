@@ -66,7 +66,7 @@
 //!   Combined: 6 items, sum=57, avg=9.50
 //! ```
 
-use dagx::{task, DagResult, DagRunner, Task};
+use dagx::{task, DagResult, DagRunner};
 use futures::FutureExt;
 
 // Extract: Load data from different sources

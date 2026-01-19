@@ -2,8 +2,7 @@
 //!
 //! These tests ensure we hit line 71 in the From<TaskBuilder> implementation
 
-use crate::types::TaskHandle;
-use crate::{task, DagRunner, Task};
+use crate::{task, DagRunner, TaskHandle};
 use futures::FutureExt;
 
 #[tokio::test]

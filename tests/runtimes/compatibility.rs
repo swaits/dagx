@@ -1,6 +1,6 @@
 //! Runtime integration tests - verify dagx works correctly across different runtimes
 
-use dagx::{DagResult, DagRunner, Task};
+use dagx::{DagResult, DagRunner};
 use futures::FutureExt;
 
 struct Value(i32);
