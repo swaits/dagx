@@ -12,7 +12,7 @@ async fn test_two_dependencies() -> DagResult<()> {
     let b = dag.add_task(task_fn(|_: ()| async { 20 }));
     let sum = dag
         .add_task(task_fn(|(x, y): (i32, i32)| async move { x + y }))
-        .depends_on((&a, &b));
+        .depends_on((a, b));
 
     dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 
@@ -31,7 +31,7 @@ async fn test_three_dependencies() -> DagResult<()> {
         .add_task(task_fn(
             |(x, y, z): (i32, i32, i32)| async move { x + y + z },
         ))
-        .depends_on((&a, &b, &c));
+        .depends_on((a, b, c));
 
     dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 
@@ -44,7 +44,7 @@ async fn test_four_dependencies() -> DagResult<()> {
     let dag = DagRunner::new();
 
     let deps: Vec<_> = (1..=4)
-        .map(|i| dag.add_task(task_fn(move |_: ()| async move { i })))
+        .map(|i| dag.add_task(task_fn(move |_: ()| async move { i })).into())
         .collect();
 
     let sum = dag
@@ -64,7 +64,7 @@ async fn test_five_dependencies() -> DagResult<()> {
     let dag = DagRunner::new();
 
     let deps: Vec<_> = (1..=5)
-        .map(|i| dag.add_task(task_fn(move |_: ()| async move { i })))
+        .map(|i| dag.add_task(task_fn(move |_: ()| async move { i })).into())
         .collect();
 
     let sum = dag
@@ -84,7 +84,7 @@ async fn test_six_dependencies() -> DagResult<()> {
     let dag = DagRunner::new();
 
     let deps: Vec<_> = (1..=6)
-        .map(|i| dag.add_task(task_fn(move |_: ()| async move { i })))
+        .map(|i| dag.add_task(task_fn(move |_: ()| async move { i })).into())
         .collect();
 
     let sum = dag.add_task(task_fn(
@@ -106,7 +106,7 @@ async fn test_seven_dependencies() -> DagResult<()> {
     let dag = DagRunner::new();
 
     let deps: Vec<_> = (1..=7)
-        .map(|i| dag.add_task(task_fn(move |_: ()| async move { i })))
+        .map(|i| dag.add_task(task_fn(move |_: ()| async move { i })).into())
         .collect();
 
     let sum = dag
@@ -130,7 +130,7 @@ async fn test_eight_dependencies() -> DagResult<()> {
     let dag = DagRunner::new();
 
     let deps: Vec<_> = (1..=8)
-        .map(|i| dag.add_task(task_fn(move |_: ()| async move { i })))
+        .map(|i| dag.add_task(task_fn(move |_: ()| async move { i })).into())
         .collect();
 
     let sum = dag

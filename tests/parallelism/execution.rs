@@ -1,7 +1,7 @@
 //! Tests for execution correctness and parallelism
 
 use crate::common::task_fn;
-use dagx::{DagResult, DagRunner};
+use dagx::{DagResult, DagRunner, TaskHandle};
 use futures::FutureExt;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -32,7 +32,7 @@ async fn test_layers_execute_in_parallel() -> DagResult<()> {
 
     // Layer 1: Tasks depending on layer 0
     let layer1: Vec<_> = sources
-        .iter()
+        .into_iter()
         .enumerate()
         .map(|(i, source)| {
             let timing = layer_timing.clone();
@@ -168,7 +168,7 @@ async fn test_completion_order_matches_dependencies() -> DagResult<()> {
                 x + y
             }
         }))
-        .depends_on((&a, &b))
+        .depends_on((a, b))
     };
 
     let d = {
@@ -216,7 +216,7 @@ async fn test_dependent_tasks_respect_ordering() -> DagResult<()> {
     let execution_order = Arc::new(Mutex::new(Vec::new()));
 
     // Create a chain: A -> B -> C -> D
-    let a = {
+    let a: TaskHandle<_> = {
         let order = execution_order.clone();
         dag.add_task(task_fn(move |_: ()| {
             let order = order.clone();
@@ -226,7 +226,8 @@ async fn test_dependent_tasks_respect_ordering() -> DagResult<()> {
                 1
             }
         }))
-    };
+    }
+    .into();
 
     let b = {
         let order = execution_order.clone();
@@ -238,7 +239,7 @@ async fn test_dependent_tasks_respect_ordering() -> DagResult<()> {
                 x + 1
             }
         }))
-        .depends_on(&a)
+        .depends_on(a)
     };
 
     let c = {

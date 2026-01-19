@@ -63,11 +63,11 @@ impl IsUnitType for () {}
 /// let b = dag.add_task(Multiplier::new(2));
 /// // b is TaskBuilder<_, Pending> until we call depends_on()
 ///
-/// let b = b.depends_on(&a);
+/// let b = b.depends_on(a);
 /// // Now b is a TaskHandle<i32>
 ///
 /// dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await.unwrap();
-/// assert_eq!(dag.get(&b).unwrap(), 20);
+/// assert_eq!(dag.get(b).unwrap(), 20);
 /// # };
 /// ```
 pub struct TaskBuilder<'a, Tk: Task, Deps> {
@@ -118,14 +118,14 @@ impl<'a, Tk: Task, Deps> TaskBuilder<'a, Tk, Deps> {
     /// # async {
     /// let dag = DagRunner::new();
     ///
-    /// let x = dag.add_task(Value(2));
+    /// let x = dag.add_task(Value(2)).into();
     /// let y = dag.add_task(Value(3));
     ///
     /// // Single dependency
     /// let double = dag.add_task(Scale(2)).depends_on(&x);
     ///
     /// // Multiple dependencies: tuple form
-    /// let sum = dag.add_task(Add).depends_on((&x, &y));
+    /// let sum = dag.add_task(Add).depends_on((&x, y));
     ///
     /// dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await.unwrap();
     /// # };
@@ -169,7 +169,3 @@ impl<'a, Tk: Task, Deps> TaskBuilder<'a, Tk, Deps> {
 
 #[cfg(test)]
 mod tests;
-
-// Note: We cannot safely implement AsRef<TaskHandle<Tk::Output>> for TaskBuilder<Tk, Deps>
-// because Handle is Copy and returning a reference to a temporary would be unsound.
-// Instead, users should use From/Into conversions or call .into() explicitly.

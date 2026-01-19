@@ -25,7 +25,7 @@ async fn test_basic_dag_async_std() {
 
     let x = dag.add_task(Value(2));
     let y = dag.add_task(Value(3));
-    let sum = dag.add_task(Add).depends_on((&x, &y));
+    let sum = dag.add_task(Add).depends_on((x, y));
 
     dag.run(async_std::task::spawn).await.unwrap();
 
@@ -42,7 +42,7 @@ async fn test_parallel_execution_async_std() {
 
     dag.run(async_std::task::spawn).await.unwrap();
 
-    for (i, task) in tasks.iter().enumerate() {
+    for (i, task) in tasks.into_iter().enumerate() {
         assert_eq!(dag.get(task).unwrap(), i * 2);
     }
 }
@@ -53,7 +53,7 @@ async fn test_complex_dependencies_async_std() {
 
     let a = dag.add_task(Value(10));
     let b = dag.add_task(Value(20));
-    let sum = dag.add_task(Add).depends_on((&a, &b));
+    let sum = dag.add_task(Add).depends_on((a, b));
     let double = dag
         .add_task(task_fn(|x: i32| async move { x * 2 }))
         .depends_on(sum);

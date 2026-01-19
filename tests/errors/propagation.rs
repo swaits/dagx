@@ -1,7 +1,7 @@
 //! Tests for error propagation through the DAG
 
 use crate::common::task_fn;
-use dagx::DagRunner;
+use dagx::{DagRunner, TaskHandle};
 use futures::FutureExt;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
@@ -10,12 +10,12 @@ use std::sync::Arc;
 async fn test_linear_error_propagation() {
     let dag = DagRunner::new();
 
-    let t1 = dag.add_task(task_fn(|_: ()| async { 1 }));
+    let t1: TaskHandle<_> = dag.add_task(task_fn(|_: ()| async { 1 })).into();
     let t2 = dag
         .add_task(task_fn(|x: i32| async move {
             panic!("Error at t2 with input {}", x);
         }))
-        .depends_on(&t1);
+        .depends_on(t1);
     let t3 = dag
         .add_task(task_fn(|x: i32| async move { x + 1 }))
         .depends_on(t2);
@@ -26,7 +26,7 @@ async fn test_linear_error_propagation() {
     let _ = dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await;
 
     // t1 succeeds
-    assert_eq!(dag.get(&t1).unwrap(), 1);
+    assert_eq!(dag.get(t1).unwrap(), 1);
 
     // t2 fails
     assert!(dag.get(t2).is_err());
@@ -46,17 +46,17 @@ async fn test_diamond_error_propagation() {
     //     \    /
     //      sink
 
-    let source = dag.add_task(task_fn(|_: ()| async { 100 }));
+    let source: TaskHandle<_> = dag.add_task(task_fn(|_: ()| async { 100 })).into();
 
     let left = dag
         .add_task(task_fn(|x: i32| async move { x / 2 }))
-        .depends_on(&source);
+        .depends_on(source);
 
     let right = dag
         .add_task(task_fn(|x: i32| async move {
             panic!("Right path fails with {}", x);
         }))
-        .depends_on(&source);
+        .depends_on(source);
 
     let sink = dag
         .add_task(task_fn(|(l, r): (i32, i32)| async move { l + r }))
@@ -64,7 +64,7 @@ async fn test_diamond_error_propagation() {
 
     let _ = dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await;
 
-    assert_eq!(dag.get(&source).unwrap(), 100);
+    assert_eq!(dag.get(source).unwrap(), 100);
     assert_eq!(dag.get(left).unwrap(), 50);
     assert!(dag.get(right).is_err());
     assert!(dag.get(sink).is_err()); // Fails due to right dependency
@@ -76,16 +76,18 @@ async fn test_error_stops_at_boundary() {
     let execution_tracker = Arc::new(AtomicUsize::new(0));
 
     // Branch with error
-    let error_source = dag.add_task(task_fn({
-        let tracker = execution_tracker.clone();
-        move |_: ()| {
-            let tracker = tracker.clone();
-            async move {
-                tracker.fetch_add(1, Ordering::SeqCst);
-                panic!("Error source");
+    let error_source: TaskHandle<_> = dag
+        .add_task(task_fn({
+            let tracker = execution_tracker.clone();
+            move |_: ()| {
+                let tracker = tracker.clone();
+                async move {
+                    tracker.fetch_add(1, Ordering::SeqCst);
+                    panic!("Error source");
+                }
             }
-        }
-    }));
+        }))
+        .into();
 
     let error_dependent = dag
         .add_task(task_fn({
@@ -98,7 +100,7 @@ async fn test_error_stops_at_boundary() {
                 }
             }
         }))
-        .depends_on(&error_source);
+        .depends_on(error_source);
 
     // Independent branch
     let independent = dag.add_task(task_fn({
@@ -115,11 +117,11 @@ async fn test_error_stops_at_boundary() {
     let _ = dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await;
 
     // Error branch: source runs but dependent doesn't
-    assert!(dag.get(&error_source).is_err());
+    assert!(dag.get(error_source).is_err());
     assert!(dag.get(error_dependent).is_err());
 
     // Independent branch runs
-    assert_eq!(dag.get(&independent).unwrap(), 10);
+    assert_eq!(dag.get(independent).unwrap(), 10);
 
     // Check execution: 1 (error_source) + 10 (independent) = 11
     assert_eq!(execution_tracker.load(Ordering::SeqCst), 11);
@@ -130,15 +132,19 @@ async fn test_multiple_error_sources_convergence() {
     let dag = DagRunner::new();
 
     // Multiple error sources
-    let error1 = dag.add_task(task_fn(|_: ()| async {
-        panic!("Error source 1");
-    }));
+    let error1 = dag
+        .add_task(task_fn(|_: ()| async {
+            panic!("Error source 1");
+        }))
+        .into();
 
-    let error2 = dag.add_task(task_fn(|_: ()| async {
-        panic!("Error source 2");
-    }));
+    let error2 = dag
+        .add_task(task_fn(|_: ()| async {
+            panic!("Error source 2");
+        }))
+        .into();
 
-    let success = dag.add_task(task_fn(|_: ()| async { 42 }));
+    let success = dag.add_task(task_fn(|_: ()| async { 42 })).into();
 
     // Convergence point depends on all three
     let convergence = dag
@@ -148,11 +154,11 @@ async fn test_multiple_error_sources_convergence() {
     let _ = dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await;
 
     // All error sources fail
-    assert!(dag.get(&error1).is_err());
-    assert!(dag.get(&error2).is_err());
+    assert!(dag.get(error1).is_err());
+    assert!(dag.get(error2).is_err());
 
     // Success task works
-    assert_eq!(dag.get(&success).unwrap(), 42);
+    assert_eq!(dag.get(success).unwrap(), 42);
 
     // Convergence fails due to any error dependency
     assert!(dag.get(convergence).is_err());
@@ -162,22 +168,24 @@ async fn test_multiple_error_sources_convergence() {
 async fn test_error_in_wide_fanout() {
     let dag = DagRunner::new();
 
-    let source = dag.add_task(task_fn(|_: ()| async {
-        panic!("Source fails");
-    }));
+    let source: TaskHandle<_> = dag
+        .add_task(task_fn(|_: ()| async {
+            panic!("Source fails");
+        }))
+        .into();
 
     // Create wide fanout from failing source
     let dependents: Vec<_> = (0..20)
         .map(|i| {
             dag.add_task(task_fn(move |x: i32| async move { x + i }))
-                .depends_on(&source)
+                .depends_on(source)
         })
         .collect();
 
     let _ = dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await;
 
     // Source fails
-    assert!(dag.get(&source).is_err());
+    assert!(dag.get(source).is_err());
 
     // All dependents fail
     for dependent in &dependents {
@@ -190,9 +198,11 @@ async fn test_selective_error_propagation() {
     let dag = DagRunner::new();
 
     // Source that produces a Result
-    let source = dag.add_task(task_fn(|_: ()| async {
-        Result::<i32, String>::Err("Source error".to_string())
-    }));
+    let source: TaskHandle<_> = dag
+        .add_task(task_fn(|_: ()| async {
+            Result::<i32, String>::Err("Source error".to_string())
+        }))
+        .into();
 
     // Handler that processes the Result
     let handler = dag
@@ -202,7 +212,7 @@ async fn test_selective_error_propagation() {
                 Err(_) => -1, // Default value on error
             }
         }))
-        .depends_on(&source);
+        .depends_on(source);
 
     // Further processing
     let final_task = dag
@@ -220,7 +230,7 @@ async fn test_selective_error_propagation() {
         .unwrap();
 
     // Source returns an Err variant (not a panic)
-    assert_eq!(dag.get(&source).unwrap(), Err("Source error".to_string()));
+    assert_eq!(dag.get(source).unwrap(), Err("Source error".to_string()));
 
     // Handler processes it
     assert_eq!(dag.get(handler).unwrap(), -1);
@@ -258,7 +268,7 @@ async fn test_error_propagation_timing() {
                 }
             }
         }))
-        .depends_on(&t1);
+        .depends_on(t1);
 
     let _t3 = dag
         .add_task(task_fn({
@@ -271,7 +281,7 @@ async fn test_error_propagation_timing() {
                 }
             }
         }))
-        .depends_on(&t2);
+        .depends_on(t2);
 
     let _ = dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await;
 
@@ -297,12 +307,12 @@ async fn test_partial_branch_failure_propagation() {
     //      \  |   /
     //        sink
 
-    let root = dag.add_task(task_fn(|_: ()| async { 100 }));
+    let root: TaskHandle<_> = dag.add_task(task_fn(|_: ()| async { 100 })).into();
 
     // Branch A
     let a1 = dag
         .add_task(task_fn(|x: i32| async move { x + 1 }))
-        .depends_on(&root);
+        .depends_on(root);
     let a2 = dag
         .add_task(task_fn(|x: i32| async move { x + 2 }))
         .depends_on(a1);
@@ -313,22 +323,22 @@ async fn test_partial_branch_failure_propagation() {
     // Branch B (with error) - use Result instead of panic
     let b1 = dag
         .add_task(task_fn(|x: i32| async move { Ok(x * 2) }))
-        .depends_on(&root);
+        .depends_on(root);
     let b2 = dag
         .add_task(task_fn(|_x: Result<i32, &str>| async move {
             Err("Branch B fails at b2")
         }))
-        .depends_on(&b1);
+        .depends_on(b1);
     let b3 = dag
         .add_task(task_fn(
             |x: Result<i32, &str>| async move { x.map(|v| v * 3) },
         ))
-        .depends_on(&b2);
+        .depends_on(b2);
 
     // Branch C
     let c1 = dag
         .add_task(task_fn(|x: i32| async move { x - 1 }))
-        .depends_on(&root);
+        .depends_on(root);
     let c2 = dag
         .add_task(task_fn(|x: i32| async move { x - 2 }))
         .depends_on(c1);

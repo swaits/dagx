@@ -1,5 +1,5 @@
 // Test that custom types work without any trait implementations
-use dagx::{task, DagRunner};
+use dagx::{task, DagRunner, TaskHandle};
 use futures::FutureExt;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -55,7 +55,7 @@ async fn test_custom_type_single_dependency() {
     let dag = DagRunner::new();
 
     let fetch = dag.add_task(FetchPerson);
-    let process = dag.add_task(ProcessPerson).depends_on(&fetch);
+    let process = dag.add_task(ProcessPerson).depends_on(fetch);
 
     dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
         .await
@@ -69,9 +69,9 @@ async fn test_custom_type_single_dependency() {
 async fn test_custom_type_passthrough() {
     let dag = DagRunner::new();
 
-    let fetch = dag.add_task(FetchPerson);
-    let transform = dag.add_task(PersonToCompany).depends_on(&fetch);
-    let process = dag.add_task(ProcessPerson).depends_on(&fetch);
+    let fetch: TaskHandle<_> = dag.add_task(FetchPerson).into();
+    let transform = dag.add_task(PersonToCompany).depends_on(fetch);
+    let process = dag.add_task(ProcessPerson).depends_on(fetch);
 
     dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
         .await
@@ -90,11 +90,11 @@ async fn test_custom_type_diamond_pattern() {
     let dag = DagRunner::new();
 
     // Source
-    let fetch = dag.add_task(FetchPerson);
+    let fetch: TaskHandle<_> = dag.add_task(FetchPerson).into();
 
     // Two paths from source
-    let path_a = dag.add_task(ProcessPerson).depends_on(&fetch);
-    let path_b = dag.add_task(PersonToCompany).depends_on(&fetch);
+    let path_a = dag.add_task(ProcessPerson).depends_on(fetch);
+    let path_b = dag.add_task(PersonToCompany).depends_on(fetch);
 
     dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
         .await
@@ -111,10 +111,10 @@ async fn test_custom_type_diamond_pattern() {
 async fn test_custom_type_fan_out() {
     let dag = DagRunner::new();
 
-    let fetch = dag.add_task(FetchPerson);
-    let process1 = dag.add_task(ProcessPerson).depends_on(&fetch);
-    let process2 = dag.add_task(ProcessPerson).depends_on(&fetch);
-    let process3 = dag.add_task(ProcessPerson).depends_on(&fetch);
+    let fetch: TaskHandle<_> = dag.add_task(FetchPerson).into();
+    let process1 = dag.add_task(ProcessPerson).depends_on(fetch);
+    let process2 = dag.add_task(ProcessPerson).depends_on(fetch);
+    let process3 = dag.add_task(ProcessPerson).depends_on(fetch);
 
     dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
         .await

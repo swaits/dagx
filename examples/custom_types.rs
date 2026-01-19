@@ -36,7 +36,7 @@
 //! Validation: Alice is valid (age 30 >= 18)
 //! ```
 
-use dagx::{task, DagRunner};
+use dagx::{task, DagRunner, TaskHandle};
 use futures::FutureExt;
 
 // Custom type - just derive Clone!
@@ -97,15 +97,17 @@ async fn main() {
     let dag = DagRunner::new();
 
     // Create a task that produces a custom User type
-    let user_task = dag.add_task(CreateUser {
-        name: "Alice".to_string(),
-        age: 30,
-    });
+    let user_task: TaskHandle<_> = dag
+        .add_task(CreateUser {
+            name: "Alice".to_string(),
+            age: 30,
+        })
+        .into();
 
     // Two different tasks consume the same custom User type
     // dagx automatically handles Arc wrapping, so both tasks get &User
-    let greeting = dag.add_task(GreetUser).depends_on(&user_task);
-    let validation = dag.add_task(ValidateUser).depends_on(&user_task);
+    let greeting = dag.add_task(GreetUser).depends_on(user_task);
+    let validation = dag.add_task(ValidateUser).depends_on(user_task);
 
     // Execute the DAG
     dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))

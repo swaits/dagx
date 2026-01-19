@@ -83,8 +83,8 @@ async fn main() {
     // Step 4: Add source tasks (tasks with no dependencies)
     //
     // add_task() returns a TaskHandle<T> where T is the task's output type
-    let x = dag.add_task(Value::new(2)); // TaskHandle<i32>
-    let y = dag.add_task(Value::new(3)); // TaskHandle<i32>
+    let x = dag.add_task(Value::new(2)).into(); // TaskHandle<i32>
+    let y = dag.add_task(Value::new(3)).into(); // TaskHandle<i32>
 
     // Step 5: Add a task with dependencies
     //

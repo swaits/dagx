@@ -1,7 +1,7 @@
 //! Tests for dependency resolution order and transitive dependencies
 
 use crate::common::task_fn;
-use dagx::{DagResult, DagRunner};
+use dagx::{DagResult, DagRunner, TaskHandle};
 use futures::FutureExt;
 use std::sync::{Arc, Mutex};
 
@@ -37,7 +37,7 @@ async fn test_dependency_resolution_order() -> DagResult<()> {
                 x + 1
             }
         }))
-        .depends_on(&a)
+        .depends_on(a)
     };
 
     let c = {
@@ -108,17 +108,17 @@ async fn test_transitive_dependencies() -> DagResult<()> {
     // A -> B -> C (creates transitive A -> C relationship)
     let dag = DagRunner::new();
 
-    let a = dag.add_task(task_fn(|_: ()| async { 10 }));
+    let a: TaskHandle<_> = dag.add_task(task_fn(|_: ()| async { 10 })).into();
     let b = dag
         .add_task(task_fn(|x: i32| async move { x * 2 }))
-        .depends_on(&a);
+        .depends_on(a);
     let c = dag
         .add_task(task_fn(|x: i32| async move { x + 5 }))
         .depends_on(b);
 
     dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 
-    assert_eq!(dag.get(&a)?, 10);
+    assert_eq!(dag.get(a)?, 10);
     assert_eq!(dag.get(b)?, 20);
     assert_eq!(dag.get(c)?, 25); // 20 + 5
 
@@ -130,7 +130,7 @@ async fn test_deep_chain_50_levels() -> DagResult<()> {
     let dag = DagRunner::new();
 
     let first = dag.add_task(task_fn(|_: ()| async { 0 }));
-    let mut handles = vec![(&first).into()];
+    let mut handles = vec![first.into()];
 
     for _i in 1..=50 {
         let next = dag
@@ -150,7 +150,7 @@ async fn test_deep_chain_200_levels() -> DagResult<()> {
     let dag = DagRunner::new();
 
     let first = dag.add_task(task_fn(|_: ()| async { 1 }));
-    let mut current = (&first).into();
+    let mut current = first.into();
 
     for _ in 0..200 {
         current = dag

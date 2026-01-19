@@ -27,19 +27,19 @@ pub fn bench_etl_pipeline(c: &mut Criterion) {
                     .add_task(task_fn(|data: Vec<i32>| async move {
                         data.into_iter().map(|x| x * 2).collect::<Vec<_>>()
                     }))
-                    .depends_on(&source1);
+                    .depends_on(source1);
 
                 let transform2 = dag
                     .add_task(task_fn(|data: Vec<i32>| async move {
                         data.into_iter().map(|x| x * 2).collect::<Vec<_>>()
                     }))
-                    .depends_on(&source2);
+                    .depends_on(source2);
 
                 let transform3 = dag
                     .add_task(task_fn(|data: Vec<i32>| async move {
                         data.into_iter().map(|x| x * 2).collect::<Vec<_>>()
                     }))
-                    .depends_on(&source3);
+                    .depends_on(source3);
 
                 // Merge all transformed data
                 let merge = dag

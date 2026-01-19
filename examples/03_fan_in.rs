@@ -130,7 +130,7 @@ async fn main() {
     // Single downstream task consuming all values
     let profile = dag
         .add_task(BuildProfile)
-        .depends_on((&name, &age, &city, &active));
+        .depends_on((name, age, city, active));
 
     // Run the DAG
     println!("Running fan-in DAG...\n");

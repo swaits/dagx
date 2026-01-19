@@ -47,7 +47,7 @@ async fn test_concurrent_run_calls() {
     assert_eq!(error_count, 4);
 
     // Verify results are consistent from the successful run
-    for (i, task) in tasks.iter().enumerate() {
+    for (i, task) in tasks.into_iter().enumerate() {
         assert_eq!(dag.get(task).unwrap(), i);
     }
 }
@@ -71,7 +71,7 @@ async fn test_concurrent_execution_and_building() {
     let mut handles = JoinSet::new();
 
     // Reader tasks
-    for task in &initial {
+    for task in initial {
         let dag = Arc::clone(&dag);
         let task_handle: dagx::TaskHandle<i32> = task.into();
         handles.spawn(async move { dag.get(task_handle).unwrap() });
@@ -116,7 +116,7 @@ async fn test_dag_builder_thread_safety() {
 
             let transform1 = dag
                 .add_task(task_fn(move |x: i32| async move { x * 10 }))
-                .depends_on(&source);
+                .depends_on(source);
 
             let transform2 = dag
                 .add_task(task_fn(move |x: i32| async move { x + thread_id }))
@@ -165,7 +165,7 @@ async fn test_concurrent_get_operations() {
     // Now access results concurrently
     let mut handles = JoinSet::new();
 
-    for task in tasks.iter() {
+    for task in tasks.into_iter() {
         let dag = Arc::clone(&dag);
         let task_handle: dagx::TaskHandle<i32> = task.into();
         handles.spawn(async move { dag.get(task_handle).unwrap() });
@@ -193,7 +193,7 @@ async fn test_no_race_in_dependency_tracking() {
     let mut handles = JoinSet::new();
 
     // Multiple threads create tasks depending on the same source
-    let source_handle: dagx::TaskHandle<i32> = (&source).into();
+    let source_handle: dagx::TaskHandle<i32> = source.into();
     for i in 0..50 {
         let dag = Arc::clone(&dag);
         let source_clone = source_handle;
@@ -245,14 +245,14 @@ async fn test_high_concurrency_stress() {
                     // Add a task with a simple dependency
                     let source = dag.add_task(task_fn(move |_: ()| async move { i }));
                     dag.add_task(task_fn(move |x: i32| async move { x * 2 }))
-                        .depends_on(&source);
+                        .depends_on(source);
                 }
                 2 => {
                     // Add a more complex subgraph
                     let a = dag.add_task(task_fn(move |_: ()| async move { i }));
                     let b = dag.add_task(task_fn(move |_: ()| async move { i + 1 }));
                     dag.add_task(task_fn(move |(x, y): (i32, i32)| async move { x + y }))
-                        .depends_on((&a, &b));
+                        .depends_on((a, b));
                 }
                 _ => unreachable!(),
             }
@@ -332,7 +332,7 @@ async fn test_atomic_dag_operations() {
     let mut handles = JoinSet::new();
     let success_count = Arc::new(AtomicUsize::new(0));
 
-    let base_handle: dagx::TaskHandle<i32> = (&base).into();
+    let base_handle: dagx::TaskHandle<i32> = base.into();
     for i in 0..50 {
         let dag = Arc::clone(&dag);
         let base_clone = base_handle;
@@ -382,7 +382,7 @@ async fn test_no_deadlock_on_circular_waiting() {
         handles.spawn(async move {
             // Each thread creates a chain of tasks
             let first = dag.add_task(task_fn(move |_: ()| async move { i }));
-            let mut chain = vec![(&first).into()];
+            let mut chain = vec![first.into()];
 
             for j in 0..5 {
                 let next = dag

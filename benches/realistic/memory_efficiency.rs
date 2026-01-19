@@ -1,7 +1,7 @@
 //! Memory efficiency benchmark with large data structures
 
 use criterion::{BenchmarkId, Criterion};
-use dagx::{task_fn, DagRunner};
+use dagx::{task_fn, DagRunner, TaskHandle};
 use futures::FutureExt;
 use std::hint::black_box;
 
@@ -19,10 +19,12 @@ pub fn bench_memory_efficiency(c: &mut Criterion) {
                     rt.block_on(async {
                         let dag = DagRunner::new();
 
-                        let source = dag.add_task(task_fn(move |_: ()| async move {
-                            // Create MB of data - framework wraps in Arc automatically
-                            vec![0u8; mb * 1024 * 1024]
-                        }));
+                        let source: TaskHandle<_> = dag
+                            .add_task(task_fn(move |_: ()| async move {
+                                // Create MB of data - framework wraps in Arc automatically
+                                vec![0u8; mb * 1024 * 1024]
+                            }))
+                            .into();
 
                         // 20 consumers share the data via automatic Arc wrapping
                         for i in 0..20 {
@@ -36,7 +38,7 @@ pub fn bench_memory_efficiency(c: &mut Criterion) {
                                     .sum();
                                 black_box(sample_sum)
                             }))
-                            .depends_on(&source);
+                            .depends_on(source);
                         }
 
                         dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
