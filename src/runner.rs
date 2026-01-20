@@ -13,7 +13,6 @@ use std::sync::{
     Arc,
 };
 
-use dashmap::DashMap;
 use futures::stream::FuturesUnordered;
 use futures::{FutureExt, StreamExt, TryFutureExt};
 use parking_lot::Mutex;
@@ -314,7 +313,7 @@ impl DagRunner {
 
         let edges = self.edges.lock().clone();
 
-        let outputs: DashMap<NodeId, Arc<dyn Any + Send + Sync>> = DashMap::new();
+        let mut outputs: HashMap<NodeId, Arc<dyn Any + Send + Sync>> = HashMap::new();
         let mut first_error = None;
 
         for layer in layers {
@@ -414,7 +413,6 @@ impl DagRunner {
             } else {
                 // Slow path: Multiple tasks require spawning and coordination
                 // Spawn each task in this layer
-                let outputs = &outputs;
                 let mut futures: FuturesUnordered<_> = FuturesUnordered::new();
                 layer
                     .into_iter()
@@ -437,8 +435,7 @@ impl DagRunner {
                             // Spawn the task using the provided spawner
                             let inner_future = async move {
                                 let result = node.execute_with_deps(dependencies).await?;
-                                outputs.insert(node_id, result);
-                                Ok(())
+                                Ok((node_id, result))
                             };
 
                             Some(
@@ -477,8 +474,13 @@ impl DagRunner {
                     .for_each(|fut| futures.push(fut));
 
                 while let Some(out) = futures.next().await {
-                    if let Err(e) = out {
-                        first_error.get_or_insert(e);
+                    match out {
+                        Ok(output) => {
+                            outputs.insert(output.0, output.1);
+                        }
+                        Err(e) => {
+                            first_error.get_or_insert(e);
+                        }
                     }
                 }
             }
