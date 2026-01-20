@@ -1,4 +1,4 @@
-//! Input extraction for task dependencies via oneshot channels.
+//! Input extraction for task dependencies via a list of dependencies.
 //!
 //! # Legacy Trait for Internal Use Only
 //!
@@ -35,7 +35,7 @@
 use std::any::Any;
 use std::sync::Arc;
 
-/// Helper trait for async input extraction from oneshot channels.
+/// Helper trait for async input extraction from list of dependencies.
 ///
 /// Type erasure occurs only at the ExecutableNode trait boundary - by the time
 /// we're in ExtractInput, we know the concrete type and can safely downcast.
@@ -59,7 +59,7 @@ impl ExtractInput for () {
 
 // Implementations for common primitive and standard library types.
 // These allow tasks to receive these types as single inputs without wrapping in tuples.
-// Receives Arc<T> from channel, clones the inner value for task consumption.
+// Receives Arc<T> from runner, clones the inner value for task consumption.
 // For custom types, implement ExtractInput following the same pattern.
 macro_rules! impl_extract_single {
     ($($t:ty),+) => {
@@ -217,9 +217,6 @@ where
 
 /// Macro to implement ExtractInput for tuple types.
 ///
-/// Generates an implementation that extracts values from multiple dependency channels
-/// and combines them into a tuple. All channels are awaited concurrently using join_all.
-///
 /// We need separate implementations for each tuple size (2-8) because Rust doesn't support
 /// variadic generics. This is standard practice when working with tuples in Rust.
 ///
@@ -244,12 +241,12 @@ macro_rules! impl_extract_tuple {
                 let mut iter = dependencies.into_iter();
 
                 // dependencies now contain Arc-wrapped values for efficient fanout
-                // Dereference Box after downcasting to get the receiver itself
+                // Dereference Box after downcasting to get the parameter itself
                 // Use type names as variable names to avoid numeric suffix issues
                 let arc_results = (
                     $(
                             iter.next()
-                            .ok_or_else(|| format!("Missing receiver at index {}", $idx))?
+                            .ok_or_else(|| format!("Missing parameter at index {}", $idx))?
                             .downcast::<$T>()
                             .map_err(|_| format!("Type mismatch at index {}: expected Arc<{}>",
                                 $idx, std::any::type_name::<$T>()))?,

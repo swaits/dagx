@@ -394,10 +394,10 @@ pub fn task(_attr: TokenStream, item: TokenStream) -> TokenStream {
 
                         let mut iter = dependencies.into_iter();
 
-                        // Extract each receiver
+                        // Extract each parameter
                         let arc_results = (#(
                             iter.next()
-                                .ok_or_else(|| format!("Missing receiver at index {}", #indices))?
+                                .ok_or_else(|| format!("Missing parameter at index {}", #indices))?
                                 .downcast::<#param_types>()
                                 .map_err(|_| format!("Type mismatch at index {}: expected Arc<{}>",
                                     #indices, std::any::type_name::<#param_types>()))?,

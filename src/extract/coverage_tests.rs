@@ -2,7 +2,7 @@
 //!
 //! These tests specifically target type mismatch error messages that aren't hit
 //! in normal usage because the #[task] macro generates type-safe code.
-//! We directly call extract_from_channels with mismatched types.
+//! We directly call extract_from_deps with mismatched types.
 
 use crate::extract::ExtractInput;
 use futures::channel::oneshot;
@@ -141,19 +141,13 @@ async fn test_hashmap_type_mismatch_coverage() {
 #[tokio::test]
 async fn test_arc_type_mismatch_coverage() {
     // Tests line 211 in extract.rs - Arc<T> type mismatch error message
-    // Arc is special: it expects Arc<Arc<T>> from channel
-    // Create a channel that sends Arc<String> instead of Arc<Arc<String>>
-    let (tx, rx) = oneshot::channel::<Arc<String>>();
-
-    // Send an Arc<String> value (missing one level of Arc wrapping)
-    tokio::spawn(async move {
-        let _ = tx.send(Arc::new("not double arc".to_string()));
-    });
+    // Arc is special: it expects Arc<Arc<T>> from dependency
+    // Create a dependency that provides Arc<String> instead of Arc<Arc<String>>
+    let deps = vec![Arc::new("not double arc".to_string()) as Arc<dyn Any + Send + Sync>];
 
     // Try to extract as Arc<String> - this will fail with type mismatch
-    // because it expects Arc<Arc<String>> in the channel
-    let deps = vec![Box::new(rx) as Box<dyn Any + Send>];
-    let result = Arc::<String>::extract_from_channels(deps).await;
+    // because it expects Arc<Arc<String>> in the dependency
+    let result = Arc::<String>::extract_from_deps(deps).await;
 
     // Verify the error message contains the expected type information
     assert!(result.is_err());

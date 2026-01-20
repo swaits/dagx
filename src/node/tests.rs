@@ -67,17 +67,13 @@ async fn test_execute_with_channels_missing_input() {
 }
 
 #[tokio::test]
-async fn test_execute_with_channels_success() {
+async fn test_execute_with_deps_success() {
     // Test successful execution with channels
     let dependency_node = Box::new(TypedNode::new(NodeId(0), TestTask { value: 21 }));
     let dependent_node = Box::new(TypedNode::new(NodeId(1), TaskWithDependency));
 
-    // Create a channel from dependency to dependent (Arc-wrapped)
-    let (tx, rx) = futures::channel::oneshot::channel::<std::sync::Arc<i32>>();
-
     // Execute dependency node with sender
-    let dep_senders = vec![Box::new(tx) as Box<dyn std::any::Any + Send>];
-    let dep_receivers = vec![];
+    let dep_dependencies = vec![];
 
     // Execute in background
     let dep_handle = tokio::spawn(async move {
@@ -87,15 +83,9 @@ async fn test_execute_with_channels_success() {
     });
 
     // Execute dependent node with receiver
-    let receivers = vec![Box::new(rx) as Box<dyn std::any::Any + Send>];
-    let senders = vec![];
+    let dependencies = vec![dep_result as Arc<dyn std::any::Any + Send + Sync>];
 
-    let result = dependent_node
-        .execute_with_channels(receivers, senders)
-        .await;
-
-    // Wait for dependency to complete
-    let _ = dep_handle.await;
+    let result = dependent_node.execute_with_deps(dependencies).await;
 
     assert!(result.is_ok());
 }
@@ -106,8 +96,7 @@ async fn test_execute_with_channels_sink_node() {
     let node = Box::new(TypedNode::new(NodeId(0), TestTask { value: 42 }));
 
     // No senders means this is a sink node
-    let receivers = vec![];
-    let senders = vec![];
+    let dependencies = vec![];
 
     let result = node.execute_with_channels(receivers, senders).await;
     assert!(result.is_ok());
@@ -119,12 +108,9 @@ async fn test_execute_with_channels_sink_node() {
 }
 
 #[tokio::test]
-async fn test_execute_with_channels_non_sink_node() {
+async fn test_execute_with_deps_non_sink_node() {
     // Test that non-sink nodes send output via channels
     let node = TypedNode::new(NodeId(0), TestTask { value: 42 });
-
-    // Create output channels for one dependent
-    let (senders, mut receivers) = node.create_output_channels(1);
 
     // Execute with senders (non-sink node)
     let node = Box::new(node);
@@ -133,15 +119,7 @@ async fn test_execute_with_channels_non_sink_node() {
     assert!(result.is_ok());
 
     // Verify output was sent through channel (Arc-wrapped)
-    let rx = receivers
-        .pop()
-        .unwrap()
-        .downcast::<futures::channel::oneshot::Receiver<std::sync::Arc<i32>>>()
-        .unwrap();
-
-    let received_arc = rx.await;
-    assert!(received_arc.is_ok());
-    assert_eq!(*received_arc.unwrap(), 42);
+    let arc_value = result.unwrap().downcast::<i32>().unwrap();
 
     // Also verify output was returned (Arc-wrapped)
     let output = result.unwrap();

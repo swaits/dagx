@@ -231,10 +231,13 @@ impl DagRunner {
     ///
     /// # Parameters
     ///
-    /// - `spawner`: A function that spawns futures on the async runtime. Examples:
-    ///   - Tokio: `|fut| { tokio::spawn(fut); }`
-    ///   - Smol: `|fut| { smol::spawn(fut).detach(); }`
-    ///   - Async-std: `|fut| { async_std::task::spawn(fut); }`
+    /// - `spawner`: A function that spawns futures on the async runtime
+    /// and returns a task handle. Examples:
+    ///   - Tokio: `|fut| { tokio::spawn(fut).map(Result::unwrap) }`
+    ///   - Smol: `|fut| { smol::spawn(fut) }`
+    ///   - Async-std: `|fut| { async_std::task::spawn(fut) }`
+    ///   - Single-threaded: `|fut| fut`
+    ///     - For computationally light tasks, concurrency without parallelism can be significantly faster.
     ///
     /// # Errors
     ///
@@ -276,13 +279,6 @@ impl DagRunner {
     /// dag.run().await.unwrap(); // Executes all tasks
     /// # };
     /// ```
-    ///
-    /// # Implementation Note
-    ///
-    /// Tasks communicate via oneshot channels created fresh during run().
-    /// This eliminates Mutex contention on outputs and enables true streaming execution.
-    /// Type erasure occurs only at the ExecutableNode trait boundary - channels are created
-    /// with full type information and type-erased just before passing to execute_with_channels.
     #[inline]
     #[cfg_attr(feature = "tracing", tracing::instrument(skip(self)))]
     pub async fn run(&self) -> DagResult<()> {
@@ -334,7 +330,6 @@ impl DagRunner {
             // pipelines), we execute it inline rather than spawning it. This provides
             // 10-100x performance improvements for sequential workloads by eliminating:
             //   - Task spawning overhead
-            //   - Channel creation/destruction for layer coordination
             //   - Context switching to/from the runtime
             //
             // CRITICAL: Panic handling is required to maintain behavioral consistency.
@@ -407,7 +402,6 @@ impl DagRunner {
                             })
                         });
 
-                    // Send the output (ignore send errors - receiver may be dropped)
                     match result {
                         Ok(output) => {
                             outputs.insert(node_id, output);

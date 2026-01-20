@@ -25,12 +25,12 @@ type ExecuteFuture =
 /// collection. While the public API (Task, Handle, Node) is fully type-safe, internally we
 /// need dynamic dispatch to execute tasks with different input/output types.
 ///
-/// This is the ONLY place where type erasure occurs - channels are created with full type
+/// This is the ONLY place where type erasure occurs - tasks are created with full type
 /// information and only erased at this trait boundary.
 ///
 /// This is an implementation detail and not part of the public API.
 pub(crate) trait ExecutableNode: Send {
-    /// Execute the task with type-erased input receivers and output senders.
+    /// Execute the task with type-erased inputs and output
     ///
     /// The TypedNode implementation knows the concrete types and can safely downcast.
     /// Consumes the node and returns the output value.
@@ -50,10 +50,7 @@ pub(crate) trait ExecutableNode: Send {
 /// The task is owned directly (no Mutex needed) and consumed during execution.
 /// Each task executes exactly once, taking ownership and producing an output.
 ///
-/// # Oneshot Channels
-///
-/// Outputs are communicated via oneshot channels for inter-task communication.
-/// The output is also returned from execute_with_channels for central storage.
+/// The output is also returned from execute_with_deps for central storage.
 pub(crate) struct TypedNode<T: Task> {
     pub(crate) id: NodeId,
     pub(crate) task: T,
@@ -81,7 +78,8 @@ where
             let output = match self.task.extract_and_run(dependencies).await {
                 Ok(output) => output,
                 Err(_msg) => {
-                    // Failed to extract input - likely channel closed or type mismatch
+                    // Failed to extract input - likely type mismatch.
+                    // This should technically be infallible, so it might be worth removing in the future.
                     return Err(DagError::InvalidDependency { task_id: self.id.0 });
                 }
             };

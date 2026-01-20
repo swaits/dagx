@@ -4,7 +4,6 @@
 
 use crate::extract::ExtractInput;
 use crate::task::Task;
-use futures::channel::oneshot;
 use std::any::Any;
 use std::sync::Arc;
 
@@ -206,16 +205,9 @@ async fn test_extract_channel_closed() {
 #[tokio::test]
 async fn test_extract_type_mismatch() {
     // Test type mismatch during downcast
-    let (tx, rx) = oneshot::channel::<String>();
-
-    // Send a String
-    tokio::spawn(async move {
-        let _ = tx.send("hello".to_string());
-    });
-
-    // Try to extract as wrong type - put wrong receiver type in deps
-    let deps = vec![Box::new(rx) as Box<dyn Any + Send>];
-    let result = i32::extract_from_channels(deps).await;
+    // Try to extract as wrong type - put wrong parameter type in deps
+    let deps = vec![Arc::new("hello".to_string()) as Arc<dyn Any + Send + Sync>];
+    let result = i32::extract_from_deps(deps).await;
     assert!(result.is_err());
     assert!(result.unwrap_err().contains("Type mismatch"));
 }
@@ -312,13 +304,8 @@ async fn test_hashmap_extract_wrong_dependency_count() {
 
 #[tokio::test]
 async fn test_hashmap_extract_type_mismatch() {
-    let (tx, rx) = oneshot::channel::<Arc<String>>();
-    tokio::spawn(async move {
-        let _ = tx.send(Arc::new("wrong type".to_string()));
-    });
-
-    let deps = vec![Box::new(rx) as Box<dyn Any + Send>];
-    let result = HashMap::<String, i32>::extract_from_channels(deps).await;
+    let deps = vec![Arc::new("wrong type".to_string()) as Arc<dyn Any + Send + Sync>];
+    let result = HashMap::<String, i32>::extract_from_deps(deps).await;
     assert!(result.is_err());
     assert!(result.unwrap_err().contains("Type mismatch"));
 }
@@ -336,39 +323,24 @@ async fn test_hashmap_extract_channel_closed() {
 
 #[tokio::test]
 async fn test_result_extract_downcast_failure() {
-    let (tx, rx) = oneshot::channel::<Arc<String>>();
-    tokio::spawn(async move {
-        let _ = tx.send(Arc::new("wrong".to_string()));
-    });
-
-    let deps = vec![Box::new(rx) as Box<dyn Any + Send>];
-    let result = Result::<i32, String>::extract_from_channels(deps).await;
+    let deps = vec![Arc::new("wrong".to_string()) as Arc<dyn Any + Send + Sync>];
+    let result = Result::<i32, String>::extract_from_deps(deps).await;
     assert!(result.is_err());
     assert!(result.unwrap_err().contains("Type mismatch"));
 }
 
 #[tokio::test]
 async fn test_option_extract_downcast_failure() {
-    let (tx, rx) = oneshot::channel::<Arc<String>>();
-    tokio::spawn(async move {
-        let _ = tx.send(Arc::new("wrong".to_string()));
-    });
-
-    let deps = vec![Box::new(rx) as Box<dyn Any + Send>];
-    let result = Option::<i32>::extract_from_channels(deps).await;
+    let deps = vec![Arc::new("wrong".to_string()) as Arc<dyn Any + Send + Sync>];
+    let result = Option::<i32>::extract_from_deps(deps).await;
     assert!(result.is_err());
     assert!(result.unwrap_err().contains("Type mismatch"));
 }
 
 #[tokio::test]
 async fn test_vec_extract_downcast_failure() {
-    let (tx, rx) = oneshot::channel::<Arc<String>>();
-    tokio::spawn(async move {
-        let _ = tx.send(Arc::new("wrong".to_string()));
-    });
-
-    let deps = vec![Box::new(rx) as Box<dyn Any + Send>];
-    let result = Vec::<i32>::extract_from_channels(deps).await;
+    let deps = vec![Arc::new("wrong".to_string()) as Arc<dyn Any + Send + Sync>];
+    let result = Vec::<i32>::extract_from_deps(deps).await;
     assert!(result.is_err());
     assert!(result.unwrap_err().contains("Type mismatch"));
 }
@@ -383,13 +355,8 @@ async fn test_arc_extract_wrong_dependency_count() {
 
 #[tokio::test]
 async fn test_arc_extract_downcast_failure() {
-    let (tx, rx) = oneshot::channel::<Arc<String>>();
-    tokio::spawn(async move {
-        let _ = tx.send(Arc::new("wrong".to_string()));
-    });
-
-    let deps = vec![Box::new(rx) as Box<dyn Any + Send>];
-    let result = Arc::<i32>::extract_from_channels(deps).await;
+    let deps = vec![Arc::new("wrong".to_string()) as Arc<dyn Any + Send + Sync>];
+    let result = Arc::<i32>::extract_from_deps(deps).await;
     assert!(result.is_err());
     assert!(result.unwrap_err().contains("Type mismatch"));
 }

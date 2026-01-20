@@ -87,7 +87,7 @@ use std::{future::Future, sync::Arc};
 /// # Output Wrapping
 ///
 /// **Task outputs are automatically wrapped in `Arc<T>` internally** for efficient fan-out.
-/// You define `Output = T`, but the framework wraps it in `Arc<T>` before sending to channels.
+/// You define `Output = T`, but the framework wraps it in `Arc<T>` before sending to dependents.
 /// This enables O(1) sharing for 1:N dependencies - Arc is cloned (cheap), not your data.
 ///
 /// Downstream tasks receive `&T` after ExtractInput extracts from the Arc. This is transparent
@@ -98,7 +98,7 @@ pub trait Task: Send {
 
     fn run(self, input: Self::Input) -> impl Future<Output = Self::Output> + Send;
 
-    /// Internal method: Extract input from type-erased channels and execute the task.
+    /// Internal method: Extract input from list of type-erased dependencies and execute the task.
     ///
     /// This method is implemented automatically by the #[task] macro with inline
     /// extraction logic based on the task's parameter signature. This allows ANY

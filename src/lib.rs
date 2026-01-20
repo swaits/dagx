@@ -64,7 +64,7 @@
 //! dagx automatically optimizes execution for sequential workloads using an inline fast-path.
 //! When a layer contains only a single task (common in deep chains and linear pipelines),
 //! that task executes inline rather than being spawned. This eliminates spawning overhead,
-//! context switching, and channel creation.
+//! and context switching.
 //!
 //! **Panic handling**: To maintain consistent behavior between inline and spawned execution,
 //! panics in inline tasks are caught using `FutureExt::catch_unwind()` and converted to

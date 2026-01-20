@@ -104,7 +104,6 @@ dagx provides true parallel execution with sub-microsecond overhead per task.
 **Why is dagx so fast?**
 
 - **Inline fast-path**: Sequential chains execute inline without spawning (8.9-129x faster)
-- **Primitives as scheduler**: No custom scheduler — channels coordinate execution
 - **Adaptive execution**: Inline for sequential work, true parallelism for concurrent work
 - **Zero-cost abstractions**: Generics and monomorphization eliminate overhead
 
@@ -223,13 +222,18 @@ dagx works with any async runtime. Provide a spawner function to `run()`:
 
 ```rust
 // With Tokio
-dag.run().await.unwrap();
+// The join handle result can be unwrapped because dagx catches panics internally
+dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await.unwrap();
 
 // With async-std
-dag.run().await.unwrap();
+dag.run(|fut| async_std::task::spawn(fut)).await.unwrap();
 
 // With smol
-dag.run().await.unwrap();
+dag.run(|fut| smol::spawn(fut)).await.unwrap();
+
+// Single-threaded on the invoking runtime
+// Faster for situations with many computationally light tasks
+dag.run(|fut| fut).await.unwrap()
 ```
 
 ## Tutorials & Examples
