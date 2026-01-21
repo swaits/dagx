@@ -284,7 +284,7 @@ impl DagRunner {
     /// # };
     /// ```
     #[inline]
-    #[cfg_attr(feature = "tracing", tracing::instrument(skip(self)))]
+    #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, spawner)))]
     pub async fn run<S, F>(&self, spawner: S) -> DagResult<()>
     where
         S: Fn(BoxFuture<'static, DagResult<(NodeId, Arc<dyn Any + Send + Sync>)>>) -> F,

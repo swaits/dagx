@@ -1,6 +1,7 @@
 //! Tests with tracing feature enabled
 
 use dagx::{task, DagRunner, Task};
+use futures::FutureExt;
 use tracing_subscriber::{fmt, EnvFilter};
 
 struct Value(i32);
