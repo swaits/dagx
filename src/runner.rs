@@ -235,7 +235,7 @@ impl DagRunner {
     /// # Parameters
     ///
     /// - `spawner`: A function that spawns futures on the async runtime
-    /// and returns a task handle. Examples:
+    /// and returns a handle to the task. This is the only way to run tasks on separate threads. Examples:
     ///   - Tokio: `|fut| { tokio::spawn(fut).map(Result::unwrap) }`
     ///   - Smol: `|fut| { smol::spawn(fut) }`
     ///   - Async-std: `|fut| { async_std::task::spawn(fut) }`

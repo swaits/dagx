@@ -111,6 +111,77 @@ async fn test_5000_node_pyramid() -> DagResult<()> {
 }
 
 #[tokio::test]
+async fn test_5000_node_pyramid_single_threaded() -> DagResult<()> {
+    // Create a pyramid structure with ~5000 nodes
+    // Layer sizes: 2048 -> 512 -> 128 -> 32 -> 8 -> 2 -> 1
+    let dag = DagRunner::new();
+
+    // Bottom layer: 2048 nodes - convert to TaskHandles
+    let mut current_layer: Vec<dagx::TaskHandle<i32>> = (0..2048)
+        .map(|i| {
+            let task = dag.add_task(task_fn(move |_: ()| async move {
+                if i < 1024 {
+                    1
+                } else {
+                    0
+                }
+            }));
+            (&task).into()
+        })
+        .collect();
+
+    let layer_sizes = vec![512, 128, 32, 8, 2];
+
+    for layer_size in layer_sizes {
+        let mut next_layer = Vec::with_capacity(layer_size);
+        let group_size = current_layer.len() / layer_size;
+
+        for i in 0..layer_size {
+            let start = i * group_size;
+            let deps: Vec<_> = current_layer[start..start + group_size.min(4)]
+                .iter()
+                .take(4)
+                .collect();
+
+            let task = match deps.len() {
+                1 => dag
+                    .add_task(task_fn(|a: i32| async move { a }))
+                    .depends_on(deps[0]),
+                2 => dag
+                    .add_task(task_fn(|(a, b): (i32, i32)| async move { a + b }))
+                    .depends_on((deps[0], deps[1])),
+                3 => dag
+                    .add_task(task_fn(
+                        |(a, b, c): (i32, i32, i32)| async move { a + b + c },
+                    ))
+                    .depends_on((deps[0], deps[1], deps[2])),
+                4 => dag
+                    .add_task(task_fn(|(a, b, c, d): (i32, i32, i32, i32)| async move {
+                        a + b + c + d
+                    }))
+                    .depends_on((deps[0], deps[1], deps[2], deps[3])),
+                _ => unreachable!(),
+            };
+            next_layer.push(task);
+        }
+        current_layer = next_layer;
+    }
+
+    // Final layer combines the last 2
+    let root = dag
+        .add_task(task_fn(|(a, b): (i32, i32)| async move { a + b }))
+        .depends_on((&current_layer[0], &current_layer[1]));
+
+    dag.run(|fut| fut).await?;
+
+    // We created 1024 ones and 1024 zeros at the bottom
+    // The sum should propagate up to 1024
+    let result = dag.get(root)?;
+    assert!(result > 0, "Expected positive result, got {}", result);
+    Ok(())
+}
+
+#[tokio::test]
 async fn test_wide_dag_1000_sources_1000_sinks() -> DagResult<()> {
     // Test a very wide DAG with 1000 sources and 1000 sinks
     let dag = DagRunner::new();
