@@ -7,12 +7,14 @@
 
 use std::any::Any;
 use std::collections::{HashMap, HashSet, VecDeque};
+use std::future::Future;
 use std::panic::AssertUnwindSafe;
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc,
 };
 
+use futures::future::BoxFuture;
 use futures::stream::FuturesUnordered;
 use futures::{FutureExt, StreamExt, TryFutureExt};
 use parking_lot::Mutex;
@@ -280,7 +282,11 @@ impl DagRunner {
     /// ```
     #[inline]
     #[cfg_attr(feature = "tracing", tracing::instrument(skip(self)))]
-    pub async fn run(&self) -> DagResult<()> {
+    pub async fn run<S, F>(&self, spawner: S) -> DagResult<()>
+    where
+        S: Fn(BoxFuture<'static, DagResult<(NodeId, Arc<dyn Any + Send + Sync>)>>) -> F,
+        F: Future<Output = DagResult<(NodeId, Arc<dyn Any + Send + Sync>)>>,
+    {
         #[cfg(feature = "tracing")]
         info!("starting DAG execution");
         // Acquire run lock to prevent concurrent executions
@@ -413,10 +419,9 @@ impl DagRunner {
             } else {
                 // Slow path: Multiple tasks require spawning and coordination
                 // Spawn each task in this layer
-                let mut futures: FuturesUnordered<_> = FuturesUnordered::new();
-                layer
+                let mut futures: FuturesUnordered<_> = layer
                     .into_iter()
-                    .flat_map(|node_id| {
+                    .filter_map(|node_id| {
                         #[cfg(feature = "tracing")]
                         trace!(task_id = node_id.0, "spawning task");
 
@@ -439,7 +444,7 @@ impl DagRunner {
                             };
 
                             Some(
-                                AssertUnwindSafe(Box::pin(inner_future))
+                                AssertUnwindSafe(spawner(Box::pin(inner_future)))
                                     .catch_unwind()
                                     .unwrap_or_else(move |panic_payload| {
                                         // Convert panic to error
@@ -471,7 +476,7 @@ impl DagRunner {
                             None
                         }
                     })
-                    .for_each(|fut| futures.push(fut));
+                    .collect();
 
                 while let Some(out) = futures.next().await {
                     match out {
