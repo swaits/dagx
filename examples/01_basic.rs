@@ -31,6 +31,7 @@
 //! ```
 
 use dagx::{task, DagRunner, Task};
+use futures::FutureExt;
 
 // Step 1: Define a source task (no dependencies)
 //
@@ -105,11 +106,9 @@ async fn main() {
     // 1. Tasks with no dependencies run first (x and y in parallel)
     // 2. Once x and y complete, sum runs (it depends on both)
     println!("Running DAG...\n");
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await
-    .unwrap();
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        .await
+        .unwrap();
 
     // Step 7: Retrieve results
     //

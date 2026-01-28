@@ -37,6 +37,7 @@
 //! ```
 
 use dagx::{task, DagRunner, Task};
+use futures::FutureExt;
 
 // Custom type - just derive Clone!
 #[derive(Clone, Debug)]
@@ -107,11 +108,9 @@ async fn main() {
     let validation = dag.add_task(ValidateUser).depends_on(&user_task);
 
     // Execute the DAG
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await
-    .unwrap();
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        .await
+        .unwrap();
 
     // Print results
     println!("Greeting: {}", dag.get(greeting).unwrap());

@@ -2,6 +2,7 @@
 
 use crate::common::task_fn;
 use dagx::{DagResult, DagRunner};
+use futures::FutureExt;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -23,10 +24,7 @@ async fn test_concurrent_result_retrieval() -> DagResult<()> {
         .collect();
 
     // Execute the DAG
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await?;
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 
     // Now try to get results concurrently from multiple threads
     let mut get_handles = Vec::new();
@@ -77,10 +75,7 @@ async fn test_simultaneous_dag_building_and_execution() -> DagResult<()> {
     tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
 
     // Execute the DAG
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await?;
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 
     // Get the additional tasks
     let additional_tasks = build_handle.await.unwrap();
@@ -94,10 +89,7 @@ async fn test_simultaneous_dag_building_and_execution() -> DagResult<()> {
     // (they need another run cycle)
     if building_complete.load(Ordering::SeqCst) {
         // Run again for the new tasks
-        dag.run(|fut| {
-            tokio::spawn(fut);
-        })
-        .await?;
+        dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 
         // Now they should have results
         for (i, task) in additional_tasks.iter().enumerate() {
@@ -141,10 +133,7 @@ async fn test_concurrent_dependency_resolution() -> DagResult<()> {
         })
         .collect();
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await?;
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 
     // Check all completed
     assert_eq!(resolution_counter.load(Ordering::SeqCst), 101);
@@ -198,10 +187,7 @@ async fn test_read_write_race_patterns() -> DagResult<()> {
         })
         .collect();
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await?;
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 
     // Verify readers saw their writer's data
     for reader in &readers {
@@ -257,10 +243,7 @@ async fn test_atomic_counter_races() -> DagResult<()> {
         })
         .collect();
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await?;
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 
     // Final counter should be 200 * 100 = 20000
     assert_eq!(counter.load(Ordering::SeqCst), 20000);
@@ -296,10 +279,7 @@ async fn test_multiple_dag_runners_interaction() -> DagResult<()> {
                 })
                 .collect();
 
-            dag.run(|fut| {
-                tokio::spawn(fut);
-            })
-            .await?;
+            dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 
             // Collect results
             let mut results = Vec::new();

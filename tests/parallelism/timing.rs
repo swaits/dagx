@@ -2,6 +2,7 @@
 
 use crate::common::task_fn;
 use dagx::{DagResult, DagRunner, Task};
+use futures::FutureExt;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
@@ -26,10 +27,7 @@ async fn test_parallel_execution_speedup() -> DagResult<()> {
         .collect();
 
     let start = Instant::now();
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await?;
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
     let elapsed = start.elapsed();
 
     // Verify all tasks completed
@@ -113,10 +111,7 @@ async fn test_sync_tasks_dont_block_async_runtime() -> DagResult<()> {
         }))
     };
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await?;
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 
     // Verify results
     assert_eq!(dag.get(sync1)?, 20);

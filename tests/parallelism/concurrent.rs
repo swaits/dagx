@@ -2,6 +2,7 @@
 
 use crate::common::task_fn;
 use dagx::DagRunner;
+use futures::FutureExt;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
@@ -14,7 +15,12 @@ async fn test_concurrent_run_calls() {
 
     // Add some tasks
     let tasks: Vec<_> = (0..10)
-        .map(|i| dag.add_task(task_fn(move |_: ()| async move { i })))
+        .map(|i| {
+            dag.add_task(task_fn(move |_: ()| async move {
+                tokio::time::sleep(Duration::from_millis(5)).await;
+                i
+            }))
+        })
         .collect();
 
     // Try to run the DAG multiple times concurrently
@@ -22,12 +28,7 @@ async fn test_concurrent_run_calls() {
 
     for _ in 0..5 {
         let dag = Arc::clone(&dag);
-        handles.spawn(async move {
-            dag.run(|fut| {
-                tokio::spawn(fut);
-            })
-            .await
-        });
+        handles.spawn(async move { dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await });
     }
 
     // Only one run should succeed, others should fail with concurrent execution error
@@ -62,11 +63,9 @@ async fn test_concurrent_execution_and_building() {
         .collect();
 
     // Execute the initial DAG
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await
-    .unwrap();
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        .await
+        .unwrap();
 
     // Now try to add more tasks while also reading results
     let mut handles = JoinSet::new();
@@ -93,11 +92,9 @@ async fn test_concurrent_execution_and_building() {
     }
 
     // Execute again with the new tasks
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await
-    .unwrap();
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        .await
+        .unwrap();
 }
 
 #[tokio::test]
@@ -139,11 +136,9 @@ async fn test_dag_builder_thread_safety() {
     assert_eq!(counter.load(Ordering::SeqCst), 10);
 
     // Execute the combined DAG
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await
-    .unwrap();
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        .await
+        .unwrap();
 
     // Verify each pipeline computed correctly
     for task in final_tasks.iter() {
@@ -163,11 +158,9 @@ async fn test_concurrent_get_operations() {
         .map(|i| dag.add_task(task_fn(move |_: ()| async move { i })))
         .collect();
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await
-    .unwrap();
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        .await
+        .unwrap();
 
     // Now access results concurrently
     let mut handles = JoinSet::new();
@@ -217,11 +210,9 @@ async fn test_no_race_in_dependency_tracking() {
     }
 
     // Execute
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await
-    .unwrap();
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        .await
+        .unwrap();
 
     // All dependents should have correct values
     for dep in dependents.iter() {
@@ -277,11 +268,9 @@ async fn test_high_concurrency_stress() {
     assert_eq!(completed.load(Ordering::SeqCst), 1000);
 
     // The DAG should still be executable
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await
-    .unwrap();
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        .await
+        .unwrap();
 }
 
 #[tokio::test]
@@ -369,11 +358,9 @@ async fn test_atomic_dag_operations() {
     assert_eq!(deps.len(), 50);
 
     // Execute and verify
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await
-    .unwrap();
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        .await
+        .unwrap();
 
     for dep in deps.iter() {
         let result = dag.get(dep).unwrap();
@@ -424,9 +411,7 @@ async fn test_no_deadlock_on_circular_waiting() {
     assert!(result.is_ok(), "Deadlock detected - operation timed out");
 
     // Should be able to execute the DAG
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await
-    .unwrap();
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        .await
+        .unwrap();
 }

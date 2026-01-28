@@ -2,6 +2,7 @@
 
 use crate::common::task_fn;
 use dagx::DagRunner;
+use futures::FutureExt;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
@@ -22,11 +23,7 @@ async fn test_linear_error_propagation() {
         .add_task(task_fn(|x: i32| async move { x * 2 }))
         .depends_on(t3);
 
-    let _ = dag
-        .run(|fut| {
-            tokio::spawn(fut);
-        })
-        .await;
+    let _ = dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await;
 
     // t1 succeeds
     assert_eq!(dag.get(&t1).unwrap(), 1);
@@ -65,11 +62,7 @@ async fn test_diamond_error_propagation() {
         .add_task(task_fn(|(l, r): (i32, i32)| async move { l + r }))
         .depends_on((&left, &right));
 
-    let _ = dag
-        .run(|fut| {
-            tokio::spawn(fut);
-        })
-        .await;
+    let _ = dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await;
 
     assert_eq!(dag.get(&source).unwrap(), 100);
     assert_eq!(dag.get(left).unwrap(), 50);
@@ -119,11 +112,7 @@ async fn test_error_stops_at_boundary() {
         }
     }));
 
-    let _ = dag
-        .run(|fut| {
-            tokio::spawn(fut);
-        })
-        .await;
+    let _ = dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await;
 
     // Error branch: source runs but dependent doesn't
     assert!(dag.get(&error_source).is_err());
@@ -156,11 +145,7 @@ async fn test_multiple_error_sources_convergence() {
         .add_task(task_fn(|(_, _, _): (i32, i32, i32)| async { 100 }))
         .depends_on((&error1, &error2, &success));
 
-    let _ = dag
-        .run(|fut| {
-            tokio::spawn(fut);
-        })
-        .await;
+    let _ = dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await;
 
     // All error sources fail
     assert!(dag.get(&error1).is_err());
@@ -189,11 +174,7 @@ async fn test_error_in_wide_fanout() {
         })
         .collect();
 
-    let _ = dag
-        .run(|fut| {
-            tokio::spawn(fut);
-        })
-        .await;
+    let _ = dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await;
 
     // Source fails
     assert!(dag.get(&source).is_err());
@@ -234,11 +215,9 @@ async fn test_selective_error_propagation() {
         }))
         .depends_on(handler);
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await
-    .unwrap();
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        .await
+        .unwrap();
 
     // Source returns an Err variant (not a panic)
     assert_eq!(dag.get(&source).unwrap(), Err("Source error".to_string()));
@@ -294,11 +273,7 @@ async fn test_error_propagation_timing() {
         }))
         .depends_on(&t2);
 
-    let _ = dag
-        .run(|fut| {
-            tokio::spawn(fut);
-        })
-        .await;
+    let _ = dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await;
 
     let order = propagation_order.lock().clone();
 
@@ -373,11 +348,9 @@ async fn test_partial_branch_failure_propagation() {
         ))
         .depends_on((&a3, &b3, &c3));
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await
-    .ok();
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        .await
+        .ok();
 
     // Branch A succeeds
     assert_eq!(dag.get(a3).unwrap(), 106);

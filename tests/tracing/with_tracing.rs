@@ -1,6 +1,7 @@
 //! Tests with tracing feature enabled
 
 use dagx::{task, DagRunner, Task};
+use futures::FutureExt;
 use tracing_subscriber::{fmt, EnvFilter};
 
 struct Value(i32);
@@ -44,11 +45,9 @@ async fn test_tracing_with_subscriber() {
     let b = dag.add_task(Value(3));
     let sum = dag.add_task(Add).depends_on((&a, &b));
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await
-    .unwrap();
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        .await
+        .unwrap();
 
     assert_eq!(dag.get(sum).unwrap(), 5);
 }
@@ -69,11 +68,9 @@ async fn test_tracing_with_complex_dag() {
     let right = dag.add_task(Multiply).depends_on((&source, &source));
     let sink = dag.add_task(Add).depends_on((&left, &right));
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await
-    .unwrap();
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        .await
+        .unwrap();
 
     // source = 10
     // left = 10 + 10 = 20
@@ -97,11 +94,9 @@ async fn test_tracing_inline_execution() {
     let b = dag.add_task(Add).depends_on((&a, &a));
     let c = dag.add_task(Multiply).depends_on((&b, &b));
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await
-    .unwrap();
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        .await
+        .unwrap();
 
     // a = 1
     // b = 1 + 1 = 2
@@ -133,11 +128,9 @@ async fn test_tracing_multiple_layers() {
     // Layer 2
     let final_sum = dag.add_task(Add).depends_on((&sum12, &mul23));
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await
-    .unwrap();
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        .await
+        .unwrap();
 
     // v1 = 1, v2 = 2, v3 = 3
     // sum12 = 1 + 2 = 3

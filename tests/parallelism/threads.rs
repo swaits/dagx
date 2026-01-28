@@ -2,6 +2,7 @@
 
 use crate::common::task_fn;
 use dagx::{DagResult, DagRunner};
+use futures::FutureExt;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -40,10 +41,7 @@ async fn test_tasks_run_on_different_threads() -> DagResult<()> {
         })
         .collect();
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await?;
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 
     // Verify all tasks completed
     for task in tasks.iter() {
@@ -112,10 +110,7 @@ async fn test_concurrent_execution_with_atomic_counter() -> DagResult<()> {
         })
         .collect();
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await?;
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 
     // Verify all tasks completed
     for (i, task) in tasks.iter().enumerate() {
@@ -186,10 +181,7 @@ async fn test_diamond_parallel_execution() -> DagResult<()> {
         .add_task(task_fn(|(a, b): (i32, i32)| async move { a + b }))
         .depends_on((&parallel1, &parallel2));
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await?;
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 
     assert_eq!(dag.get(sink)?, 500); // (100 * 2) + (100 * 3)
 
@@ -276,10 +268,7 @@ async fn test_parallel_branches_with_dependencies() -> DagResult<()> {
         .depends_on(b2_1)
     };
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await?;
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 
     // Verify results
     assert_eq!(dag.get(b1_2)?, 21); // (10 * 2) + 1
@@ -371,10 +360,7 @@ async fn test_wide_fanout_parallel_execution() -> DagResult<()> {
         })
         .collect();
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await?;
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 
     // Verify results
     for (i, task) in dependents.iter().enumerate() {
@@ -445,10 +431,7 @@ async fn test_massive_parallel_fanout() -> DagResult<()> {
         .collect();
 
     let start = Instant::now();
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await?;
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
     let elapsed = start.elapsed();
 
     // All should complete

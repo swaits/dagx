@@ -2,6 +2,7 @@
 
 use crate::common::task_fn;
 use dagx::{DagResult, DagRunner};
+use futures::FutureExt;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 
@@ -23,11 +24,7 @@ async fn test_fallback_on_error() -> DagResult<()> {
     let _selector = dag.add_task(task_fn(|_: ()| async {}));
 
     // Run DAG
-    let _ = dag
-        .run(|fut| {
-            tokio::spawn(fut);
-        })
-        .await;
+    let _ = dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await;
 
     // Primary should fail
     assert!(dag.get(&primary).is_err());
@@ -63,10 +60,7 @@ async fn test_retry_pattern_simulation() -> DagResult<()> {
         }
     }));
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await?;
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 
     // Task completes with error on first "attempt"
     assert_eq!(dag.get(&task)?, Err("Simulated failure"));
@@ -109,10 +103,7 @@ async fn test_circuit_breaker_pattern() -> DagResult<()> {
         })
         .collect();
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await?;
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 
     // First few tasks fail and open circuit
     for task in &tasks[0..3] {
@@ -144,11 +135,7 @@ async fn test_partial_recovery_with_defaults() -> DagResult<()> {
         vec![0, 10, 20, 0, 40, 50, 0, 70, 80, 0] // 0 for failed tasks
     }));
 
-    let _ = dag
-        .run(|fut| {
-            tokio::spawn(fut);
-        })
-        .await;
+    let _ = dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await;
 
     let result = dag.get(&aggregator)?;
     assert_eq!(result.len(), 10);
@@ -178,10 +165,7 @@ async fn test_error_accumulation_pattern() -> DagResult<()> {
         })
         .collect();
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await?;
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 
     // Check accumulated errors
     let error_list = errors.lock().clone();
@@ -215,10 +199,7 @@ async fn test_graceful_degradation() -> DagResult<()> {
         }))
         .depends_on(&critical);
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await?;
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 
     // Critical path works
     assert_eq!(dag.get(final_task)?, 15);
@@ -249,10 +230,7 @@ async fn test_error_boundary_isolation() -> DagResult<()> {
         .add_task(task_fn(|x: i32| async move { x + 5 }))
         .depends_on(b2);
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await?;
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 
     // Group A fails (returns Err)
     assert_eq!(dag.get(a2)?, Err("Group A error"));
@@ -287,11 +265,7 @@ async fn test_compensation_action() -> DagResult<()> {
         }
     }));
 
-    let _ = dag
-        .run(|fut| {
-            tokio::spawn(fut);
-        })
-        .await;
+    let _ = dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await;
 
     // Action failed
     assert!(dag.get(&action).is_err());

@@ -53,6 +53,7 @@
 //! ```
 
 use dagx::{task, DagResult, DagRunner, Task};
+use futures::FutureExt;
 use std::time::{Duration, Instant};
 use tokio::time::sleep;
 
@@ -126,10 +127,7 @@ async fn main() -> DagResult<()> {
             .add_task(Aggregate)
             .depends_on((&sum1, &sum2, &sum3, &sum4));
 
-        dag.run(|fut| {
-            tokio::spawn(fut);
-        })
-        .await?;
+        dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 
         let result = dag.get(total)?;
         let elapsed = start.elapsed();

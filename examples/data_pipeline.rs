@@ -76,6 +76,7 @@
 //! ```
 
 use dagx::{task, DagRunner, Task};
+use futures::FutureExt;
 
 // Data source tasks
 struct LoadValue1;
@@ -220,11 +221,9 @@ async fn main() {
 
     // Execute the pipeline
     println!("Executing pipeline...\n");
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await
-    .unwrap();
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        .await
+        .unwrap();
 
     // Print final report
     println!("{}", dag.get(report).unwrap());

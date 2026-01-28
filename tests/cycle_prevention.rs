@@ -4,6 +4,7 @@
 //! prevents it through the type-state pattern.
 
 use dagx::{task, DagRunner, Task, TaskHandle};
+use futures::FutureExt;
 
 /// Demonstrates that TaskBuilder is consumed by depends_on,
 /// preventing you from wiring the same task multiple times
@@ -270,11 +271,9 @@ async fn test_type_safety_prevents_invalid_graphs() {
     let result = dag.add_task(Aggregate).depends_on((&t1, &t2));
 
     // Execute and verify
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await
-    .unwrap();
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        .await
+        .unwrap();
 
     assert_eq!(dag.get(result).unwrap(), 40); // (10*2) + (10*2)
 

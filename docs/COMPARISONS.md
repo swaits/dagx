@@ -19,7 +19,7 @@ let dag = DagRunner::new();
 let x = dag.add_task(Value(2));
 let y = dag.add_task(Value(3));
 let sum = dag.add_task(Add).depends_on((&x, &y));
-dag.run(|fut| tokio::spawn(fut)).await?;
+dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 ```
 
 **dagrs** (Complex: traits + channels + IDs + manual wiring):
@@ -227,7 +227,7 @@ impl Task<String, Bytes> for MyTask {
 let mut dag = Dag::default();
 dag.add_vertex("one", || async move { /* task */ });
 dag.add_edge("one", "two");
-dag.run().await?;
+dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 ```
 
 ### tasksitter (Dynamic Workflows)

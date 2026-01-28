@@ -2,6 +2,7 @@
 
 use crate::common::task_fn;
 use dagx::{task, DagResult, DagRunner, Task};
+use futures::FutureExt;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
@@ -10,10 +11,7 @@ async fn test_empty_dag_execution() -> DagResult<()> {
     // Test that an empty DAG can be created and run without issues
     let dag = DagRunner::new();
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await?;
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 
     // Should complete successfully with no tasks
     Ok(())
@@ -26,10 +24,7 @@ async fn test_single_task_no_deps() -> DagResult<()> {
 
     let task = dag.add_task(task_fn(|_: ()| async { 42 }));
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await?;
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 
     assert_eq!(dag.get(task)?, 42);
     Ok(())
@@ -50,10 +45,7 @@ async fn test_single_task_unit_input_output() -> DagResult<()> {
         }
     }));
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await?;
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 
     dag.get(task)?; // Just verify it doesn't error
     assert_eq!(executed.load(Ordering::SeqCst), 1);
@@ -70,10 +62,7 @@ async fn test_zero_sized_type_task() -> DagResult<()> {
 
     let task = dag.add_task(task_fn(|_: ()| async { ZeroSized }));
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await?;
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 
     assert_eq!(dag.get(&task)?, ZeroSized);
     Ok(())
@@ -85,10 +74,7 @@ async fn test_empty_dag_multiple_runs() -> DagResult<()> {
     let dag = DagRunner::new();
 
     for _ in 0..10 {
-        dag.run(|fut| {
-            tokio::spawn(fut);
-        })
-        .await?;
+        dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
     }
 
     Ok(())
@@ -103,10 +89,7 @@ async fn test_dag_with_only_source_tasks() -> DagResult<()> {
         .map(|i| dag.add_task(task_fn(move |_: ()| async move { i })))
         .collect();
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await?;
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 
     for (i, task) in tasks.iter().enumerate() {
         assert_eq!(dag.get(task)?, i);
@@ -132,10 +115,7 @@ async fn test_single_self_contained_stateful_task() -> DagResult<()> {
     let dag = DagRunner::new();
     let task = dag.add_task(Counter { value: 21 });
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await?;
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 
     assert_eq!(dag.get(task)?, 42);
     Ok(())
@@ -149,17 +129,11 @@ async fn test_alternating_empty_and_filled_dag_runs() -> DagResult<()> {
 
         if i % 2 == 0 {
             // Empty DAG
-            dag.run(|fut| {
-                tokio::spawn(fut);
-            })
-            .await?;
+            dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
         } else {
             // DAG with a task
             let task = dag.add_task(task_fn(move |_: ()| async move { i }));
-            dag.run(|fut| {
-                tokio::spawn(fut);
-            })
-            .await?;
+            dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
             assert_eq!(dag.get(task)?, i);
         }
     }
@@ -179,10 +153,7 @@ async fn test_dag_with_never_type_simulation() -> DagResult<()> {
     // This task completes immediately but returns a Result containing "never" type
     let task = dag.add_task(task_fn(|_: ()| async { Result::<i32, Never>::Ok(42) }));
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await?;
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 
     assert_eq!(dag.get(&task)?, Ok(42));
     Ok(())
@@ -199,10 +170,7 @@ async fn test_minimal_task_with_minimal_async_work() -> DagResult<()> {
         1337
     }));
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await?;
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 
     assert_eq!(dag.get(task)?, 1337);
     Ok(())

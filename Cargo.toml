@@ -22,16 +22,24 @@ default = []
 tracing = ["dep:tracing"]
 
 [lints.rust]
-unexpected_cfgs = { level = "warn", check-cfg = ['cfg(tarpaulin)', 'cfg(tarpaulin_include)'] }
+unexpected_cfgs = { level = "warn", check-cfg = [
+    'cfg(tarpaulin)',
+    'cfg(tarpaulin_include)',
+] }
 
 [dependencies]
-futures = "0.3"
+futures = { version = "0.3", default-features = false, features = ["std"] }
 parking_lot = "0.12"
 dagx-macros = { version = "0.3.1", path = "./dagx-macros" }
 tracing = { version = "0.1", optional = true }
 
 [dev-dependencies]
-tokio = { version = "1", features = ["macros", "rt-multi-thread", "time", "sync"] }
+tokio = { version = "1", features = [
+    "macros",
+    "rt-multi-thread",
+    "time",
+    "sync",
+] }
 async-std = { version = "1", features = ["attributes"] }
 smol = "2"
 criterion = "0.7"

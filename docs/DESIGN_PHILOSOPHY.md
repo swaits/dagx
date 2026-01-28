@@ -8,28 +8,23 @@ Traditional DAG executors contain substantial scheduling code—algorithms that 
 
 dagx eliminates this entirely:
 
-1. **Wire up tasks with primitives**: During DAG construction, tasks are connected using channels and organized into topological layers based on their dependencies
+1. **Wire up tasks with primitives**: During DAG construction, tasks are organized into topological layers based on their dependencies
 2. **Start everything simultaneously**: When you call `run()`, all tasks spawn at once—there's no scheduler deciding when each task should start
-3. **Let the primitives handle coordination**: Channels naturally enforce execution order—tasks wait on their input channels until upstream tasks send data. No custom orchestration needed.
-4. **Runtime joins on completion**: The runtime simply spawns all tasks and waits for the completion channel to close. That's it.
+3. **Let the primitives handle coordination**: Layers naturally enforce execution order—tasks wait on their dependencies until . No custom orchestration needed.
+4. **Runtime joins on completion**: The runtime simply spawns all tasks and waits for them to finish. That's it.
 
 ## The Implementation
 
 Under the hood, dagx uses:
 
-- **Oneshot channels**: Each edge in the DAG gets a `futures::channel::oneshot` - producer sends once, consumer receives once
 - **Ownership model**: Tasks take ownership (`self`) and are consumed during execution - no Mutex needed for task state
-- **Direct data flow**: Outputs flow from producer to consumer via channels, never stored in shared memory during execution
+- **Direct data flow**: Outputs flow from producer(s) to consumer(s) through a shared hash map
 - **Fast-path optimization**: Single-task layers execute inline without spawning overhead
 
 The core execution logic in `run()` is remarkably simple:
 
 ```rust
-// Create oneshot channel for each edge
-for (producer, consumer) in edges {
-    let (tx, rx) = oneshot::channel();
-    // Wire tx to producer, rx to consumer
-}
+let outputs = HashMap::new();
 
 // Execute layer by layer
 for layer in layers {
@@ -40,25 +35,27 @@ for layer in layers {
         // Convert panic to error to match spawned task behavior
     } else {
         // Parallel path: Spawn all tasks in layer
-        for task in layer {
-            spawner(async {
-                let input = await_on_input_channels();  // Blocks until deps complete
+        let tasks = layers
+            .map(async {
+                let input = get_inputs(map);            // Deps are guaranteed to be in the map
                 let output = task.run(input);           // Consumes task
-                send_to_output_channels(output);        // Sends to dependents
-            });
+                output
+            })
+            .collect::<FuturesUnordered<_>>();          // Run all tasks in parallel
+
+        while let Some(out) = tasks.next().await {
+            outputs.insert(out.task_id, out.output);    // Make result available for dependents
         }
-        // Wait for layer completion
     }
+    // Wait for layer completion
 }
 
-// Tasks coordinate themselves via channels - no scheduler needed
+// FuturesUnordered coordinates task execution - no custom scheduler needed
 ```
-
-No state machines. No task queues. No wake-up logic. No Mutex locks. Just channels doing what channels do, with an inline fast-path for sequential execution.
 
 ## Inline Execution Fast-Path
 
-**Performance optimization for sequential workloads**: When a layer contains only a single task (common in deep chains and linear pipelines), dagx executes it inline rather than spawning it. This eliminates spawning overhead, context switching, and channel creation, resulting in 10-100x performance improvements for sequential patterns.
+**Performance optimization for sequential workloads**: When a layer contains only a single task (common in deep chains and linear pipelines), dagx executes it inline rather than spawning it. This eliminates spawning overhead and context switching, resulting in a 10-100x performance improvements for sequential patterns.
 
 **Panic handling guarantee**: To maintain behavioral consistency between inline and spawned execution, panics in inline tasks are caught using `FutureExt::catch_unwind()` and converted to errors. This matches the behavior of all major async runtimes (Tokio, async-std, smol, embassy-rs), which catch panics in spawned tasks and convert them to `JoinError` or equivalent.
 
@@ -72,19 +69,19 @@ This ensures your code behaves the same whether a task runs inline or spawned, m
 
 ## Benefits
 
-**Simplicity**: The runtime is straightforward: create channels, spawn tasks, let them coordinate via awaiting. No complex scheduler code to maintain, debug, or optimize.
+**Simplicity**: The runtime is straightforward: spawn tasks, coordinate via compile-time dependency guarantees. No complex scheduler code to maintain, debug, or optimize.
 
-**Reliability**: Built on battle-tested primitives (oneshot channels, async/await) from Rust's standard library and the futures crate. These have been used in production by thousands of projects and are orders of magnitude more reliable than custom scheduling logic.
+**Reliability**: Built on battle-tested primitives from Rust's standard library and the futures crate. These have been used in production by thousands of projects and are orders of magnitude more reliable than custom scheduling logic.
 
-**Bug resistance**: Fewer moving parts means fewer places for bugs to hide. The type system enforces correct wiring at compile time. Channels handle synchronization. The ownership model prevents data races. What's left to break?
+**Bug resistance**: Fewer moving parts means fewer places for bugs to hide. The type system enforces correct wiring at compile time. The ownership model prevents data races. What's left to break?
 
-**Performance**: Near zero-overhead. No Mutex locks during execution. Arc reference counting for efficient fanout (atomic operations, not locks). Oneshot channels are often lock-free. Tasks start as soon as their dependencies complete - maximum parallelism.
+**Performance**: Near zero-overhead. No Mutex locks during execution. Arc reference counting for efficient fanout (atomic operations, not locks). Tasks start as soon as their dependencies complete - maximum parallelism.
 
-**Auditability**: Want to verify correctness? Check the channel wiring, verify tasks await their inputs, done. No need to trace through complex state machine transitions or wake-up cascades.
+**Auditability**: Want to verify correctness? Check the dependency wiring, verify tasks await their inputs, done. No need to trace through complex state machine transitions or wake-up cascades.
 
 ## The Insight
 
-The key insight is that **dependencies ARE the schedule**. If task B depends on task A's output, a channel naturally enforces that B waits for A. The dependency graph already encodes all the scheduling information—we just need to wire up channels to match it.
+The key insight is that **dependencies ARE the schedule**. If task B depends on task A's output, the topological sort naturally enforces that B waits for A. The dependency graph already encodes all the scheduling information—we just need to wire outputs to match it.
 
 This is dagx's core philosophy: leverage the type system for correctness, use primitives for coordination, and let the compiler optimize everything else away.
 

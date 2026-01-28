@@ -151,6 +151,7 @@
 //! ```
 
 use dagx::{task, DagRunner, Task};
+use futures::FutureExt;
 use std::sync::Arc;
 use std::time::Instant;
 use tokio::sync::Mutex;
@@ -389,11 +390,9 @@ async fn main() {
             false, // success
         ));
 
-        dag.run(|fut| {
-            tokio::spawn(fut);
-        })
-        .await
-        .unwrap();
+        dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+            .await
+            .unwrap();
 
         println!("Result 1: {:?}\n", dag.get(call1).unwrap());
 
@@ -405,11 +404,9 @@ async fn main() {
             true, // fail
         ));
 
-        dag.run(|fut| {
-            tokio::spawn(fut);
-        })
-        .await
-        .unwrap();
+        dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+            .await
+            .unwrap();
 
         println!("Result 2: {:?}\n", dag.get(call2).unwrap());
 
@@ -421,11 +418,9 @@ async fn main() {
             true, // fail
         ));
 
-        dag.run(|fut| {
-            tokio::spawn(fut);
-        })
-        .await
-        .unwrap();
+        dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+            .await
+            .unwrap();
 
         println!("Result 3: {:?}\n", dag.get(call3).unwrap());
 
@@ -437,11 +432,9 @@ async fn main() {
             true, // fail
         ));
 
-        dag.run(|fut| {
-            tokio::spawn(fut);
-        })
-        .await
-        .unwrap();
+        dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+            .await
+            .unwrap();
 
         println!("Result 4: {:?}\n", dag.get(call4).unwrap());
 
@@ -457,11 +450,9 @@ async fn main() {
             .add_task(FallbackService::new("ServiceCall-5"))
             .depends_on(&call5);
 
-        dag.run(|fut| {
-            tokio::spawn(fut);
-        })
-        .await
-        .unwrap();
+        dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+            .await
+            .unwrap();
 
         println!("Result 5: {:?}\n", dag.get(fallback5).unwrap());
 
@@ -478,11 +469,9 @@ async fn main() {
             false, // success
         ));
 
-        dag.run(|fut| {
-            tokio::spawn(fut);
-        })
-        .await
-        .unwrap();
+        dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+            .await
+            .unwrap();
 
         println!("Result 6: {:?}\n", dag.get(call6).unwrap());
 
@@ -494,11 +483,9 @@ async fn main() {
             false, // success
         ));
 
-        dag.run(|fut| {
-            tokio::spawn(fut);
-        })
-        .await
-        .unwrap();
+        dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+            .await
+            .unwrap();
 
         println!("Result 7: {:?}\n", dag.get(call7).unwrap());
     }

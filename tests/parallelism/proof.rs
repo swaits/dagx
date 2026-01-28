@@ -2,6 +2,7 @@
 
 use crate::common::task_fn;
 use dagx::{DagResult, DagRunner};
+use futures::FutureExt;
 use std::time::{Duration, Instant};
 use tokio::time::sleep;
 
@@ -24,10 +25,7 @@ async fn test_parallelism_proof_1000_tasks() -> DagResult<()> {
         .collect();
 
     let start = Instant::now();
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await?;
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
     let elapsed = start.elapsed();
 
     // Verify all tasks completed

@@ -1,7 +1,7 @@
 //! Runtime compatibility tests for async-std
 
-use dagx::{DagRunner, Task};
 use crate::common::task_fn;
+use dagx::{DagRunner, Task};
 
 struct Value(i32);
 #[dagx::task]
@@ -27,7 +27,7 @@ async fn test_basic_dag_async_std() {
     let y = dag.add_task(Value(3));
     let sum = dag.add_task(Add).depends_on((&x, &y));
 
-    dag.run(|fut| { async_std::task::spawn(fut); }).await.unwrap();
+    dag.run(|fut| async_std::task::spawn(fut)).await.unwrap();
 
     assert_eq!(dag.get(sum).unwrap(), 5);
 }
@@ -40,7 +40,7 @@ async fn test_parallel_execution_async_std() {
         .map(|i| dag.add_task(task_fn(move |_: ()| async move { i * 2 })))
         .collect();
 
-    dag.run(|fut| { async_std::task::spawn(fut); }).await.unwrap();
+    dag.run(|fut| async_std::task::spawn(fut)).await.unwrap();
 
     for (i, task) in tasks.iter().enumerate() {
         assert_eq!(dag.get(task).unwrap(), i * 2);
@@ -58,7 +58,7 @@ async fn test_complex_dependencies_async_std() {
         .add_task(task_fn(|x: i32| async move { x * 2 }))
         .depends_on(sum);
 
-    dag.run(|fut| { async_std::task::spawn(fut); }).await.unwrap();
+    dag.run(|fut| async_std::task::spawn(fut)).await.unwrap();
 
     assert_eq!(dag.get(double).unwrap(), 60);
 }

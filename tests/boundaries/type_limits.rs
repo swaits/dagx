@@ -2,6 +2,7 @@
 
 use crate::common::task_fn;
 use dagx::{DagResult, DagRunner};
+use futures::FutureExt;
 use std::marker::PhantomData;
 
 #[tokio::test]
@@ -38,10 +39,7 @@ async fn test_zero_sized_types_throughout() -> DagResult<()> {
         }))
         .depends_on(&t2);
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await?;
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 
     assert_eq!(dag.get(t1)?, Empty);
     assert_eq!(dag.get(t2)?, 42);
@@ -76,10 +74,7 @@ async fn test_large_value_types() -> DagResult<()> {
         }))
         .depends_on(&t1);
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await?;
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 
     assert_eq!(dag.get(t2)?, 1042);
 
@@ -98,10 +93,7 @@ async fn test_unit_type_chains() -> DagResult<()> {
         .add_task(task_fn(|_: ()| async { "done" }))
         .depends_on(&t3);
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await?;
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 
     dag.get(t1)?; // Verify no error
     dag.get(t2)?;
@@ -132,10 +124,7 @@ async fn test_nested_option_result_types() -> DagResult<()> {
         }))
         .depends_on(&t1);
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await?;
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 
     assert_eq!(dag.get(t2)?, 55);
 
@@ -159,10 +148,7 @@ async fn test_tuple_of_tuples() -> DagResult<()> {
         ))
         .depends_on((&t1, &t2));
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await?;
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 
     assert_eq!(dag.get(t3)?, 36);
 
@@ -196,10 +182,7 @@ async fn test_string_types_variety() -> DagResult<()> {
         ))
         .depends_on((&t1, &t2, &t3, &t4, &t5, &t6));
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await?;
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 
     let result = dag.get(combined)?;
     assert!(result.contains("static str"));
@@ -228,10 +211,7 @@ async fn test_generic_type_constraints() -> DagResult<()> {
         ))
         .depends_on((&t1, &t2, &t3));
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await?;
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 
     let result = dag.get(combined)?;
     assert!(result.contains("Wrapper(42)"));
@@ -257,10 +237,7 @@ async fn test_reference_wrapper_types() -> DagResult<()> {
         .add_task(task_fn(|val: i32| async move { val * 2 }))
         .depends_on(&t1);
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await?;
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 
     assert_eq!(dag.get(t2)?, 200);
 
@@ -285,10 +262,7 @@ async fn test_array_types() -> DagResult<()> {
         }))
         .depends_on((&t1, &t2));
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await?;
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 
     assert_eq!(dag.get(t3)?, 55);
 
@@ -327,10 +301,7 @@ async fn test_enum_variants() -> DagResult<()> {
         ))
         .depends_on((&t1, &t2, &t3, &t4));
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await?;
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 
     assert!(dag.get(combined)?);
 

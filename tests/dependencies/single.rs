@@ -2,6 +2,7 @@
 
 use crate::common::task_fn;
 use dagx::{DagResult, DagRunner};
+use futures::FutureExt;
 
 #[tokio::test]
 async fn test_single_dependency() -> DagResult<()> {
@@ -12,10 +13,7 @@ async fn test_single_dependency() -> DagResult<()> {
         .add_task(task_fn(|x: i32| async move { x + 1 }))
         .depends_on(&source);
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await?;
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 
     assert_eq!(dag.get(dependent)?, 43);
     Ok(())
@@ -42,10 +40,7 @@ async fn test_dependency_data_flow() -> DagResult<()> {
         .add_task(task_fn(|(s, p): (i32, i32)| async move { s + p }))
         .depends_on((&sum, &product));
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await?;
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 
     // Note: sum and product are not sinks (final_result depends on them)
     // Only final_result is a sink and can be retrieved
@@ -69,10 +64,7 @@ async fn test_dependencies_with_different_types() -> DagResult<()> {
         }))
         .depends_on((&int_source, &string_source, &bool_source));
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await?;
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 
     assert_eq!(dag.get(combined)?, "hello: 42 (true)");
     Ok(())
@@ -93,10 +85,7 @@ async fn test_shared_dependencies() -> DagResult<()> {
         })
         .collect();
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await?;
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 
     // Verify all dependents got the correct value from shared
     for (i, handle) in dependents.iter().enumerate() {
@@ -115,10 +104,7 @@ async fn test_multiple_source_nodes() -> DagResult<()> {
         .map(|i| dag.add_task(task_fn(move |_: ()| async move { i * 10 })))
         .collect();
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await?;
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 
     for (i, source) in sources.iter().enumerate() {
         assert_eq!(dag.get(source)?, i as i32 * 10);

@@ -2,6 +2,7 @@
 use crate::common::task_fn;
 
 use dagx::*;
+use futures::FutureExt;
 
 #[tokio::test]
 async fn test_complex_type_safety() {
@@ -21,11 +22,9 @@ async fn test_complex_type_safety() {
         }
     }));
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await
-    .unwrap();
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        .await
+        .unwrap();
 
     // Correct type works
     let custom = dag.get(&custom_task).unwrap();
@@ -47,11 +46,9 @@ async fn test_generic_type_safety() {
         vec!["a".to_string(), "b".to_string()]
     }));
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await
-    .unwrap();
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        .await
+        .unwrap();
 
     // Correct types work
     assert_eq!(dag.get(&vec_i32).unwrap(), vec![1, 2, 3]);
@@ -69,11 +66,9 @@ async fn test_option_result_type_safety() {
     // Task returning Result<i32, String>
     let result_task = dag.add_task(task_fn(|_: ()| async { Ok::<i32, String>(42) }));
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await
-    .unwrap();
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        .await
+        .unwrap();
 
     // Correct wrapped types work
     assert_eq!(dag.get(&opt_task).unwrap(), Some(42));
@@ -94,11 +89,9 @@ async fn test_zero_sized_type_safety() {
     let zst1_task = dag.add_task(task_fn(|_: ()| async { Zst1 }));
     let _zst2_task = dag.add_task(task_fn(|_: ()| async { Zst2 }));
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await
-    .unwrap();
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        .await
+        .unwrap();
 
     // Correct ZSTs work
     assert!(dag.get(&zst1_task).is_ok());
@@ -117,11 +110,9 @@ async fn test_type_safety_with_many_types() {
     let string_task = dag.add_task(task_fn(|_: ()| async { "42".to_string() }));
     let bool_task = dag.add_task(task_fn(|_: ()| async { true }));
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await
-    .unwrap();
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        .await
+        .unwrap();
 
     // Each type works correctly
     assert_eq!(dag.get(&i32_task).unwrap(), 42i32);
@@ -145,11 +136,9 @@ async fn test_type_safety_single_dependency() {
         .add_task(task_fn(|x: i32| async move { x * 2 }))
         .depends_on(&source);
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await
-    .unwrap();
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        .await
+        .unwrap();
     assert_eq!(dag.get(transform).unwrap(), 84);
 }
 
@@ -169,11 +158,9 @@ async fn test_type_safety_tuple_dependencies() {
         }))
         .depends_on((&a, &b, &c));
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await
-    .unwrap();
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        .await
+        .unwrap();
     assert_eq!(dag.get(combine).unwrap(), "hello: 10 (true)");
 }
 
@@ -186,11 +173,9 @@ async fn test_type_safety_different_output_types() {
     let str_source = dag.add_task(task_fn(|_: ()| async { "test".to_string() }));
     let vec_source = dag.add_task(task_fn(|_: ()| async { vec![1, 2, 3] }));
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await
-    .unwrap();
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        .await
+        .unwrap();
 
     assert_eq!(dag.get(&int_source).unwrap(), 42);
     assert_eq!(dag.get(&str_source).unwrap(), "test");
@@ -214,11 +199,9 @@ async fn test_type_safety_complex_types() {
         vec![Some(1), None, Some(2), Some(3)]
     }));
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await
-    .unwrap();
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        .await
+        .unwrap();
 
     let tuple_result = dag.get(tuple_task).unwrap();
     assert_eq!(tuple_result.0, 42);
@@ -245,11 +228,9 @@ async fn test_type_safety_with_generics() {
         ))
         .depends_on(&source);
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await
-    .unwrap();
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        .await
+        .unwrap();
 
     assert_eq!(dag.get(transform).unwrap(), Some(84));
 
@@ -261,11 +242,9 @@ async fn test_type_safety_with_generics() {
         ))
         .depends_on(&source2);
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await
-    .unwrap();
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        .await
+        .unwrap();
     assert_eq!(dag.get(transform2).unwrap(), None);
 }
 
@@ -285,11 +264,9 @@ async fn test_large_tuple_input() {
         ))
         .depends_on((&a, &b, &c, &d, &e));
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await
-    .unwrap();
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        .await
+        .unwrap();
 
     assert_eq!(dag.get(sum).unwrap(), 15);
 }

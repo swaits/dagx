@@ -38,7 +38,7 @@ See [how it works](docs/CYCLE_PREVENTION.md).
 
 ```rust
 let sum = dag.add_task(Add).depends_on((&x, &y));
-dag.run(|fut| tokio::spawn(fut)).await?;
+dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 ```
 
 That's it. No trait boilerplate, no manual channels, no node IDs.
@@ -90,7 +90,7 @@ async fn main() {
     let sum = dag.add_task(Add).depends_on((&x, &y));
 
     // Execute with true parallelism
-    dag.run(|fut| { tokio::spawn(fut); }).await.unwrap();
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await.unwrap();
 
     // Retrieve results
     assert_eq!(dag.get(sum).unwrap(), 5);
@@ -104,7 +104,6 @@ dagx provides true parallel execution with sub-microsecond overhead per task.
 **Why is dagx so fast?**
 
 - **Inline fast-path**: Sequential chains execute inline without spawning (8.9-129x faster)
-- **Primitives as scheduler**: No custom scheduler — channels coordinate execution
 - **Adaptive execution**: Inline for sequential work, true parallelism for concurrent work
 - **Zero-cost abstractions**: Generics and monomorphization eliminate overhead
 
@@ -223,13 +222,18 @@ dagx works with any async runtime. Provide a spawner function to `run()`:
 
 ```rust
 // With Tokio
-dag.run(|fut| { tokio::spawn(fut); }).await.unwrap();
+// The join handle result can be unwrapped because dagx catches panics internally
+dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await.unwrap();
 
 // With async-std
-dag.run(|fut| { async_std::task::spawn(fut); }).await.unwrap();
+dag.run(|fut| async_std::task::spawn(fut)).await.unwrap();
 
 // With smol
-dag.run(|fut| { smol::spawn(fut).detach(); }).await.unwrap();
+dag.run(|fut| smol::spawn(fut)).await.unwrap();
+
+// Single-threaded on the invoking runtime
+// Faster for situations with many computationally light tasks
+dag.run(|fut| fut).await.unwrap()
 ```
 
 ## Tutorials & Examples

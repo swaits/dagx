@@ -2,6 +2,7 @@
 
 use crate::common::task_fn;
 use dagx::{DagResult, DagRunner};
+use futures::FutureExt;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::sync::Mutex;
@@ -16,16 +17,22 @@ async fn test_spawner_actually_spawns_tasks() -> DagResult<()> {
 
     // Create 10 independent tasks
     let tasks: Vec<_> = (0..10)
-        .map(|i| dag.add_task(task_fn(move |_: ()| async move { i })))
+        .map(|i| {
+            dag.add_task(task_fn({
+                let value = spawn_count.clone();
+                move |_: ()| {
+                    let value = value.clone();
+                    async move {
+                        value.fetch_add(1, Ordering::SeqCst);
+                        i
+                    }
+                }
+            }))
+        })
         .collect();
 
     // Custom spawner that counts invocations
-    let counter = spawn_count.clone();
-    dag.run(move |fut| {
-        counter.fetch_add(1, Ordering::SeqCst);
-        tokio::spawn(fut);
-    })
-    .await?;
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 
     // Verify all tasks were spawned
     for (i, task) in tasks.iter().enumerate() {
@@ -71,10 +78,7 @@ async fn test_tasks_not_running_inline() -> DagResult<()> {
         })
         .collect();
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await?;
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 
     // Verify results
     for (i, task) in tasks.iter().enumerate() {

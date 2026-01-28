@@ -2,6 +2,7 @@
 
 use crate::common::task_fn;
 use dagx::{DagError, DagRunner};
+use futures::FutureExt;
 
 #[tokio::test]
 async fn test_result_not_found_error() {
@@ -14,11 +15,9 @@ async fn test_result_not_found_error() {
     assert!(matches!(result, Err(DagError::ResultNotFound { .. })));
 
     // Run and verify it works after
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await
-    .unwrap();
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        .await
+        .unwrap();
 
     assert_eq!(dag.get(&t1).unwrap(), 42);
 }
@@ -34,11 +33,9 @@ async fn test_nested_result_error_handling() {
 
     let task2 = dag.add_task(task_fn(|_: ()| async { Result::<i32, String>::Ok(42) }));
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await
-    .unwrap();
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        .await
+        .unwrap();
 
     // Both tasks complete successfully (they return Results)
     assert_eq!(dag.get(&task1).unwrap(), Err("Internal error".to_string()));
@@ -51,11 +48,9 @@ async fn test_option_none_not_error() {
 
     let task = dag.add_task(task_fn(|_: ()| async { None::<i32> }));
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await
-    .unwrap();
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        .await
+        .unwrap();
 
     // None is a valid result, not an error
     assert_eq!(dag.get(&task).unwrap(), None);
@@ -82,11 +77,9 @@ async fn test_custom_error_types() {
         })
     }));
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await
-    .unwrap();
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        .await
+        .unwrap();
 
     // Check custom errors are preserved
     match dag.get(&task1).unwrap() {
@@ -113,11 +106,7 @@ async fn test_error_in_tuple_dependency() {
         .add_task(task_fn(|(a, b): (i32, i32)| async move { a + b }))
         .depends_on((&ok_task, &err_task));
 
-    let result = dag
-        .run(|fut| {
-            tokio::spawn(fut);
-        })
-        .await;
+    let result = dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await;
 
     assert!(result.is_err());
     assert!(dag.get(dependent).is_err());
@@ -135,11 +124,7 @@ async fn test_string_panic_vs_structured_panic() {
         panic!("Formatted panic: value={}, code={}", 42, "ERROR");
     }));
 
-    let _ = dag
-        .run(|fut| {
-            tokio::spawn(fut);
-        })
-        .await;
+    let _ = dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await;
 
     // Both should result in errors
     assert!(dag.get(&string_panic).is_err());
@@ -159,11 +144,9 @@ async fn test_anyhow_like_error_chain() {
         outer
     }));
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await
-    .unwrap();
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        .await
+        .unwrap();
 
     // Get the chained error
     let result = dag.get(&task).unwrap();

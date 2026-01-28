@@ -1,6 +1,7 @@
 //! Tests that the library works correctly without tracing feature
 
 use dagx::{task, DagRunner, Task};
+use futures::FutureExt;
 
 struct Value(i32);
 
@@ -28,11 +29,9 @@ async fn test_basic_dag_without_tracing() {
     let b = dag.add_task(Value(3));
     let sum = dag.add_task(Add).depends_on((&a, &b));
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await
-    .unwrap();
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        .await
+        .unwrap();
 
     assert_eq!(dag.get(sum).unwrap(), 5);
 }
@@ -51,11 +50,9 @@ async fn test_complex_dag_without_tracing() {
     let sum34 = dag.add_task(Add).depends_on((&v3, &v4));
     let final_sum = dag.add_task(Add).depends_on((&sum12, &sum34));
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await
-    .unwrap();
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        .await
+        .unwrap();
 
     assert_eq!(dag.get(final_sum).unwrap(), 10);
 }

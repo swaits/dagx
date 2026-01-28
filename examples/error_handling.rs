@@ -115,6 +115,7 @@
 //! ```
 
 use dagx::{task, DagRunner, Task};
+use futures::FutureExt;
 
 // Source task that provides a string input
 struct StringSource(&'static str);
@@ -222,11 +223,9 @@ async fn main() {
         let processed = dag.add_task(ProcessData).depends_on(validated);
         let logged = dag.add_task(LogError).depends_on(processed);
 
-        dag.run(|fut| {
-            tokio::spawn(fut);
-        })
-        .await
-        .unwrap();
+        dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+            .await
+            .unwrap();
 
         match dag.get(logged).unwrap() {
             Ok(result) => println!("Final result: {}\n", result),
@@ -250,11 +249,9 @@ async fn main() {
         let processed = dag.add_task(ProcessData).depends_on(validated);
         let logged = dag.add_task(LogError).depends_on(processed);
 
-        dag.run(|fut| {
-            tokio::spawn(fut);
-        })
-        .await
-        .unwrap();
+        dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+            .await
+            .unwrap();
 
         match dag.get(logged).unwrap() {
             Ok(result) => println!("Final result: {}\n", result),
@@ -278,11 +275,9 @@ async fn main() {
         let processed = dag.add_task(ProcessData).depends_on(validated);
         let logged = dag.add_task(LogError).depends_on(processed);
 
-        dag.run(|fut| {
-            tokio::spawn(fut);
-        })
-        .await
-        .unwrap();
+        dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+            .await
+            .unwrap();
 
         match dag.get(logged).unwrap() {
             Ok(result) => println!("Final result: {}\n", result),
@@ -303,11 +298,9 @@ async fn main() {
             .add_task(WithFallback { fallback: 0 })
             .depends_on(parsed);
 
-        dag.run(|fut| {
-            tokio::spawn(fut);
-        })
-        .await
-        .unwrap();
+        dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+            .await
+            .unwrap();
 
         let result = dag.get(with_fallback).unwrap();
         println!("Recovered with fallback: {}\n", result);

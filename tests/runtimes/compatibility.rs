@@ -1,6 +1,7 @@
 //! Runtime integration tests - verify dagx works correctly across different runtimes
 
 use dagx::{DagResult, DagRunner, Task};
+use futures::FutureExt;
 
 struct Value(i32);
 #[dagx::task]
@@ -26,10 +27,7 @@ async fn runtime_integration_tokio() -> DagResult<()> {
     let b = dag.add_task(Value(20));
     let sum = dag.add_task(Add).depends_on((&a, &b));
 
-    dag.run(|fut| {
-        tokio::spawn(fut);
-    })
-    .await?;
+    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 
     assert_eq!(dag.get(sum)?, 30);
     Ok(())

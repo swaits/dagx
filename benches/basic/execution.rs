@@ -2,6 +2,7 @@
 
 use criterion::Criterion;
 use dagx::{task_fn, DagRunner, Task};
+use futures::FutureExt;
 
 pub fn bench_dag_execution(c: &mut Criterion) {
     let rt = tokio::runtime::Runtime::new().unwrap();
@@ -13,11 +14,9 @@ pub fn bench_dag_execution(c: &mut Criterion) {
                 for i in 0..10 {
                     dag.add_task(task_fn(move |_: ()| async move { i }));
                 }
-                dag.run(|fut| {
-                    tokio::spawn(fut);
-                })
-                .await
-                .unwrap();
+                dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+                    .await
+                    .unwrap();
             })
         });
     });
@@ -29,11 +28,9 @@ pub fn bench_dag_execution(c: &mut Criterion) {
                 for i in 0..100 {
                     dag.add_task(task_fn(move |_: ()| async move { i }));
                 }
-                dag.run(|fut| {
-                    tokio::spawn(fut);
-                })
-                .await
-                .unwrap();
+                dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+                    .await
+                    .unwrap();
             })
         });
     });
@@ -111,11 +108,9 @@ pub fn bench_dag_execution(c: &mut Criterion) {
                     .add_task(task_fn(|x: i32| async move { x + 1 }))
                     .depends_on(t18);
 
-                dag.run(|fut| {
-                    tokio::spawn(fut);
-                })
-                .await
-                .unwrap();
+                dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+                    .await
+                    .unwrap();
             })
         });
     });
