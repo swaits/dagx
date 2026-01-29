@@ -1,6 +1,6 @@
 //! Tests that the library works correctly without tracing feature
 
-use dagx::{task, DagRunner, Task};
+use dagx::{task, DagRunner};
 use futures::FutureExt;
 
 struct Value(i32);

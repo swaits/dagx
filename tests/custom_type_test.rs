@@ -1,5 +1,5 @@
 // Test that custom types work without any trait implementations
-use dagx::{task, DagRunner, Task};
+use dagx::{task, DagRunner};
 use futures::FutureExt;
 
 #[derive(Clone, Debug, PartialEq)]

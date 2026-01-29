@@ -4,7 +4,6 @@
 
 use crate::error::DagError;
 use crate::runner::DagRunner;
-use crate::task::Task;
 use crate::types::TaskHandle;
 use futures::FutureExt;
 use std::collections::HashMap;

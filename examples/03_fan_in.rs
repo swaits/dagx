@@ -61,7 +61,7 @@
 //!   Active: true
 //! ```
 
-use dagx::{task, DagRunner, Task};
+use dagx::{task, DagRunner};
 use futures::FutureExt;
 
 struct FetchName;

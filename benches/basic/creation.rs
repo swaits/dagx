@@ -1,7 +1,7 @@
 //! DAG creation benchmarks
 
 use criterion::Criterion;
-use dagx::{DagRunner, Task};
+use dagx::DagRunner;
 use std::hint::black_box;
 
 // Simple task for benchmarking

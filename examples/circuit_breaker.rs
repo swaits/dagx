@@ -150,7 +150,7 @@
 //! Result 7: Ok("Success")
 //! ```
 
-use dagx::{task, DagRunner, Task};
+use dagx::{task, DagRunner};
 use futures::FutureExt;
 use std::sync::Arc;
 use std::time::Instant;

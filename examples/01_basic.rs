@@ -30,7 +30,7 @@
 //! Result: 5
 //! ```
 
-use dagx::{task, DagRunner, Task};
+use dagx::{task, DagRunner};
 use futures::FutureExt;
 
 // Step 1: Define a source task (no dependencies)

@@ -12,6 +12,7 @@ async fn test_2d_grid_pattern() -> DagResult<()> {
     let mut grid: Vec<Vec<Option<dagx::TaskHandle<i32>>>> = vec![vec![None; 4]; 4];
 
     // Initialize first row and column
+    #[allow(clippy::needless_range_loop)]
     for i in 0..4 {
         let task = dag.add_task(task_fn(move |_: ()| async move { i as i32 }));
         grid[0][i] = Some((&task).into());

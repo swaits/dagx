@@ -235,7 +235,7 @@ impl DagRunner {
     /// # Parameters
     ///
     /// - `spawner`: A function that spawns futures on the async runtime
-    /// and returns a handle to the task. This is the only way to run tasks on separate threads. Examples:
+    ///   and returns a handle to the task. This is the only way to run tasks on separate threads. Examples:
     ///   - Tokio: `|fut| { tokio::spawn(fut).map(Result::unwrap) }`
     ///   - Smol: `|fut| { smol::spawn(fut) }`
     ///   - Async-std: `|fut| { async_std::task::spawn(fut) }`
@@ -374,7 +374,7 @@ impl DagRunner {
                     let dependencies: Vec<_> = edges[&node_id]
                         .iter()
                         .flat_map(|dep| outputs.get(dep))
-                        .map(|value| value.clone())
+                        .cloned()
                         .collect();
 
                     // Execute inline with panic handling.
@@ -437,7 +437,7 @@ impl DagRunner {
                             let dependencies: Vec<_> = edges[&node_id]
                                 .iter()
                                 .flat_map(|dep| outputs.get(dep))
-                                .map(|value| value.clone())
+                                .cloned()
                                 .collect();
 
                             // Spawn the task using the provided spawner

@@ -1,6 +1,6 @@
 //! Tests with tracing feature enabled
 
-use dagx::{task, DagRunner, Task};
+use dagx::{task, DagRunner};
 use futures::FutureExt;
 use tracing_subscriber::{fmt, EnvFilter};
 

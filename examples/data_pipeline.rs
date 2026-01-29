@@ -75,7 +75,7 @@
 //! ============================
 //! ```
 
-use dagx::{task, DagRunner, Task};
+use dagx::{task, DagRunner};
 use futures::FutureExt;
 
 // Data source tasks

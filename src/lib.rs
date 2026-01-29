@@ -774,6 +774,8 @@
 
 #![allow(private_bounds, private_interfaces)]
 
+extern crate self as dagx;
+
 // Module declarations
 mod builder;
 pub mod cycle_prevention;

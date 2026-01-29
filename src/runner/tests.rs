@@ -2,7 +2,6 @@
 
 use crate::error::DagError;
 use crate::runner::DagRunner;
-use crate::task::Task;
 use crate::types::TaskHandle;
 
 use futures::FutureExt;
@@ -161,17 +160,11 @@ async fn test_concurrent_run_protection() {
     assert!(result1.is_ok() != result2.is_ok());
 
     // The error should be about concurrent execution
-    if result1.is_err() {
-        assert!(matches!(
-            result1.unwrap_err(),
-            crate::error::DagError::ConcurrentExecution
-        ));
+    if let Err(e) = result1 {
+        assert!(matches!(e, crate::error::DagError::ConcurrentExecution));
     }
-    if result2.is_err() {
-        assert!(matches!(
-            result2.unwrap_err(),
-            crate::error::DagError::ConcurrentExecution
-        ));
+    if let Err(e) = result2 {
+        assert!(matches!(e, crate::error::DagError::ConcurrentExecution));
     }
 }
 

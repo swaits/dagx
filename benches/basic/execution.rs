@@ -1,7 +1,7 @@
 //! Basic DAG execution benchmarks
 
 use criterion::Criterion;
-use dagx::{task_fn, DagRunner, Task};
+use dagx::{task_fn, DagRunner};
 use futures::FutureExt;
 
 pub fn bench_dag_execution(c: &mut Criterion) {

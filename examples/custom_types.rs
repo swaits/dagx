@@ -36,7 +36,7 @@
 //! Validation: Alice is valid (age 30 >= 18)
 //! ```
 
-use dagx::{task, DagRunner, Task};
+use dagx::{task, DagRunner};
 use futures::FutureExt;
 
 // Custom type - just derive Clone!

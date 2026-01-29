@@ -98,7 +98,7 @@
 //! === Timeout Example Complete ===
 //! ```
 
-use dagx::{task, DagRunner, Task};
+use dagx::{task, DagRunner};
 use futures::FutureExt;
 use tokio::time::{sleep, timeout, Duration};
 

@@ -3,7 +3,6 @@
 #![allow(dead_code)] // Test helpers generate unused code via macro
 
 use crate::extract::ExtractInput;
-use crate::task::Task;
 use std::any::Any;
 use std::sync::Arc;
 

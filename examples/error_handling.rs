@@ -114,7 +114,7 @@
 //! === Error Handling Example Complete ===
 //! ```
 
-use dagx::{task, DagRunner, Task};
+use dagx::{task, DagRunner};
 use futures::FutureExt;
 
 // Source task that provides a string input

@@ -1,6 +1,5 @@
 //! Unit tests for types module
 
-use crate::task::Task;
 use crate::types::{NodeId, TaskHandle};
 use std::marker::PhantomData;
 

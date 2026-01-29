@@ -3,7 +3,7 @@
 //! These tests show that even if you try to create cycles, the Rust compiler
 //! prevents it through the type-state pattern.
 
-use dagx::{task, DagRunner, Task, TaskHandle};
+use dagx::{task, DagRunner, TaskHandle};
 use futures::FutureExt;
 
 /// Demonstrates that TaskBuilder is consumed by depends_on,
