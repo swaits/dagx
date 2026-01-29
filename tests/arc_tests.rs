@@ -9,7 +9,7 @@
 //!
 //! These tests serve as both validation and documentation for proper Arc usage.
 
-use dagx::{task, DagRunner};
+use dagx::{task, DagRunner, TaskHandle};
 use futures::FutureExt;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
@@ -42,7 +42,7 @@ async fn test_arc_basic_pipeline() {
 
     let dag = DagRunner::new();
     let producer = dag.add_task(Producer);
-    let consumer = dag.add_task(Consumer).depends_on(&producer);
+    let consumer = dag.add_task(Consumer).depends_on(producer);
 
     dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
         .await
@@ -98,7 +98,7 @@ async fn test_arc_with_primitives() {
     let bool_prod = dag.add_task(BoolProducer);
     let consumer = dag
         .add_task(AllConsumer)
-        .depends_on((&i32_prod, &f64_prod, &bool_prod));
+        .depends_on((i32_prod, f64_prod, bool_prod));
 
     dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
         .await
@@ -172,7 +172,7 @@ async fn test_arc_with_collections() {
     let set_prod = dag.add_task(SetProducer);
     let consumer = dag
         .add_task(CollectionConsumer)
-        .depends_on((&vec_prod, &map_prod, &set_prod));
+        .depends_on((vec_prod, map_prod, set_prod));
 
     dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
         .await
@@ -240,10 +240,10 @@ async fn test_arc_with_custom_structs() {
     }
 
     let dag = DagRunner::new();
-    let person_prod = dag.add_task(PersonProducer);
-    let name_ext = dag.add_task(NameExtractor).depends_on(&person_prod);
-    let age_ext = dag.add_task(AgeExtractor).depends_on(&person_prod);
-    let email_ext = dag.add_task(EmailCountExtractor).depends_on(&person_prod);
+    let person_prod: TaskHandle<_> = dag.add_task(PersonProducer).into();
+    let name_ext = dag.add_task(NameExtractor).depends_on(person_prod);
+    let age_ext = dag.add_task(AgeExtractor).depends_on(person_prod);
+    let email_ext = dag.add_task(EmailCountExtractor).depends_on(person_prod);
 
     dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
         .await
@@ -306,10 +306,10 @@ async fn test_arc_fan_out_three_consumers() {
     }
 
     let dag = DagRunner::new();
-    let producer = dag.add_task(DataProducer);
-    let c1 = dag.add_task(CountConsumer).depends_on(&producer);
-    let c2 = dag.add_task(FirstConsumer).depends_on(&producer);
-    let c3 = dag.add_task(JoinConsumer).depends_on(&producer);
+    let producer: TaskHandle<_> = dag.add_task(DataProducer).into();
+    let c1 = dag.add_task(CountConsumer).depends_on(producer);
+    let c2 = dag.add_task(FirstConsumer).depends_on(producer);
+    let c3 = dag.add_task(JoinConsumer).depends_on(producer);
 
     dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
         .await
@@ -378,12 +378,12 @@ async fn test_arc_fan_out_five_consumers_large_data() {
     }
 
     let dag = DagRunner::new();
-    let producer = dag.add_task(LargeDataProducer);
-    let c1 = dag.add_task(First100Analyzer).depends_on(&producer);
-    let c2 = dag.add_task(Last100Analyzer).depends_on(&producer);
-    let c3 = dag.add_task(LongestFinder).depends_on(&producer);
-    let c4 = dag.add_task(PatternCounter).depends_on(&producer);
-    let c5 = dag.add_task(TotalBytesComputer).depends_on(&producer);
+    let producer: TaskHandle<_> = dag.add_task(LargeDataProducer).into();
+    let c1 = dag.add_task(First100Analyzer).depends_on(producer);
+    let c2 = dag.add_task(Last100Analyzer).depends_on(producer);
+    let c3 = dag.add_task(LongestFinder).depends_on(producer);
+    let c4 = dag.add_task(PatternCounter).depends_on(producer);
+    let c5 = dag.add_task(TotalBytesComputer).depends_on(producer);
 
     dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
         .await
@@ -467,9 +467,9 @@ async fn test_arc_nested_fan_out_tree() {
     }
 
     let dag = DagRunner::new();
-    let root = dag.add_task(RootProducer);
-    let l1_sum = dag.add_task(Level1Sum).depends_on(&root);
-    let l1_prod = dag.add_task(Level1Product).depends_on(&root);
+    let root: TaskHandle<_> = dag.add_task(RootProducer).into();
+    let l1_sum = dag.add_task(Level1Sum).depends_on(root);
+    let l1_prod = dag.add_task(Level1Product).depends_on(root);
     let l2_double = dag.add_task(Level2Double).depends_on(l1_sum);
     let l2_square = dag.add_task(Level2Square).depends_on(l1_sum);
     let l2_negate = dag.add_task(Level2Negate).depends_on(l1_prod);
@@ -536,10 +536,10 @@ async fn test_arc_performance_vs_clone() {
     }
 
     let dag = DagRunner::new();
-    let producer = dag.add_task(LargeProducer);
-    let p1 = dag.add_task(Process1).depends_on(&producer);
-    let p2 = dag.add_task(Process2).depends_on(&producer);
-    let p3 = dag.add_task(Process3).depends_on(&producer);
+    let producer: TaskHandle<_> = dag.add_task(LargeProducer).into();
+    let p1 = dag.add_task(Process1).depends_on(producer);
+    let p2 = dag.add_task(Process2).depends_on(producer);
+    let p3 = dag.add_task(Process3).depends_on(producer);
 
     let start = Instant::now();
 
@@ -625,8 +625,8 @@ async fn test_arc_with_result() {
     let result_arc_ok = dag.add_task(ResultArcOk);
     let arc_result_err = dag.add_task(ArcResultErr);
 
-    let consumer1 = dag.add_task(ArcResultConsumer).depends_on(&arc_result_ok);
-    let consumer2 = dag.add_task(ResultArcConsumer).depends_on(&result_arc_ok);
+    let consumer1 = dag.add_task(ArcResultConsumer).depends_on(arc_result_ok);
+    let consumer2 = dag.add_task(ResultArcConsumer).depends_on(result_arc_ok);
 
     // Create a new instance for the error case
     struct ArcResultConsumer2;
@@ -641,7 +641,7 @@ async fn test_arc_with_result() {
         }
     }
 
-    let consumer3 = dag.add_task(ArcResultConsumer2).depends_on(&arc_result_err);
+    let consumer3 = dag.add_task(ArcResultConsumer2).depends_on(arc_result_err);
 
     dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
         .await
@@ -745,10 +745,10 @@ async fn test_arc_with_option() {
     let opt_arc_some = dag.add_task(OptionArcSome);
     let opt_arc_none = dag.add_task(OptionArcNone);
 
-    let c1 = dag.add_task(ArcOptionConsumer1).depends_on(&arc_opt_some);
-    let c2 = dag.add_task(ArcOptionConsumer2).depends_on(&arc_opt_none);
-    let c3 = dag.add_task(OptionArcConsumer1).depends_on(&opt_arc_some);
-    let c4 = dag.add_task(OptionArcConsumer2).depends_on(&opt_arc_none);
+    let c1 = dag.add_task(ArcOptionConsumer1).depends_on(arc_opt_some);
+    let c2 = dag.add_task(ArcOptionConsumer2).depends_on(arc_opt_none);
+    let c3 = dag.add_task(OptionArcConsumer1).depends_on(opt_arc_some);
+    let c4 = dag.add_task(OptionArcConsumer2).depends_on(opt_arc_none);
 
     dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
         .await
@@ -800,9 +800,9 @@ async fn test_arc_diamond_dependency() {
     }
 
     let dag = DagRunner::new();
-    let top = dag.add_task(Top);
-    let left = dag.add_task(LeftBranch).depends_on(&top);
-    let right = dag.add_task(RightBranch).depends_on(&top);
+    let top: TaskHandle<_> = dag.add_task(Top).into();
+    let left = dag.add_task(LeftBranch).depends_on(top);
+    let right = dag.add_task(RightBranch).depends_on(top);
     let bottom = dag.add_task(Bottom).depends_on((&left, &right));
 
     dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
@@ -871,7 +871,7 @@ async fn test_arc_empty_collections() {
     let map_task = dag.add_task(EmptyHashMap);
     let consumer = dag
         .add_task(EmptyConsumer)
-        .depends_on((&vec_task, &string_task, &map_task));
+        .depends_on((vec_task, string_task, map_task));
 
     dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
         .await
@@ -938,11 +938,11 @@ async fn test_arc_very_large_data() {
     }
 
     let dag = DagRunner::new();
-    let producer = dag.add_task(HugeProducer);
-    let counter = dag.add_task(ItemCounter).depends_on(&producer);
-    let first = dag.add_task(FirstSampler).depends_on(&producer);
-    let last = dag.add_task(LastSampler).depends_on(&producer);
-    let middle = dag.add_task(MiddleSampler).depends_on(&producer);
+    let producer: TaskHandle<_> = dag.add_task(HugeProducer).into();
+    let counter = dag.add_task(ItemCounter).depends_on(producer);
+    let first = dag.add_task(FirstSampler).depends_on(producer);
+    let last = dag.add_task(LastSampler).depends_on(producer);
+    let middle = dag.add_task(MiddleSampler).depends_on(producer);
 
     dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
         .await
@@ -979,7 +979,7 @@ async fn test_arc_of_arc() {
 
     let dag = DagRunner::new();
     let producer = dag.add_task(NestedProducer);
-    let consumer = dag.add_task(NestedConsumer).depends_on(&producer);
+    let consumer = dag.add_task(NestedConsumer).depends_on(producer);
 
     dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
         .await
@@ -1037,13 +1037,13 @@ async fn test_arc_mixed_with_non_arc() {
     }
 
     let dag = DagRunner::new();
-    let arc_prod = dag.add_task(ArcProducer);
-    let non_arc_prod = dag.add_task(NonArcProducer);
+    let arc_prod = dag.add_task(ArcProducer).into();
+    let non_arc_prod = dag.add_task(NonArcProducer).into();
     let mixed = dag
         .add_task(MixedConsumer)
         .depends_on((&arc_prod, &non_arc_prod));
-    let unwrap = dag.add_task(Unwrapper).depends_on(&arc_prod);
-    let wrap = dag.add_task(Wrapper).depends_on(&non_arc_prod);
+    let unwrap = dag.add_task(Unwrapper).depends_on(arc_prod);
+    let wrap = dag.add_task(Wrapper).depends_on(non_arc_prod);
 
     dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
         .await
@@ -1106,10 +1106,10 @@ async fn test_arc_parallel_execution() {
     }
 
     let dag = DagRunner::new();
-    let producer = dag.add_task(SharedProducer);
-    let t1 = dag.add_task(ParallelTask1).depends_on(&producer);
-    let t2 = dag.add_task(ParallelTask2).depends_on(&producer);
-    let t3 = dag.add_task(ParallelTask3).depends_on(&producer);
+    let producer: TaskHandle<_> = dag.add_task(SharedProducer).into();
+    let t1 = dag.add_task(ParallelTask1).depends_on(producer);
+    let t2 = dag.add_task(ParallelTask2).depends_on(producer);
+    let t3 = dag.add_task(ParallelTask3).depends_on(producer);
 
     let start = Instant::now();
 
@@ -1160,7 +1160,7 @@ async fn test_arc_reference_counting() {
 
     let dag = DagRunner::new();
     let producer = dag.add_task(RefCountProducer);
-    let checker = dag.add_task(RefCountChecker).depends_on(&producer);
+    let checker = dag.add_task(RefCountChecker).depends_on(producer);
 
     dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
         .await
@@ -1223,16 +1223,18 @@ async fn test_arc_massive_fanout_performance_comparison() {
     }
 
     let dag_without_arc = DagRunner::new();
-    let producer = dag_without_arc.add_task(ProducerWithoutArc {
-        data: random_data.clone(),
-    });
+    let producer: TaskHandle<_> = dag_without_arc
+        .add_task(ProducerWithoutArc {
+            data: random_data.clone(),
+        })
+        .into();
 
     // Create consumer tasks for fan-out pattern
     let consumers_without_arc: Vec<_> = (0..FAN_OUT_COUNT)
         .map(|_| {
             dag_without_arc
                 .add_task(ConsumerWithoutArc)
-                .depends_on(&producer)
+                .depends_on(producer)
         })
         .collect();
 
@@ -1275,16 +1277,18 @@ async fn test_arc_massive_fanout_performance_comparison() {
     }
 
     let dag_with_arc = DagRunner::new();
-    let producer_arc = dag_with_arc.add_task(ProducerWithArc {
-        data: random_data.clone(),
-    });
+    let producer_arc: TaskHandle<_> = dag_with_arc
+        .add_task(ProducerWithArc {
+            data: random_data.clone(),
+        })
+        .into();
 
     // Create consumer tasks for fan-out pattern
     let consumers_with_arc: Vec<_> = (0..FAN_OUT_COUNT)
         .map(|_| {
             dag_with_arc
                 .add_task(ConsumerWithArc)
-                .depends_on(&producer_arc)
+                .depends_on(producer_arc)
         })
         .collect();
 

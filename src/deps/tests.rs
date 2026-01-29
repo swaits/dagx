@@ -91,12 +91,13 @@ fn test_deps_tuple_task_builder_ref() {
     // Test lines 51-55 in deps.rs - &TaskBuilder
     let dag = DagRunner::new();
     let builder = dag.add_task(TestTask { value: 42 });
+    let builder_id = builder.id;
 
     // We need to test the DepsTuple implementation directly
     // The builder has an id field we can check
-    let node_ids = (&builder).to_node_ids();
+    let node_ids = builder.to_node_ids();
     assert_eq!(node_ids.len(), 1);
-    assert_eq!(node_ids[0], builder.id);
+    assert_eq!(node_ids[0], builder_id);
 }
 
 #[test]
@@ -104,10 +105,11 @@ fn test_deps_tuple_task_builder_tuple() {
     // Test lines 57-61 in deps.rs - (&TaskBuilder,)
     let dag = DagRunner::new();
     let builder = dag.add_task(TestTask { value: 100 });
+    let builder_id = builder.id;
 
-    let node_ids = (&builder,).to_node_ids();
+    let node_ids = (builder,).to_node_ids();
     assert_eq!(node_ids.len(), 1);
-    assert_eq!(node_ids[0], builder.id);
+    assert_eq!(node_ids[0], builder_id);
 }
 
 #[test]
@@ -145,21 +147,18 @@ fn test_deps_tuple_multiple_builders() {
     // Test macro-generated implementations for multiple builders
     let dag = DagRunner::new();
     let builder1 = dag.add_task(TestTask { value: 10 });
+    let builder1_id = builder1.id;
     let builder2 = dag.add_task(TestTask { value: 20 });
+    let builder2_id = builder2.id;
     let builder3 = dag.add_task(TestTask { value: 30 });
-
-    // Test 2-tuple of builders
-    let node_ids = (&builder1, &builder2).to_node_ids();
-    assert_eq!(node_ids.len(), 2);
-    assert_eq!(node_ids[0], builder1.id);
-    assert_eq!(node_ids[1], builder2.id);
+    let builder3_id = builder3.id;
 
     // Test 3-tuple of builders
-    let node_ids = (&builder1, &builder2, &builder3).to_node_ids();
+    let node_ids = (builder1, builder2, builder3).to_node_ids();
     assert_eq!(node_ids.len(), 3);
-    assert_eq!(node_ids[0], builder1.id);
-    assert_eq!(node_ids[1], builder2.id);
-    assert_eq!(node_ids[2], builder3.id);
+    assert_eq!(node_ids[0], builder1_id);
+    assert_eq!(node_ids[1], builder2_id);
+    assert_eq!(node_ids[2], builder3_id);
 }
 
 #[test]

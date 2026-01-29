@@ -83,7 +83,7 @@ impl<'a> Drop for RunGuard<'a> {
 /// // Construct instances using ::new() pattern
 /// let x = dag.add_task(LoadValue::new(2));
 /// let y = dag.add_task(LoadValue::new(3));
-/// let sum = dag.add_task(Add).depends_on((&x, &y));
+/// let sum = dag.add_task(Add).depends_on((x, y));
 ///
 /// dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await.unwrap();
 ///
@@ -190,10 +190,10 @@ impl DagRunner {
     /// let base = dag.add_task(LoadValue::new(10));
     ///
     /// // Construct task with offset of 1
-    /// let inc = dag.add_task(AddOffset::new(1)).depends_on(&base);
+    /// let inc = dag.add_task(AddOffset::new(1)).depends_on(base);
     ///
     /// dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await.unwrap();
-    /// assert_eq!(dag.get(&inc).unwrap(), 11);
+    /// assert_eq!(dag.get(inc).unwrap(), 11);
     /// # };
     /// ```
     pub fn add_task<Tk>(&self, task: Tk) -> TaskBuilder<'_, Tk, Pending>
@@ -278,7 +278,7 @@ impl DagRunner {
     ///
     /// let a = dag.add_task(Value(1));
     /// let b = dag.add_task(Value(2));
-    /// let sum = dag.add_task(Add).depends_on((&a, &b));
+    /// let sum = dag.add_task(Add).depends_on((a, b));
     ///
     /// dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await.unwrap(); // Executes all tasks
     /// # };

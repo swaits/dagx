@@ -21,7 +21,7 @@ async fn test_get_with_wrong_type_returns_none() {
         .unwrap();
 
     // Verify correct type works
-    assert_eq!(dag.get(&int_task), Ok(42i32));
+    assert_eq!(dag.get(int_task), Ok(42i32));
 
     // The type safety is enforced at compile time
     // We cannot create fake handles with wrong types without accessing private fields
@@ -42,8 +42,8 @@ async fn test_handle_preserves_type() {
         .unwrap();
 
     // Get with correct types
-    assert_eq!(dag.get(&string_task).unwrap(), "hello".to_string());
-    assert_eq!(dag.get(&int_task).unwrap(), 42);
+    assert_eq!(dag.get(string_task).unwrap(), "hello".to_string());
+    assert_eq!(dag.get(int_task).unwrap(), 42);
 
     // Type safety is enforced at compile time - we cannot create wrong-typed handles
 }
@@ -53,15 +53,15 @@ async fn test_type_safety_handle_reuse() {
     // Verify that handles maintain type safety across reuse
     let dag = DagRunner::new();
 
-    let source = dag.add_task(task_fn(|_: ()| async { 100i32 }));
+    let source: TaskHandle<_> = dag.add_task(task_fn(|_: ()| async { 100i32 })).into();
 
     // Use the same source handle multiple times
     let double = dag
         .add_task(task_fn(|x: i32| async move { x * 2 }))
-        .depends_on(&source);
+        .depends_on(source);
     let triple = dag
         .add_task(task_fn(|x: i32| async move { x * 3 }))
-        .depends_on(&source);
+        .depends_on(source);
 
     dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
         .await

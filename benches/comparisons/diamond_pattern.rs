@@ -3,6 +3,7 @@
 //! Classic diamond: A → B,C → D
 
 use criterion::Criterion;
+use dagx::TaskHandle;
 use futures::FutureExt;
 
 pub fn bench_diamond_pattern(c: &mut Criterion) {
@@ -17,13 +18,13 @@ pub fn bench_diamond_pattern(c: &mut Criterion) {
 
                 let dag = DagRunner::new();
 
-                let a = dag.add_task(task_fn(|_: ()| async { 10 }));
+                let a: TaskHandle<_> = dag.add_task(task_fn(|_: ()| async { 10 })).into();
                 let b = dag
                     .add_task(task_fn(|x: i32| async move { x * 2 }))
-                    .depends_on(&a);
+                    .depends_on(a);
                 let c = dag
                     .add_task(task_fn(|x: i32| async move { x + 5 }))
-                    .depends_on(&a);
+                    .depends_on(a);
                 let d = dag
                     .add_task(task_fn(|(x, y): (i32, i32)| async move { x + y }))
                     .depends_on((&b, &c));

@@ -27,7 +27,7 @@ async fn test_basic_dag_without_tracing() {
 
     let a = dag.add_task(Value(2));
     let b = dag.add_task(Value(3));
-    let sum = dag.add_task(Add).depends_on((&a, &b));
+    let sum = dag.add_task(Add).depends_on((a, b));
 
     dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
         .await
@@ -46,8 +46,8 @@ async fn test_complex_dag_without_tracing() {
     let v3 = dag.add_task(Value(3));
     let v4 = dag.add_task(Value(4));
 
-    let sum12 = dag.add_task(Add).depends_on((&v1, &v2));
-    let sum34 = dag.add_task(Add).depends_on((&v3, &v4));
+    let sum12 = dag.add_task(Add).depends_on((v1, v2));
+    let sum34 = dag.add_task(Add).depends_on((v3, v4));
     let final_sum = dag.add_task(Add).depends_on((&sum12, &sum34));
 
     dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))

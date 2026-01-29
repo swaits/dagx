@@ -85,7 +85,7 @@ async fn test_stateful_tasks() {
     let dag = DagRunner::new();
 
     let input = dag.add_task(task_fn(|_: ()| async { 5 }));
-    let counter = dag.add_task(Counter::new(10)).depends_on(&input);
+    let counter = dag.add_task(Counter::new(10)).depends_on(input);
 
     dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
         .await
@@ -105,7 +105,7 @@ async fn test_task_fn_with_captured_state() {
     let base = dag.add_task(task_fn(|_: ()| async { 5 }));
     let scaled = dag
         .add_task(task_fn(move |x: i32| async move { x * multiplier }))
-        .depends_on(&base);
+        .depends_on(base);
 
     dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
         .await

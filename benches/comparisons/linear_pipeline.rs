@@ -20,7 +20,7 @@ pub fn bench_linear_pipeline(c: &mut Criterion) {
                 let a = dag.add_task(task_fn(|_: ()| async { 1 }));
                 let b = dag
                     .add_task(task_fn(|x: i32| async move { x + 1 }))
-                    .depends_on(&a);
+                    .depends_on(a);
                 let c = dag
                     .add_task(task_fn(|x: i32| async move { x * 2 }))
                     .depends_on(b);

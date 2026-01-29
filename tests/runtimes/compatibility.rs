@@ -25,7 +25,7 @@ async fn runtime_integration_tokio() -> DagResult<()> {
 
     let a = dag.add_task(Value(10));
     let b = dag.add_task(Value(20));
-    let sum = dag.add_task(Add).depends_on((&a, &b));
+    let sum = dag.add_task(Add).depends_on((a, b));
 
     dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 

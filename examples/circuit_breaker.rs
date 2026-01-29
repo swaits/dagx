@@ -448,7 +448,7 @@ async fn main() {
 
         let fallback5 = dag
             .add_task(FallbackService::new("ServiceCall-5"))
-            .depends_on(&call5);
+            .depends_on(call5);
 
         dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
             .await

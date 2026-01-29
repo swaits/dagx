@@ -29,7 +29,7 @@ async fn test_parallelism_proof_1000_tasks() -> DagResult<()> {
     let elapsed = start.elapsed();
 
     // Verify all tasks completed
-    for (i, task) in tasks.iter().enumerate() {
+    for (i, task) in tasks.into_iter().enumerate() {
         assert_eq!(dag.get(task)?, i as u32);
     }
 

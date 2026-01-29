@@ -190,16 +190,16 @@ async fn test_multiple_get_calls() {
     init_tracing();
     // Test that get() can be called multiple times for the same handle
     let dag = DagRunner::new();
-    let handle = dag.add_task(TestTask { value: 100 });
+    let handle: TaskHandle<_> = dag.add_task(TestTask { value: 100 }).into();
 
     dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
         .await
         .unwrap();
 
     // Multiple get calls should all return the same value
-    let result1 = dag.get(&handle).unwrap();
-    let result2 = dag.get(&handle).unwrap();
-    let result3 = dag.get(&handle).unwrap();
+    let result1 = dag.get(handle).unwrap();
+    let result2 = dag.get(handle).unwrap();
+    let result3 = dag.get(handle).unwrap();
 
     assert_eq!(result1, 100);
     assert_eq!(result2, 100);
@@ -264,11 +264,11 @@ async fn test_task_panic_in_multi_task_layer() {
     }
 
     let dag = DagRunner::new();
-    let source = dag.add_task(Source);
+    let source: TaskHandle<_> = dag.add_task(Source).into();
 
     // Create two tasks in the same layer - one panics, one doesn't
-    let _panic_task = dag.add_task(PanicTask).depends_on(&source);
-    let _good_task = dag.add_task(GoodTask).depends_on(&source);
+    let _panic_task = dag.add_task(PanicTask).depends_on(source);
+    let _good_task = dag.add_task(GoodTask).depends_on(source);
 
     // Run the DAG - the panic should be caught
     let result = dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await;

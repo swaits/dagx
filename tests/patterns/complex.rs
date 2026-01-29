@@ -1,7 +1,7 @@
 //! Complex DAG pattern tests
 
 use crate::common::task_fn;
-use dagx::{DagResult, DagRunner};
+use dagx::{DagResult, DagRunner, TaskHandle};
 use futures::FutureExt;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
@@ -21,7 +21,7 @@ async fn test_workflow_with_conditional_paths() -> DagResult<()> {
                 Err("Invalid input")
             }
         }))
-        .depends_on(&input);
+        .depends_on(input);
 
     // Process valid input
     let process = dag
@@ -31,7 +31,7 @@ async fn test_workflow_with_conditional_paths() -> DagResult<()> {
                 Err(_) => -1,
             }
         }))
-        .depends_on(&validate);
+        .depends_on(validate);
 
     // Parallel enhancement steps
     let enhance1 = dag
@@ -80,7 +80,7 @@ async fn test_map_reduce_pattern() -> DagResult<()> {
                 // Simulate word count
                 vec![("word1", i % 3), ("word2", i % 5), ("word3", i % 7)]
             }));
-            (&task).into()
+            task.into()
         })
         .collect();
 
@@ -166,7 +166,7 @@ async fn test_pipeline_with_feedback() -> DagResult<()> {
                 }
             }
         }))
-        .depends_on(&init);
+        .depends_on(init);
 
     // Stage 2: Filter
     let stage2 = dag
@@ -209,9 +209,11 @@ async fn test_scatter_gather_pattern() -> DagResult<()> {
     let dag = DagRunner::new();
 
     // Scatter: distribute work to multiple workers
-    let source = dag.add_task(task_fn(|_: ()| async {
-        vec![10, 20, 30, 40, 50, 60, 70, 80]
-    }));
+    let source: TaskHandle<_> = dag
+        .add_task(task_fn(|_: ()| async {
+            vec![10, 20, 30, 40, 50, 60, 70, 80]
+        }))
+        .into();
 
     // Workers process chunks
     let workers: Vec<_> = (0..4)
@@ -228,7 +230,7 @@ async fn test_scatter_gather_pattern() -> DagResult<()> {
 
                 data[start..end].iter().sum::<i32>()
             }))
-            .depends_on(&source)
+            .depends_on(source)
         })
         .collect();
 
@@ -266,7 +268,7 @@ async fn test_fork_join_with_barriers() -> DagResult<()> {
 
     // Multiple parallel paths
     let mut path1 = Vec::new();
-    let parent_handle: dagx::TaskHandle<i32> = (&parent).into();
+    let parent_handle: dagx::TaskHandle<i32> = parent.into();
     let mut prev1 = parent_handle;
     for i in 0..3 {
         let counter = phase_counter.clone();

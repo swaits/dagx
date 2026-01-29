@@ -64,7 +64,7 @@ async fn test_zero_sized_type_task() -> DagResult<()> {
 
     dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 
-    assert_eq!(dag.get(&task)?, ZeroSized);
+    assert_eq!(dag.get(task)?, ZeroSized);
     Ok(())
 }
 
@@ -91,7 +91,7 @@ async fn test_dag_with_only_source_tasks() -> DagResult<()> {
 
     dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 
-    for (i, task) in tasks.iter().enumerate() {
+    for (i, task) in tasks.into_iter().enumerate() {
         assert_eq!(dag.get(task)?, i);
     }
 
@@ -155,7 +155,7 @@ async fn test_dag_with_never_type_simulation() -> DagResult<()> {
 
     dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 
-    assert_eq!(dag.get(&task)?, Ok(42));
+    assert_eq!(dag.get(task)?, Ok(42));
     Ok(())
 }
 

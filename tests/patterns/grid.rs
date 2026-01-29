@@ -15,10 +15,10 @@ async fn test_2d_grid_pattern() -> DagResult<()> {
     #[allow(clippy::needless_range_loop)]
     for i in 0..4 {
         let task = dag.add_task(task_fn(move |_: ()| async move { i as i32 }));
-        grid[0][i] = Some((&task).into());
+        grid[0][i] = Some(task.into());
         if i > 0 {
             let task = dag.add_task(task_fn(move |_: ()| async move { i as i32 * 10 }));
-            grid[i][0] = Some((&task).into());
+            grid[i][0] = Some(task.into());
         }
     }
 
@@ -55,7 +55,7 @@ async fn test_3d_grid_pattern() -> DagResult<()> {
 
     // Initialize origin
     let origin = dag.add_task(task_fn(|_: ()| async { 1 }));
-    grid[0][0][0] = Some((&origin).into());
+    grid[0][0][0] = Some(origin.into());
 
     // Fill the 3D grid
     for x in 0..size {
@@ -77,7 +77,7 @@ async fn test_3d_grid_pattern() -> DagResult<()> {
                 let task_handle: dagx::TaskHandle<usize> = match deps.len() {
                     0 => {
                         let t = dag.add_task(task_fn(move |_: ()| async move { x + y + z }));
-                        (&t).into()
+                        t.into()
                     }
                     1 => dag
                         .add_task(task_fn(move |prev: usize| async move { prev + 1 }))
@@ -121,7 +121,7 @@ async fn test_hexagonal_grid() -> DagResult<()> {
 
     // Center hex
     let center_builder = dag.add_task(task_fn(|_: ()| async { 100 }));
-    let center: dagx::TaskHandle<i32> = (&center_builder).into();
+    let center: dagx::TaskHandle<i32> = center_builder.into();
     hex_grid.insert((0, 0), center);
 
     // Ring 1 (6 hexes around center)
@@ -168,7 +168,7 @@ async fn test_hexagonal_grid() -> DagResult<()> {
                 .depends_on(neighbors[0])
         } else {
             let t = dag.add_task(task_fn(move |_: ()| async move { q + r }));
-            (&t).into()
+            t.into()
         };
 
         hex_grid.insert((q, r), task);
@@ -194,7 +194,7 @@ async fn test_toroidal_grid() -> DagResult<()> {
     for i in 0..SIZE {
         for j in 0..SIZE {
             let task = dag.add_task(task_fn(move |_: ()| async move { (i * SIZE + j) as i32 }));
-            grid[i][j] = Some((&task).into());
+            grid[i][j] = Some(task.into());
         }
     }
 

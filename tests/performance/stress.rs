@@ -13,7 +13,7 @@ async fn test_deep_chain_100_levels() {
     // Create a chain 100 levels deep
     let start = Instant::now();
     let first = dag.add_task(task_fn(|_: ()| async { 0 }));
-    let mut handles = vec![(&first).into()];
+    let mut handles = vec![first.into()];
 
     for _ in 1..=100 {
         let next = dag
@@ -52,7 +52,7 @@ async fn test_stress_mixed_patterns() {
     for i in 0..10 {
         // Linear chains
         let first = dag.add_task(task_fn(move |_: ()| async move { i * 1000 }));
-        let mut chain_handles = vec![(&first).into()];
+        let mut chain_handles = vec![first.into()];
         for j in 1..10 {
             let next = dag
                 .add_task(task_fn(move |x: i32| async move { x + j }))
@@ -63,7 +63,7 @@ async fn test_stress_mixed_patterns() {
 
         // Diamonds
         let source = dag.add_task(task_fn(move |_: ()| async move { i * 100 }));
-        let source_handle: dagx::TaskHandle<i32> = (&source).into();
+        let source_handle: dagx::TaskHandle<i32> = source.into();
         let left = dag
             .add_task(task_fn(|x: i32| async move { x * 2 }))
             .depends_on(source_handle);
@@ -77,7 +77,7 @@ async fn test_stress_mixed_patterns() {
 
         // Fan-outs
         let hub = dag.add_task(task_fn(move |_: ()| async move { i }));
-        let hub_handle: dagx::TaskHandle<i32> = (&hub).into();
+        let hub_handle: dagx::TaskHandle<i32> = hub.into();
         for j in 0..5 {
             let fan = dag
                 .add_task(task_fn(move |x: i32| async move { x + j * 10 }))

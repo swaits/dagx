@@ -128,9 +128,9 @@ async fn main() -> DagResult<()> {
     let processed3 = dag.add_task(ValidateAndDouble::new(20)); // Valid: 40
 
     // Categorize each result (also parallel, threshold = 25)
-    let cat1 = dag.add_task(Categorize::new(25)).depends_on(&processed1); // 20 < 25 = "low"
-    let cat2 = dag.add_task(Categorize::new(25)).depends_on(&processed2); // 0 = "invalid"
-    let cat3 = dag.add_task(Categorize::new(25)).depends_on(&processed3); // 40 >= 25 = "high"
+    let cat1 = dag.add_task(Categorize::new(25)).depends_on(processed1); // 20 < 25 = "low"
+    let cat2 = dag.add_task(Categorize::new(25)).depends_on(processed2); // 0 = "invalid"
+    let cat3 = dag.add_task(Categorize::new(25)).depends_on(processed3); // 40 >= 25 = "high"
 
     // Combine results
     let summary = dag

@@ -1,7 +1,7 @@
 //! Tests for multi-threading and concurrent execution
 
 use crate::common::task_fn;
-use dagx::{DagResult, DagRunner};
+use dagx::{DagResult, DagRunner, TaskHandle};
 use futures::FutureExt;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
@@ -44,7 +44,7 @@ async fn test_tasks_run_on_different_threads() -> DagResult<()> {
     dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 
     // Verify all tasks completed
-    for task in tasks.iter() {
+    for task in tasks.into_iter() {
         let _ = dag.get(task)?;
     }
 
@@ -113,7 +113,7 @@ async fn test_concurrent_execution_with_atomic_counter() -> DagResult<()> {
     dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 
     // Verify all tasks completed
-    for (i, task) in tasks.iter().enumerate() {
+    for (i, task) in tasks.into_iter().enumerate() {
         assert_eq!(dag.get(task)?, i);
     }
 
@@ -141,7 +141,7 @@ async fn test_diamond_parallel_execution() -> DagResult<()> {
 
     let concurrent_middle = Arc::new(AtomicUsize::new(0));
 
-    let source = dag.add_task(task_fn(|_: ()| async { 100 }));
+    let source: TaskHandle<_> = dag.add_task(task_fn(|_: ()| async { 100 })).into();
 
     // These should run in parallel
     let parallel1 = {
@@ -157,7 +157,7 @@ async fn test_diamond_parallel_execution() -> DagResult<()> {
                 x * 2
             }
         }))
-        .depends_on(&source)
+        .depends_on(source)
     };
 
     let parallel2 = {
@@ -174,7 +174,7 @@ async fn test_diamond_parallel_execution() -> DagResult<()> {
                 x * 3
             }
         }))
-        .depends_on(&source)
+        .depends_on(source)
     };
 
     let sink = dag
@@ -196,7 +196,7 @@ async fn test_parallel_branches_with_dependencies() -> DagResult<()> {
     let branch_progress = Arc::new(Mutex::new(Vec::new()));
 
     // Source node
-    let source = dag.add_task(task_fn(|_: ()| async { 10 }));
+    let source: TaskHandle<_> = dag.add_task(task_fn(|_: ()| async { 10 })).into();
 
     // Branch 1: source -> b1_1 -> b1_2
     let b1_1 = {
@@ -213,7 +213,7 @@ async fn test_parallel_branches_with_dependencies() -> DagResult<()> {
                 x * 2
             }
         }))
-        .depends_on(&source)
+        .depends_on(source)
     };
 
     let b1_2 = {
@@ -248,7 +248,7 @@ async fn test_parallel_branches_with_dependencies() -> DagResult<()> {
                 x * 3
             }
         }))
-        .depends_on(&source)
+        .depends_on(source)
     };
 
     let b2_2 = {
@@ -320,7 +320,7 @@ async fn test_wide_fanout_parallel_execution() -> DagResult<()> {
     let max_concurrent = Arc::new(AtomicUsize::new(0));
     let current_concurrent = Arc::new(AtomicUsize::new(0));
 
-    let source = dag.add_task(task_fn(|_: ()| async { 42 }));
+    let source: TaskHandle<_> = dag.add_task(task_fn(|_: ()| async { 42 })).into();
 
     // Create 50 tasks that all depend on the source
     let dependents: Vec<_> = (0..50)
@@ -356,7 +356,7 @@ async fn test_wide_fanout_parallel_execution() -> DagResult<()> {
                     x + i
                 }
             }))
-            .depends_on(&source)
+            .depends_on(source)
         })
         .collect();
 
@@ -388,7 +388,7 @@ async fn test_massive_parallel_fanout() -> DagResult<()> {
     let max_concurrent = Arc::new(AtomicUsize::new(0));
     let current = Arc::new(AtomicUsize::new(0));
 
-    let source = dag.add_task(task_fn(|_: ()| async { 1 }));
+    let source: TaskHandle<_> = dag.add_task(task_fn(|_: ()| async { 1 })).into();
 
     // Create 1000 tasks all depending on the same source
     let tasks: Vec<_> = (0..1000)
@@ -426,7 +426,7 @@ async fn test_massive_parallel_fanout() -> DagResult<()> {
                     x + i
                 }
             }))
-            .depends_on(&source)
+            .depends_on(source)
         })
         .collect();
 

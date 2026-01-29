@@ -55,7 +55,7 @@ async fn test_readonly_state_with_input() {
     let dag = DagRunner::new();
 
     let input = dag.add_task(task_fn(|_: ()| async { 5 }));
-    let result = dag.add_task(ReadOnlyMultiplier(7)).depends_on(&input);
+    let result = dag.add_task(ReadOnlyMultiplier(7)).depends_on(input);
 
     dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
         .await
@@ -76,13 +76,13 @@ async fn test_readonly_state_multiple_uses() {
         offset: 5,
     };
 
-    let result1 = dag.add_task(config).depends_on(&input1);
+    let result1 = dag.add_task(config).depends_on(input1);
     // Note: Can't reuse config because it was moved, so create another
     let config2 = ReadOnlyConfig {
         multiplier: 3,
         offset: 5,
     };
-    let result2 = dag.add_task(config2).depends_on(&input2);
+    let result2 = dag.add_task(config2).depends_on(input2);
 
     dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
         .await

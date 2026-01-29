@@ -98,7 +98,7 @@
 //! === Timeout Example Complete ===
 //! ```
 
-use dagx::{task, DagRunner};
+use dagx::{task, DagRunner, TaskHandle};
 use futures::FutureExt;
 use tokio::time::{sleep, timeout, Duration};
 
@@ -196,7 +196,7 @@ async fn main() {
             timeout_ms: 200,
         });
 
-        let processed = dag.add_task(ProcessResult).depends_on(&timed);
+        let processed = dag.add_task(ProcessResult).depends_on(timed);
 
         dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
             .await
@@ -241,13 +241,15 @@ async fn main() {
     {
         let dag = DagRunner::new();
 
-        let source = dag.add_task(TaskWithTimeout {
-            work_duration_ms: 500,
-            timeout_ms: 100,
-        });
+        let source: TaskHandle<_> = dag
+            .add_task(TaskWithTimeout {
+                work_duration_ms: 500,
+                timeout_ms: 100,
+            })
+            .into();
 
-        let processed1 = dag.add_task(ProcessResult).depends_on(&source);
-        let processed2 = dag.add_task(ProcessResult).depends_on(&source);
+        let processed1 = dag.add_task(ProcessResult).depends_on(source);
+        let processed2 = dag.add_task(ProcessResult).depends_on(source);
 
         dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
             .await

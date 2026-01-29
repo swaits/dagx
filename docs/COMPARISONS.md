@@ -18,7 +18,7 @@ impl Add { async fn run(a: &i32, b: &i32) -> i32 { a + b } }
 let dag = DagRunner::new();
 let x = dag.add_task(Value(2));
 let y = dag.add_task(Value(3));
-let sum = dag.add_task(Add).depends_on((&x, &y));
+let sum = dag.add_task(Add).depends_on((x, y));
 dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 ```
 

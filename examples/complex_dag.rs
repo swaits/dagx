@@ -184,8 +184,8 @@ async fn main() -> DagResult<()> {
     let source_b = dag.add_task(LoadData::new("B"));
 
     // Transform: Process each source (parallel)
-    let transform_a = dag.add_task(Transform::new(2)).depends_on(&source_a);
-    let transform_b = dag.add_task(Transform::new(3)).depends_on(&source_b);
+    let transform_a = dag.add_task(Transform::new(2)).depends_on(source_a);
+    let transform_b = dag.add_task(Transform::new(3)).depends_on(source_b);
 
     // Combine: Merge the transformed datasets
     let combined = dag

@@ -1,7 +1,7 @@
 //! Mixed realistic patterns - fan-out, fan-in, and processing
 
 use criterion::Criterion;
-use dagx::{task_fn, DagRunner};
+use dagx::{task_fn, DagRunner, TaskHandle};
 use futures::FutureExt;
 
 pub fn bench_mixed_patterns(c: &mut Criterion) {
@@ -13,28 +13,30 @@ pub fn bench_mixed_patterns(c: &mut Criterion) {
                 let dag = DagRunner::new();
 
                 // Stage 1: Load data (framework wraps in Arc automatically)
-                let data = dag.add_task(task_fn(|_: ()| async {
-                    (0..1000)
-                        .map(|i| format!("Record-{:04}", i))
-                        .collect::<Vec<_>>()
-                }));
+                let data: TaskHandle<_> = dag
+                    .add_task(task_fn(|_: ()| async {
+                        (0..1000)
+                            .map(|i| format!("Record-{:04}", i))
+                            .collect::<Vec<_>>()
+                    }))
+                    .into();
 
                 // Stage 2: Fan-out for parallel analysis
                 let analysis1 = dag
                     .add_task(task_fn(|d: Vec<String>| async move {
                         d.iter().filter(|s| s.contains("00")).count()
                     }))
-                    .depends_on(&data);
+                    .depends_on(data);
 
                 let analysis2 = dag
                     .add_task(task_fn(|d: Vec<String>| async move {
                         d.iter().map(|s| s.len()).sum::<usize>()
                     }))
-                    .depends_on(&data);
+                    .depends_on(data);
 
                 let analysis3 = dag
                     .add_task(task_fn(|d: Vec<String>| async move { d.len() }))
-                    .depends_on(&data);
+                    .depends_on(data);
 
                 // Stage 3: Fan-in to aggregate
                 let summary = dag

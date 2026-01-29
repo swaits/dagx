@@ -55,7 +55,7 @@
 //!   Squared: 100
 //! ```
 
-use dagx::{task, DagRunner};
+use dagx::{task, DagRunner, TaskHandle};
 use futures::FutureExt;
 
 // Source task with a value field
@@ -131,13 +131,13 @@ async fn main() {
     let dag = DagRunner::new();
 
     // Single source task - constructed with ::new()
-    let source = dag.add_task(Source::new(10));
+    let source: TaskHandle<_> = dag.add_task(Source::new(10)).into();
 
     // Multiple downstream tasks consuming the same value
     // Each constructed differently to show flexibility
-    let plus_one = dag.add_task(AddOffset::new(1)).depends_on(&source);
-    let times_two = dag.add_task(Multiply::new(2)).depends_on(&source);
-    let squared = dag.add_task(Power { exponent: 2 }).depends_on(&source);
+    let plus_one = dag.add_task(AddOffset::new(1)).depends_on(source);
+    let times_two = dag.add_task(Multiply::new(2)).depends_on(source);
+    let squared = dag.add_task(Power { exponent: 2 }).depends_on(source);
 
     // Run the DAG
     println!("Running fan-out DAG...\n");

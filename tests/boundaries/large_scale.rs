@@ -13,7 +13,7 @@ async fn test_10000_independent_tasks() -> DagResult<()> {
 
     let counter = Arc::new(AtomicUsize::new(0));
 
-    let tasks: Vec<_> = (0..10_000)
+    let mut tasks: Vec<_> = (0..10_000)
         .map(|i| {
             let counter = counter.clone();
             dag.add_task(task_fn(move |_: ()| {
@@ -32,9 +32,9 @@ async fn test_10000_independent_tasks() -> DagResult<()> {
     assert_eq!(counter.load(Ordering::Relaxed), 10_000);
 
     // Spot check some results
-    assert_eq!(dag.get(&tasks[0])?, 0);
-    assert_eq!(dag.get(&tasks[9_999])?, 9_999);
-    assert_eq!(dag.get(&tasks[5_000])?, 5_000);
+    assert_eq!(dag.get(tasks.swap_remove(9_999))?, 9_999);
+    assert_eq!(dag.get(tasks.swap_remove(5_000))?, 5_000);
+    assert_eq!(dag.get(tasks.swap_remove(0))?, 0);
 
     Ok(())
 }
@@ -55,7 +55,7 @@ async fn test_5000_node_pyramid() -> DagResult<()> {
                     0
                 }
             }));
-            (&task).into()
+            task.into()
         })
         .collect();
 
@@ -126,7 +126,7 @@ async fn test_5000_node_pyramid_single_threaded() -> DagResult<()> {
                     0
                 }
             }));
-            (&task).into()
+            task.into()
         })
         .collect();
 
@@ -188,7 +188,10 @@ async fn test_wide_dag_1000_sources_1000_sinks() -> DagResult<()> {
 
     // Create 1000 source tasks
     let sources: Vec<_> = (0..1000)
-        .map(|i| dag.add_task(task_fn(move |_: ()| async move { i % 10 })))
+        .map(|i| {
+            dag.add_task(task_fn(move |_: ()| async move { i % 10 }))
+                .into()
+        })
         .collect();
 
     // Create 1000 sink tasks, each depending on 3 random sources
@@ -238,7 +241,7 @@ async fn test_10000_node_linear_chain_segments() -> DagResult<()> {
                 }
             }
         }));
-        let mut current: dagx::TaskHandle<i32> = (&first).into();
+        let mut current: dagx::TaskHandle<i32> = first.into();
 
         for _i in 1..100 {
             current = dag

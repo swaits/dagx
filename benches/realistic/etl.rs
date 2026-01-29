@@ -1,7 +1,7 @@
 //! ETL (Extract, Transform, Load) pipeline benchmark
 
 use criterion::{BenchmarkId, Criterion};
-use dagx::{task_fn, DagRunner};
+use dagx::{task_fn, DagRunner, TaskHandle};
 use futures::FutureExt;
 
 pub fn bench_etl_pipeline(c: &mut Criterion) {
@@ -21,7 +21,7 @@ pub fn bench_etl_pipeline(c: &mut Criterion) {
                         let dag = DagRunner::new();
 
                         // Extract: Load JSON-like data (framework wraps in Arc automatically)
-                        let extract = dag.add_task(task_fn(move |_: ()| async move {
+                        let extract: TaskHandle<_> = dag.add_task(task_fn(move |_: ()| async move {
                             (0..count)
                                 .map(|i| {
                                     format!(
@@ -32,7 +32,7 @@ pub fn bench_etl_pipeline(c: &mut Criterion) {
                                     )
                                 })
                                 .collect::<Vec<_>>()
-                        }));
+                        })).into();
 
                         // Transform: Three parallel transformations
 
@@ -47,7 +47,7 @@ pub fn bench_etl_pipeline(c: &mut Criterion) {
                                     })
                                     .count()
                             }))
-                            .depends_on(&extract);
+                            .depends_on(extract);
 
                         // T2: Extract scores
                         let scores = dag
@@ -60,7 +60,7 @@ pub fn bench_etl_pipeline(c: &mut Criterion) {
                                     })
                                     .collect::<Vec<_>>()
                             }))
-                            .depends_on(&extract);
+                            .depends_on(extract);
 
                         // T3: Extract names
                         let names = dag
@@ -74,7 +74,7 @@ pub fn bench_etl_pipeline(c: &mut Criterion) {
                                     })
                                     .collect::<Vec<_>>()
                             }))
-                            .depends_on(&extract);
+                            .depends_on(extract);
 
                         // Load: Aggregate all transformations
                         dag.add_task(task_fn(

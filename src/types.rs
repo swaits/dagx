@@ -75,18 +75,6 @@ where
     }
 }
 
-impl<'a, Tk: Task, Deps> From<&TaskBuilder<'a, Tk, Deps>> for TaskHandle<Tk::Output>
-where
-    Tk::Input: IsUnitType,
-{
-    fn from(node: &TaskBuilder<'a, Tk, Deps>) -> Self {
-        TaskHandle {
-            id: node.id,
-            _phantom: std::marker::PhantomData,
-        }
-    }
-}
-
 // TaskHandle can be converted from &TaskHandle (for .get() calls)
 impl<T> From<&TaskHandle<T>> for TaskHandle<T> {
     fn from(handle: &TaskHandle<T>) -> Self {

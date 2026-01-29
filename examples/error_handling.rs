@@ -214,7 +214,7 @@ async fn main() {
 
         let input = dag.add_task(StringSource("42"));
 
-        let parsed = dag.add_task(ParseInt).depends_on(&input);
+        let parsed = dag.add_task(ParseInt).depends_on(input);
 
         let validated = dag
             .add_task(ValidateRange { min: 0, max: 100 })
@@ -240,7 +240,7 @@ async fn main() {
 
         let input = dag.add_task(StringSource("not a number"));
 
-        let parsed = dag.add_task(ParseInt).depends_on(&input);
+        let parsed = dag.add_task(ParseInt).depends_on(input);
 
         let validated = dag
             .add_task(ValidateRange { min: 0, max: 100 })
@@ -266,7 +266,7 @@ async fn main() {
 
         let input = dag.add_task(StringSource("150"));
 
-        let parsed = dag.add_task(ParseInt).depends_on(&input);
+        let parsed = dag.add_task(ParseInt).depends_on(input);
 
         let validated = dag
             .add_task(ValidateRange { min: 0, max: 100 })
@@ -292,7 +292,7 @@ async fn main() {
 
         let input = dag.add_task(StringSource("invalid"));
 
-        let parsed = dag.add_task(ParseInt).depends_on(&input);
+        let parsed = dag.add_task(ParseInt).depends_on(input);
 
         let with_fallback = dag
             .add_task(WithFallback { fallback: 0 })

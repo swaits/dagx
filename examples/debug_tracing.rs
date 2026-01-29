@@ -398,7 +398,7 @@ async fn main() {
         // Aggregate traces
         let summary = dag
             .add_task(TraceAggregator::new(correlation_id))
-            .depends_on((&inventory, &payment, &shipping));
+            .depends_on((inventory, payment, shipping));
 
         // Run the DAG
         dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))

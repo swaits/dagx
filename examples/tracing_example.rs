@@ -87,7 +87,7 @@ async fn main() {
         let dag = DagRunner::new();
 
         // Layer 0: Source
-        let source = dag.add_task(Value(10));
+        let source = dag.add_task(Value(10)).into();
 
         // Layer 1: Two parallel computations
         let left = dag.add_task(Add).depends_on((&source, &source));
@@ -112,7 +112,7 @@ async fn main() {
 
         // Create a linear chain - each layer has only one task
         // This should trigger inline execution optimization
-        let a = dag.add_task(Value(1));
+        let a = dag.add_task(Value(1)).into();
         let b = dag.add_task(Add).depends_on((&a, &a));
         let c = dag.add_task(Multiply).depends_on((&b, &b));
         let d = dag.add_task(Add).depends_on((&c, &c));
@@ -132,10 +132,10 @@ async fn main() {
         let dag = DagRunner::new();
 
         // Layer 0: Multiple sources
-        let v1 = dag.add_task(Value(1));
-        let v2 = dag.add_task(Value(2));
-        let v3 = dag.add_task(Value(3));
-        let v4 = dag.add_task(Value(4));
+        let v1 = dag.add_task(Value(1)).into();
+        let v2 = dag.add_task(Value(2)).into();
+        let v3 = dag.add_task(Value(3)).into();
+        let v4 = dag.add_task(Value(4)).into();
 
         // Layer 1: Multiple parallel computations
         let sum12 = dag.add_task(Add).depends_on((&v1, &v2));

@@ -52,7 +52,7 @@ pub fn bench_dag_execution(c: &mut Criterion) {
                 let t0 = dag.add_task(Value(0));
                 let t1 = dag
                     .add_task(task_fn(|x: i32| async move { x + 1 }))
-                    .depends_on(&t0);
+                    .depends_on(t0);
                 let t2 = dag
                     .add_task(task_fn(|x: i32| async move { x + 1 }))
                     .depends_on(t1);

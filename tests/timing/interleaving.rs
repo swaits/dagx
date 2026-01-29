@@ -1,7 +1,7 @@
 //! Tests for forced execution interleaving patterns
 
 use crate::common::task_fn;
-use dagx::{DagResult, DagRunner};
+use dagx::{DagResult, DagRunner, TaskHandle};
 use futures::FutureExt;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
@@ -65,7 +65,7 @@ async fn test_forced_interleaving_with_barriers() -> DagResult<()> {
         .add_task(task_fn(
             |(a, b, c): (i32, i32, i32)| async move { a + b + c },
         ))
-        .depends_on((&t1, &t2, &t3));
+        .depends_on((t1, t2, t3));
 
     dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 
@@ -110,7 +110,7 @@ async fn test_alternating_execution_pattern() -> DagResult<()> {
             }
         }
     }));
-    let mut chain_a: dagx::TaskHandle<i32> = (&first_a).into();
+    let mut chain_a: dagx::TaskHandle<i32> = first_a.into();
 
     let first_b = dag.add_task(task_fn({
         let turn = turn.clone();
@@ -128,7 +128,7 @@ async fn test_alternating_execution_pattern() -> DagResult<()> {
             }
         }
     }));
-    let mut chain_b: dagx::TaskHandle<i32> = (&first_b).into();
+    let mut chain_b: dagx::TaskHandle<i32> = first_b.into();
 
     for i in 1..5 {
         let turn_clone = turn.clone();
@@ -197,6 +197,7 @@ async fn test_layered_interleaving() -> DagResult<()> {
                     i as i32
                 }
             }))
+            .into()
         })
         .collect();
 
@@ -250,19 +251,21 @@ async fn test_cross_branch_synchronization() -> DagResult<()> {
     let events = Arc::new(parking_lot::Mutex::new(Vec::new()));
 
     // Branch A
-    let a1 = dag.add_task(task_fn({
-        let sync = sync_point.clone();
-        let events = events.clone();
-        move |_: ()| {
-            let sync = sync.clone();
+    let a1: TaskHandle<_> = dag
+        .add_task(task_fn({
+            let sync = sync_point.clone();
             let events = events.clone();
-            async move {
-                events.lock().push("A1");
-                sync.fetch_add(1, Ordering::SeqCst);
-                1
+            move |_: ()| {
+                let sync = sync.clone();
+                let events = events.clone();
+                async move {
+                    events.lock().push("A1");
+                    sync.fetch_add(1, Ordering::SeqCst);
+                    1
+                }
             }
-        }
-    }));
+        }))
+        .into();
 
     let a2 = dag
         .add_task(task_fn({
@@ -282,7 +285,7 @@ async fn test_cross_branch_synchronization() -> DagResult<()> {
                 }
             }
         }))
-        .depends_on(&a1);
+        .depends_on(a1);
 
     // Branch B
     let b1 = dag.add_task(task_fn({
@@ -320,7 +323,7 @@ async fn test_cross_branch_synchronization() -> DagResult<()> {
                 }
             }
         }))
-        .depends_on(&b1);
+        .depends_on(b1);
 
     // Merge
     let merge = dag

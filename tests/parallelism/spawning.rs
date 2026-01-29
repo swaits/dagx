@@ -35,7 +35,7 @@ async fn test_spawner_actually_spawns_tasks() -> DagResult<()> {
     dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 
     // Verify all tasks were spawned
-    for (i, task) in tasks.iter().enumerate() {
+    for (i, task) in tasks.into_iter().enumerate() {
         assert_eq!(dag.get(task)?, i as i32);
     }
 
@@ -81,7 +81,7 @@ async fn test_tasks_not_running_inline() -> DagResult<()> {
     dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 
     // Verify results
-    for (i, task) in tasks.iter().enumerate() {
+    for (i, task) in tasks.into_iter().enumerate() {
         assert_eq!(dag.get(task)?, i as i32);
     }
 

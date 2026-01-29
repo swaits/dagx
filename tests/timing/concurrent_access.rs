@@ -1,7 +1,7 @@
 //! Tests for concurrent access patterns and race conditions
 
 use crate::common::task_fn;
-use dagx::{DagResult, DagRunner};
+use dagx::{DagResult, DagRunner, TaskHandle};
 use futures::FutureExt;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
@@ -19,7 +19,7 @@ async fn test_concurrent_result_retrieval() -> DagResult<()> {
                 tokio::time::sleep(tokio::time::Duration::from_millis(1)).await;
                 i as usize
             }));
-            (&task).into()
+            task.into()
         })
         .collect();
 
@@ -64,7 +64,7 @@ async fn test_simultaneous_dag_building_and_execution() -> DagResult<()> {
         let mut tasks: Vec<dagx::TaskHandle<i32>> = Vec::new();
         for i in 5..50 {
             let task = dag_build.add_task(task_fn(move |_: ()| async move { i }));
-            tasks.push((&task).into());
+            tasks.push(task.into());
             tokio::time::sleep(tokio::time::Duration::from_millis(1)).await;
         }
         building.store(true, Ordering::SeqCst);
@@ -81,7 +81,7 @@ async fn test_simultaneous_dag_building_and_execution() -> DagResult<()> {
     let additional_tasks = build_handle.await.unwrap();
 
     // Initial tasks should have results
-    for (i, task) in initial.iter().enumerate() {
+    for (i, task) in initial.into_iter().enumerate() {
         assert_eq!(dag.get(task)?, i);
     }
 
@@ -107,16 +107,18 @@ async fn test_concurrent_dependency_resolution() -> DagResult<()> {
     let resolution_counter = Arc::new(AtomicUsize::new(0));
 
     // Create a source task
-    let source = dag.add_task(task_fn({
-        let counter = resolution_counter.clone();
-        move |_: ()| {
-            let counter = counter.clone();
-            async move {
-                counter.fetch_add(1, Ordering::SeqCst);
-                42
+    let source: TaskHandle<_> = dag
+        .add_task(task_fn({
+            let counter = resolution_counter.clone();
+            move |_: ()| {
+                let counter = counter.clone();
+                async move {
+                    counter.fetch_add(1, Ordering::SeqCst);
+                    42
+                }
             }
-        }
-    }));
+        }))
+        .into();
 
     // Create many tasks depending on the same source
     let dependents: Vec<_> = (0..100)
@@ -129,7 +131,7 @@ async fn test_concurrent_dependency_resolution() -> DagResult<()> {
                     val + i
                 }
             }))
-            .depends_on(&source)
+            .depends_on(source)
         })
         .collect();
 
@@ -166,6 +168,7 @@ async fn test_read_write_race_patterns() -> DagResult<()> {
                     i
                 }
             }))
+            .into()
         })
         .collect();
 
@@ -284,7 +287,7 @@ async fn test_multiple_dag_runners_interaction() -> DagResult<()> {
             // Collect results
             let mut results = Vec::new();
             for task in tasks {
-                results.push(dag.get(&task)?);
+                results.push(dag.get(task)?);
             }
 
             Ok::<_, dagx::DagError>(results)

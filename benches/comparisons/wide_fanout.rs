@@ -3,6 +3,7 @@
 //! One source task feeding 100 dependent tasks
 
 use criterion::Criterion;
+use dagx::TaskHandle;
 use futures::FutureExt;
 
 pub fn bench_wide_fanout(c: &mut Criterion) {
@@ -16,12 +17,12 @@ pub fn bench_wide_fanout(c: &mut Criterion) {
                 use dagx::{task_fn, DagRunner};
 
                 let dag = DagRunner::new();
-                let source = dag.add_task(task_fn(|_: ()| async { 42 }));
+                let source: TaskHandle<_> = dag.add_task(task_fn(|_: ()| async { 42 })).into();
 
                 // Create 100 tasks that all depend on source
                 for i in 0..100 {
                     dag.add_task(task_fn(move |x: i32| async move { x + i }))
-                        .depends_on(&source);
+                        .depends_on(source);
                 }
 
                 dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))

@@ -43,7 +43,7 @@ async fn test_tracing_with_subscriber() {
 
     let a = dag.add_task(Value(2));
     let b = dag.add_task(Value(3));
-    let sum = dag.add_task(Add).depends_on((&a, &b));
+    let sum = dag.add_task(Add).depends_on((a, b));
 
     dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
         .await
@@ -63,7 +63,7 @@ async fn test_tracing_with_complex_dag() {
     let dag = DagRunner::new();
 
     // Create a diamond pattern
-    let source = dag.add_task(Value(10));
+    let source = dag.add_task(Value(10)).into();
     let left = dag.add_task(Add).depends_on((&source, &source));
     let right = dag.add_task(Multiply).depends_on((&source, &source));
     let sink = dag.add_task(Add).depends_on((&left, &right));
@@ -90,7 +90,7 @@ async fn test_tracing_inline_execution() {
     let dag = DagRunner::new();
 
     // Create a linear chain (should trigger inline execution)
-    let a = dag.add_task(Value(1));
+    let a = dag.add_task(Value(1)).into();
     let b = dag.add_task(Add).depends_on((&a, &a));
     let c = dag.add_task(Multiply).depends_on((&b, &b));
 
@@ -118,12 +118,12 @@ async fn test_tracing_multiple_layers() {
 
     // Layer 0
     let v1 = dag.add_task(Value(1));
-    let v2 = dag.add_task(Value(2));
+    let v2 = dag.add_task(Value(2)).into();
     let v3 = dag.add_task(Value(3));
 
     // Layer 1
-    let sum12 = dag.add_task(Add).depends_on((&v1, &v2));
-    let mul23 = dag.add_task(Multiply).depends_on((&v2, &v3));
+    let sum12 = dag.add_task(Add).depends_on((v1, &v2));
+    let mul23 = dag.add_task(Multiply).depends_on((&v2, v3));
 
     // Layer 2
     let final_sum = dag.add_task(Add).depends_on((&sum12, &mul23));
