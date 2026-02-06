@@ -191,15 +191,15 @@ async fn main() {
     // Stage 2: Data transformation (with stateful tasks)
     let transformed_1 = dag
         .add_task(DataTransformer::new(1.5))
-        .depends_on(&raw_value_1);
+        .depends_on(raw_value_1);
 
     let transformed_2 = dag
         .add_task(DataTransformer::new(2.0))
-        .depends_on(&raw_value_2);
+        .depends_on(raw_value_2);
 
     let transformed_3 = dag
         .add_task(DataTransformer::new(0.5))
-        .depends_on(&raw_value_3);
+        .depends_on(raw_value_3);
 
     // Stage 3: Statistical analysis (parallel operations on transformed data)
     let sum = dag

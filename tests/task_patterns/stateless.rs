@@ -84,7 +84,7 @@ async fn test_stateless_basic() {
 
     let x = dag.add_task(task_fn(|_: ()| async { 10 }));
     let y = dag.add_task(task_fn(|_: ()| async { 20 }));
-    let sum = dag.add_task(StatelessAdd).depends_on((&x, &y));
+    let sum = dag.add_task(StatelessAdd).depends_on((x, y));
 
     dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
         .await
@@ -98,7 +98,7 @@ async fn test_stateless_single_input() {
     let dag = DagRunner::new();
 
     let input = dag.add_task(task_fn(|_: ()| async { 21 }));
-    let doubled = dag.add_task(StatelessDouble).depends_on(&input);
+    let doubled = dag.add_task(StatelessDouble).depends_on(input);
 
     dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
         .await
@@ -128,9 +128,7 @@ async fn test_stateless_multiple_inputs() {
     let text = dag.add_task(task_fn(|_: ()| async { "test".to_string() }));
     let flag = dag.add_task(task_fn(|_: ()| async { true }));
 
-    let result = dag
-        .add_task(StatelessFormat)
-        .depends_on((&num, &text, &flag));
+    let result = dag.add_task(StatelessFormat).depends_on((num, text, flag));
 
     dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
         .await
@@ -166,7 +164,7 @@ async fn test_stateless_mixed_with_stateful() {
     let y = dag.add_task(task_fn(|_: ()| async { 3 }));
 
     // Stateless multiplication
-    let product = dag.add_task(StatelessMultiply).depends_on((&x, &y));
+    let product = dag.add_task(StatelessMultiply).depends_on((x, y));
 
     // Stateful counter
     let counted = dag.add_task(Counter::new(10)).depends_on(product);
@@ -185,7 +183,7 @@ async fn test_stateless_chain() {
     let dag = DagRunner::new();
 
     let start = dag.add_task(task_fn(|_: ()| async { 0 }));
-    let step1 = dag.add_task(StatelessInc).depends_on(&start);
+    let step1 = dag.add_task(StatelessInc).depends_on(start);
     let step2 = dag.add_task(StatelessInc).depends_on(step1);
     let step3 = dag.add_task(StatelessInc).depends_on(step2);
 
@@ -206,7 +204,7 @@ async fn test_stateless_parallel() {
     let tasks: Vec<_> = (1..=5)
         .map(|i| {
             let source = dag.add_task(task_fn(move |_: ()| async move { i }));
-            dag.add_task(StatelessSquare).depends_on(&source)
+            dag.add_task(StatelessSquare).depends_on(source)
         })
         .collect();
 
@@ -229,7 +227,7 @@ async fn test_stateless_with_string_types() {
     let hello = dag.add_task(task_fn(|_: ()| async { "Hello, ".to_string() }));
     let world = dag.add_task(task_fn(|_: ()| async { "World!".to_string() }));
 
-    let greeting = dag.add_task(StatelessConcat).depends_on((&hello, &world));
+    let greeting = dag.add_task(StatelessConcat).depends_on((hello, world));
 
     dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
         .await

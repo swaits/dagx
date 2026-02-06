@@ -1,7 +1,7 @@
 //! Butterfly pattern DAG tests
 
 use crate::common::task_fn;
-use dagx::{DagResult, DagRunner};
+use dagx::{DagResult, DagRunner, TaskHandle};
 use futures::FutureExt;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
@@ -13,7 +13,10 @@ async fn test_butterfly_network() -> DagResult<()> {
     // Simplified butterfly network - avoid tuples entirely
     // Layer 0: inputs
     let inputs: Vec<_> = (0..8)
-        .map(|i| dag.add_task(task_fn(move |_: ()| async move { i as f64 })))
+        .map(|i| {
+            dag.add_task(task_fn(move |_: ()| async move { i as f64 }))
+                .into()
+        })
         .collect();
 
     // Layer 1: butterfly operations (compute pairs separately)
@@ -92,7 +95,7 @@ async fn test_recursive_butterfly() -> DagResult<()> {
         .into_iter()
         .map(|val| {
             let task = dag.add_task(task_fn(move |_: ()| async move { val }));
-            (&task).into()
+            task.into()
         })
         .collect();
 
@@ -115,7 +118,10 @@ async fn test_benes_network() -> DagResult<()> {
 
     // 4 inputs
     let inputs: Vec<_> = (0..4)
-        .map(|i| dag.add_task(task_fn(move |_: ()| async move { 1 << i }))) // Powers of 2
+        .map(|i| {
+            dag.add_task(task_fn(move |_: ()| async move { 1 << i }))
+                .into()
+        }) // Powers of 2
         .collect();
 
     // First stage: sort pairs
@@ -153,7 +159,7 @@ async fn test_shuffle_exchange_network() -> DagResult<()> {
     let counter = Arc::new(AtomicUsize::new(0));
 
     // Create 8 inputs
-    let inputs: Vec<_> = (0..8)
+    let inputs: Vec<TaskHandle<_>> = (0..8)
         .map(|i| {
             let counter = counter.clone();
             dag.add_task(task_fn(move |_: ()| {
@@ -163,6 +169,7 @@ async fn test_shuffle_exchange_network() -> DagResult<()> {
                     i
                 }
             }))
+            .into()
         })
         .collect();
 
@@ -172,7 +179,7 @@ async fn test_shuffle_exchange_network() -> DagResult<()> {
             // Shuffle pattern: rotate bits
             let source = ((i << 1) | (i >> 2)) & 0x7;
             dag.add_task(task_fn(move |x: i32| async move { x }))
-                .depends_on(&inputs[source])
+                .depends_on(inputs[source])
         })
         .collect();
 

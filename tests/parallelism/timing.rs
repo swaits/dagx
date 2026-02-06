@@ -2,7 +2,7 @@
 
 use crate::common::task_fn;
 
-use dagx::{DagResult, DagRunner};
+use dagx::{DagResult, DagRunner, TaskHandle};
 use futures::FutureExt;
 use std::sync::Arc;
 use std::sync::Mutex;
@@ -32,7 +32,7 @@ async fn test_parallel_execution_speedup() -> DagResult<()> {
     let elapsed = start.elapsed();
 
     // Verify all tasks completed
-    for (i, task) in tasks.iter().enumerate() {
+    for (i, task) in tasks.into_iter().enumerate() {
         assert_eq!(dag.get(task)?, i);
     }
 
@@ -84,15 +84,15 @@ async fn test_sync_tasks_dont_block_async_runtime() -> DagResult<()> {
     let start_times = Arc::new(Mutex::new(Vec::new()));
 
     // Mix of sync and async tasks
-    let source = dag.add_task(task_fn(|_: ()| async { 10 }));
+    let source: TaskHandle<_> = dag.add_task(task_fn(|_: ()| async { 10 })).into();
 
     // Sync tasks
-    let sync1 = dag.add_task(SyncTask).depends_on(&source);
-    let sync2 = dag.add_task(SyncTask).depends_on(&source);
+    let sync1 = dag.add_task(SyncTask).depends_on(source);
+    let sync2 = dag.add_task(SyncTask).depends_on(source);
 
     // Async tasks
-    let async1 = dag.add_task(AsyncTask).depends_on(&source);
-    let async2 = dag.add_task(AsyncTask).depends_on(&source);
+    let async1 = dag.add_task(AsyncTask).depends_on(source);
+    let async2 = dag.add_task(AsyncTask).depends_on(source);
 
     // Track timing
     let timing_task = {

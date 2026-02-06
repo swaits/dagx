@@ -23,7 +23,7 @@
 //! # Quick Start
 //!
 //! ```no_run
-//! use dagx::{task, DagRunner, Task};
+//! use dagx::{task, DagRunner, Task, TaskHandle};
 //! use futures::FutureExt; // for FutureExt::map
 //!
 //! // Source task with read-only state (tuple struct)
@@ -47,10 +47,10 @@
 //!
 //! // Add source tasks
 //! let x = dag.add_task(Value(2));
-//! let y = dag.add_task(Value(3));
+//! let y: TaskHandle<_> = dag.add_task(Value(3)).into(); // Allows y to be reused as a dependency
 //!
 //! // Add task with dependencies
-//! let sum = dag.add_task(Add).depends_on((&x, &y));
+//! let sum = dag.add_task(Add).depends_on((x, &y));
 //!
 //! // Execute and retrieve results
 //! dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await.unwrap();
@@ -255,7 +255,7 @@
 //! # async {
 //! # let dag = DagRunner::new();
 //! # let source = dag.add_task(Value(42));
-//! let doubled = dag.add_task(Double).depends_on(&source);
+//! let doubled = dag.add_task(Double).depends_on(source);
 //! # };
 //! ```
 //!
@@ -279,7 +279,7 @@
 //! # let dag = DagRunner::new();
 //! # let x = dag.add_task(Value(2));
 //! # let y = dag.add_task(Value(3));
-//! let sum = dag.add_task(Add).depends_on((&x, &y));
+//! let sum = dag.add_task(Add).depends_on((x, y));
 //! # };
 //! ```
 //!
@@ -320,7 +320,7 @@
 //! # async {
 //! let dag = DagRunner::new();
 //!
-//! let base = dag.add_task(Value(10));
+//! let base = dag.add_task(Value(10)).into();
 //! let plus1 = dag.add_task(Add(1)).depends_on(&base);
 //! let times2 = dag.add_task(Scale(2)).depends_on(&base);
 //!
@@ -379,7 +379,7 @@
 //! let name = dag.add_task(Name("Alice".to_string()));
 //! let age = dag.add_task(Age(30));
 //! let active = dag.add_task(Active(true));
-//! let result = dag.add_task(FormatUser).depends_on((&name, &age, &active));
+//! let result = dag.add_task(FormatUser).depends_on((name, age, active));
 //!
 //! dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await.unwrap();
 //!
@@ -424,12 +424,12 @@
 //!
 //! // Layer 1: Sources
 //! let x = dag.add_task(Value(2));
-//! let y = dag.add_task(Value(3));
+//! let y = dag.add_task(Value(3)).into();
 //! let z = dag.add_task(Value(5));
 //!
 //! // Layer 2: Intermediate computations
-//! let sum_xy = dag.add_task(Add).depends_on((&x, &y));  // 2 + 3 = 5
-//! let prod_yz = dag.add_task(Multiply).depends_on((&y, &z)); // 3 * 5 = 15
+//! let sum_xy = dag.add_task(Add).depends_on((x, &y));  // 2 + 3 = 5
+//! let prod_yz = dag.add_task(Multiply).depends_on((&y, z)); // 3 * 5 = 15
 //!
 //! // Layer 3: Final result
 //! let total = dag.add_task(Add).depends_on((&sum_xy, &prod_yz)); // 5 + 15 = 20
@@ -476,7 +476,7 @@
 //! let dag = DagRunner::new();
 //!
 //! let user = dag.add_task(CreateUser);
-//! let formatted = dag.add_task(FormatUser).depends_on(&user);
+//! let formatted = dag.add_task(FormatUser).depends_on(user);
 //!
 //! dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await.unwrap();
 //!
@@ -656,7 +656,7 @@
 //!
 //! # async {
 //! let dag = DagRunner::new();
-//! let data = dag.add_task(FetchData);
+//! let data = dag.add_task(FetchData).into();
 //!
 //! // All three tasks get efficient Arc-wrapped sharing automatically
 //! let task1 = dag.add_task(ProcessData).depends_on(&data);

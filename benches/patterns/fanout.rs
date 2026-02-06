@@ -1,7 +1,7 @@
 //! Fan-out pattern benchmarks (1 → N dependencies)
 
 use criterion::Criterion;
-use dagx::{task_fn, DagRunner};
+use dagx::{task_fn, DagRunner, TaskHandle};
 use futures::FutureExt;
 
 pub fn bench_fanout(c: &mut Criterion) {
@@ -12,11 +12,11 @@ pub fn bench_fanout(c: &mut Criterion) {
         b.iter(|| {
             rt.block_on(async {
                 let dag = DagRunner::new();
-                let source = dag.add_task(task_fn(|_: ()| async { 42 }));
+                let source: TaskHandle<_> = dag.add_task(task_fn(|_: ()| async { 42 })).into();
 
                 for i in 0..100 {
                     dag.add_task(task_fn(move |x: i32| async move { x + i }))
-                        .depends_on(&source);
+                        .depends_on(source);
                 }
 
                 dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
@@ -31,17 +31,19 @@ pub fn bench_fanout(c: &mut Criterion) {
         b.iter(|| {
             rt.block_on(async {
                 let dag = DagRunner::new();
-                let source = dag.add_task(task_fn(|_: ()| async {
-                    // Create 1000 strings - framework wraps in Arc automatically
-                    (0..1000).map(|i| format!("Item {}", i)).collect::<Vec<_>>()
-                }));
+                let source: TaskHandle<_> = dag
+                    .add_task(task_fn(|_: ()| async {
+                        // Create 1000 strings - framework wraps in Arc automatically
+                        (0..1000).map(|i| format!("Item {}", i)).collect::<Vec<_>>()
+                    }))
+                    .into();
 
                 for i in 0..100 {
                     dag.add_task(task_fn(move |data: Vec<String>| async move {
                         // Each consumer gets data extracted from Arc
                         data.iter().filter(|s| s.contains(&i.to_string())).count()
                     }))
-                    .depends_on(&source);
+                    .depends_on(source);
                 }
 
                 dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
@@ -61,12 +63,12 @@ pub fn bench_fanout(c: &mut Criterion) {
 
                 // Source produces a simple Copy type (usize)
                 // Framework wraps in Arc<usize> internally
-                let source = dag.add_task(task_fn(|_: ()| async { 42usize }));
+                let source: TaskHandle<_> = dag.add_task(task_fn(|_: ()| async { 42usize })).into();
 
                 // 100 dependents - Arc overhead visible on Copy types
                 for i in 0..100 {
                     dag.add_task(task_fn(move |x: usize| async move { x + i }))
-                        .depends_on(&source);
+                        .depends_on(source);
                 }
 
                 dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))

@@ -59,9 +59,9 @@ async fn integration_test_etl_pipeline() -> DagResult<()> {
     let source3 = dag.add_task(LoadValue::new(30));
 
     // Transform: Process each source
-    let transform1 = dag.add_task(Multiply::new(2)).depends_on(&source1);
-    let transform2 = dag.add_task(Multiply::new(3)).depends_on(&source2);
-    let transform3 = dag.add_task(Multiply::new(4)).depends_on(&source3);
+    let transform1 = dag.add_task(Multiply::new(2)).depends_on(source1);
+    let transform2 = dag.add_task(Multiply::new(3)).depends_on(source2);
+    let transform3 = dag.add_task(Multiply::new(4)).depends_on(source3);
 
     // Load: Aggregate results
     let combine12 = dag.add_task(Add).depends_on((&transform1, &transform2));
@@ -115,9 +115,9 @@ async fn integration_test_multiple_sinks() -> DagResult<()> {
     let source = dag.add_task(LoadValue::new(10));
 
     // Multiple independent branches
-    let branch1 = dag.add_task(Multiply::new(2)).depends_on(&source);
-    let branch2 = dag.add_task(Multiply::new(3)).depends_on(&source);
-    let branch3 = dag.add_task(Multiply::new(4)).depends_on(&source);
+    let branch1 = dag.add_task(Multiply::new(2)).depends_on(source);
+    let branch2 = dag.add_task(Multiply::new(3)).depends_on(source);
+    let branch3 = dag.add_task(Multiply::new(4)).depends_on(source);
 
     dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 
@@ -136,8 +136,8 @@ async fn integration_test_diamond_cascade() -> DagResult<()> {
 
     // Diamond 1
     let source1 = dag.add_task(LoadValue::new(10));
-    let left1 = dag.add_task(Multiply::new(2)).depends_on(&source1);
-    let right1 = dag.add_task(Multiply::new(3)).depends_on(&source1);
+    let left1 = dag.add_task(Multiply::new(2)).depends_on(source1);
+    let right1 = dag.add_task(Multiply::new(3)).depends_on(source1);
     let sink1 = dag.add_task(Add).depends_on((&left1, &right1));
 
     // Diamond 2 (depends on Diamond 1)
@@ -193,7 +193,7 @@ async fn integration_test_error_recovery() -> DagResult<()> {
     let dag = DagRunner::new();
 
     let source = dag.add_task(LoadValue::new(42));
-    let transform = dag.add_task(Multiply::new(2)).depends_on(&source);
+    let transform = dag.add_task(Multiply::new(2)).depends_on(source);
 
     dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 
@@ -248,9 +248,9 @@ async fn integration_test_reused_values() -> DagResult<()> {
     let source = dag.add_task(LoadValue::new(100));
 
     // Use source in multiple different ways
-    let double = dag.add_task(Multiply::new(2)).depends_on(&source);
-    let triple = dag.add_task(Multiply::new(3)).depends_on(&source);
-    let quadruple = dag.add_task(Multiply::new(4)).depends_on(&source);
+    let double = dag.add_task(Multiply::new(2)).depends_on(source);
+    let triple = dag.add_task(Multiply::new(3)).depends_on(source);
+    let quadruple = dag.add_task(Multiply::new(4)).depends_on(source);
 
     // Combine some of the results
     let combined = dag.add_task(Add).depends_on((&double, &triple));
@@ -328,7 +328,7 @@ async fn integration_test_parallel_vs_sequential_timing() -> DagResult<()> {
             sleep(sleep_duration).await;
             x + 1
         }))
-        .depends_on(&parallel_tasks[0]);
+        .depends_on(parallel_tasks[0]);
 
     let seq2 = dag
         .add_task(task_fn(move |x: i32| async move {

@@ -84,10 +84,11 @@ async fn main() {
 
     // Add source tasks with no dependencies
     let x = dag.add_task(Value(2));
-    let y = dag.add_task(Value(3));
+    let y: TaskHandle<_> = dag.add_task(Value(3)).into();
 
-    // Add task that depends on both x and y
-    let sum = dag.add_task(Add).depends_on((&x, &y));
+    // Add task that depends on both x and y.
+    // Here, y could be reused as a dependency for other tasks, while x could not.
+    let sum = dag.add_task(Add).depends_on((x, &y));
 
     // Execute with true parallelism
     dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await.unwrap();

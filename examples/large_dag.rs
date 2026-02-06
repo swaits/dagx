@@ -192,7 +192,7 @@ async fn main() {
 
         // Verify a few results
         let sum: i32 = tasks
-            .iter()
+            .into_iter()
             .take(10)
             .map(|t| dag.get(t).unwrap())
             .fold(0i32, |acc, x| acc.wrapping_add(x));
@@ -208,7 +208,7 @@ async fn main() {
 
         // Create a deep chain by combining adjacent task pairs
         let tasks: Vec<_> = (0..100)
-            .map(|i| dag.add_task(Compute { value: i }))
+            .map(|i| dag.add_task(Compute { value: i }).into())
             .collect();
         let mut chain_tasks = vec![];
         for i in 0..99 {
@@ -246,7 +246,7 @@ async fn main() {
         // Process all levels reducing by combining pairs
         let mut level = 0;
         let mut layer: Vec<dagx::TaskHandle<i32>> =
-            current_level.iter().map(|b| b.into()).collect();
+            current_level.into_iter().map(|b| b.into()).collect();
 
         while layer.len() > 1 {
             level += 1;
@@ -291,7 +291,7 @@ async fn main() {
 
         // Layer 1: 50 source tasks
         let sources: Vec<_> = (0..50)
-            .map(|i| dag.add_task(Compute { value: i }))
+            .map(|i| dag.add_task(Compute { value: i }).into())
             .collect();
 
         // Layer 2: 50 tasks, each depends on all sources
@@ -361,11 +361,11 @@ async fn main() {
 
         // Verify results are accessible
         let i32_sum: i32 = small_tasks
-            .iter()
+            .into_iter()
             .map(|t| dag.get(t).unwrap())
             .fold(0i32, |acc, x| acc.wrapping_add(x));
         let string_count = string_tasks
-            .iter()
+            .into_iter()
             .map(|t| dag.get(t).unwrap().len())
             .sum::<usize>();
 

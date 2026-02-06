@@ -45,7 +45,7 @@ async fn test_all_three_task_patterns() {
     let y = dag.add_task(task_fn(|_: ()| async { 3 }));
 
     // Pattern 1: Stateless addition
-    let sum = dag.add_task(StatelessAdd).depends_on((&x, &y)); // 5 + 3 = 8
+    let sum = dag.add_task(StatelessAdd).depends_on((x, y)); // 5 + 3 = 8
 
     // Pattern 2: Read-only multiplication
     let doubled = dag.add_task(ReadOnlyMultiplier(2)).depends_on(sum); // 8 * 2 = 16
@@ -102,9 +102,9 @@ async fn test_parallel_execution() {
 
     // All three tasks should have run
     assert_eq!(counter.load(Ordering::SeqCst), 3);
-    assert_eq!(dag.get(&t1).unwrap(), 1);
-    assert_eq!(dag.get(&t2).unwrap(), 2);
-    assert_eq!(dag.get(&t3).unwrap(), 3);
+    assert_eq!(dag.get(t1).unwrap(), 1);
+    assert_eq!(dag.get(t2).unwrap(), 2);
+    assert_eq!(dag.get(t3).unwrap(), 3);
 }
 
 #[tokio::test]
@@ -115,7 +115,7 @@ async fn test_task_fn_with_captured_state() {
     let base = dag.add_task(task_fn(|_: ()| async { 5 }));
     let scaled = dag
         .add_task(task_fn(move |x: i32| async move { x * multiplier }))
-        .depends_on(&base);
+        .depends_on(base);
 
     dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
         .await

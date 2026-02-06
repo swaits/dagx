@@ -93,7 +93,7 @@ async fn main() {
     let elapsed = start.elapsed();
 
     // Verify all tasks completed correctly
-    for (i, task) in tasks.iter().enumerate() {
+    for (i, task) in tasks.into_iter().enumerate() {
         assert_eq!(dag.get(task).unwrap(), i as u32);
     }
 

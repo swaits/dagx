@@ -31,11 +31,11 @@ fn test_builder_consumed_by_depends_on() {
     let consumer_builder = dag.add_task(Consumer);
 
     // This consumes consumer_builder and returns a TaskHandle
-    let _consumer_handle = consumer_builder.depends_on(&source);
+    let _consumer_handle = consumer_builder.depends_on(source);
 
     // We CANNOT use consumer_builder again because it was moved
     // This would fail to compile:
-    // let _consumer2 = consumer_builder.depends_on(&source);  // ERROR: use of moved value
+    // let _consumer2 = consumer_builder.depends_on(source);  // ERROR: use of moved value
 }
 
 /// Demonstrates that you can only get a TaskHandle by finalizing a builder,
@@ -64,7 +64,7 @@ fn test_handle_is_immutable_reference() {
     // But TaskHandle has NO methods to modify the DAG
     // There's no way to add dependencies to it
     // This would fail to compile:
-    // handle.depends_on(&something);  // ERROR: no method named `depends_on`
+    // handle.depends_on(something);  // ERROR: no method named `depends_on`
 }
 
 /// Documents the ordering constraint that prevents cycles
@@ -110,7 +110,7 @@ fn test_ordering_prevents_cycles() {
     // Let's create a valid DAG instead: A→B (B depends on A)
     let a_handle: TaskHandle<i32> = a_builder.into(); // A has no deps (unit input)
     let _b_handle = b_builder.depends_on(a_handle);
-    // Now we could try: a_handle.depends_on(&b_handle)?
+    // Now we could try: a_handle.depends_on(b_handle)?
     // But TaskHandle has no such method!
 }
 
@@ -147,7 +147,7 @@ fn test_unit_tasks_cannot_create_cycles() {
     // And once you've converted to TaskHandle, you can't go back
 
     // This would fail to compile:
-    // _handle1.depends_on(&_handle2);  // ERROR: no method named `depends_on`
+    // _handle1.depends_on(_handle2);  // ERROR: no method named `depends_on`
 }
 
 /// Demonstrates the catch-22 of three-way cycles
@@ -183,9 +183,9 @@ fn test_three_way_cycle_impossible() {
     let _c_builder = dag.add_task(C);
 
     // To create A→C→B→A:
-    // 1. a_builder.depends_on(&c_handle)  // Need c_handle
-    // 2. c_builder.depends_on(&b_handle)  // Need b_handle
-    // 3. b_builder.depends_on(&a_handle)  // Need a_handle (from step 1!)
+    // 1. a_builder.depends_on(c_handle)  // Need c_handle
+    // 2. c_builder.depends_on(b_handle)  // Need b_handle
+    // 3. b_builder.depends_on(a_handle)  // Need a_handle (from step 1!)
     //
     // But step 3 needs a_handle which doesn't exist until step 1 completes.
     // And step 1 needs c_handle which doesn't exist until step 2 completes.
@@ -210,7 +210,7 @@ fn test_self_loop_prevented() {
     let _builder = dag.add_task(SelfReferential);
 
     // To create A→A (self-loop):
-    // builder.depends_on(&builder)
+    // builder.depends_on(builder)
     //
     // But this would fail because:
     // 1. depends_on() takes `self` by value (moves builder)
@@ -218,7 +218,7 @@ fn test_self_loop_prevented() {
     // 3. We can't also use &builder as an argument because it's being moved
     //
     // This would fail to compile:
-    // let _handle = builder.depends_on(&builder);  // ERROR: use of moved value
+    // let _handle = builder.depends_on(builder);  // ERROR: use of moved value
 }
 
 /// Comprehensive test showing all the guardrails
@@ -264,8 +264,8 @@ async fn test_type_safety_prevents_invalid_graphs() {
     let s2 = dag.add_task(Source);
 
     // Transform depends on sources
-    let t1 = dag.add_task(Transform).depends_on(&s1);
-    let t2 = dag.add_task(Transform).depends_on(&s2);
+    let t1 = dag.add_task(Transform).depends_on(s1);
+    let t2 = dag.add_task(Transform).depends_on(s2);
 
     // Aggregate depends on transforms
     let result = dag.add_task(Aggregate).depends_on((&t1, &t2));

@@ -3,6 +3,7 @@
 //! Long sequential chain: 100 tasks in sequence
 
 use criterion::Criterion;
+use dagx::TaskHandle;
 use futures::FutureExt;
 
 pub fn bench_deep_chain(c: &mut Criterion) {
@@ -17,10 +18,10 @@ pub fn bench_deep_chain(c: &mut Criterion) {
 
                 let dag = DagRunner::new();
 
-                let first = dag.add_task(task_fn(|_: ()| async { 0 }));
+                let first: TaskHandle<_> = dag.add_task(task_fn(|_: ()| async { 0 })).into();
                 let mut prev = dag
                     .add_task(task_fn(|x: i32| async move { x + 1 }))
-                    .depends_on(&first);
+                    .depends_on(first);
 
                 for i in 2..100 {
                     prev = dag

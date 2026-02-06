@@ -12,7 +12,7 @@ async fn test_1000_level_deep_chain() -> DagResult<()> {
     let dag = DagRunner::new();
 
     let first = dag.add_task(task_fn(|_: ()| async { 0 }));
-    let mut current = (&first).into(); // Convert to TaskHandle
+    let mut current = first.into(); // Convert to TaskHandle
 
     for _i in 1..1000 {
         current = dag
@@ -32,7 +32,7 @@ async fn test_deep_chain_with_branches() -> DagResult<()> {
     let dag = DagRunner::new();
 
     let first = dag.add_task(task_fn(|_: ()| async { 0 }));
-    let mut main_chain: dagx::TaskHandle<i32> = (&first).into();
+    let mut main_chain: dagx::TaskHandle<i32> = first.into();
     let mut branches = Vec::new();
 
     for i in 1..500 {
@@ -72,7 +72,7 @@ async fn test_multiple_parallel_deep_chains() -> DagResult<()> {
 
     for chain_id in 0..8 {
         let first = dag.add_task(task_fn(move |_: ()| async move { chain_id * 1000 }));
-        let mut current: dagx::TaskHandle<i32> = (&first).into();
+        let mut current: dagx::TaskHandle<i32> = first.into();
 
         for _ in 0..500 {
             current = dag
@@ -136,7 +136,7 @@ async fn test_deep_chain_execution_order() -> DagResult<()> {
             }
         }
     }));
-    let mut current: dagx::TaskHandle<i32> = (&first).into();
+    let mut current: dagx::TaskHandle<i32> = first.into();
 
     for expected in 1..100 {
         current = dag
@@ -169,7 +169,7 @@ async fn test_deep_binary_tree() -> DagResult<()> {
     fn build_tree(dag: &DagRunner, depth: usize, value: i32) -> dagx::TaskHandle<i32> {
         if depth == 0 {
             let task = dag.add_task(task_fn(move |_: ()| async move { value }));
-            (&task).into() // Convert TaskBuilder to TaskHandle
+            task.into() // Convert TaskBuilder to TaskHandle
         } else {
             let left = build_tree(dag, depth - 1, value * 2);
             let right = build_tree(dag, depth - 1, value * 2 + 1);
@@ -199,8 +199,8 @@ async fn test_fibonacci_chain() -> DagResult<()> {
     let f0_builder = dag.add_task(task_fn(|_: ()| async { 0i64 }));
     let f1_builder = dag.add_task(task_fn(|_: ()| async { 1i64 }));
 
-    let mut prev2: dagx::TaskHandle<i64> = (&f0_builder).into();
-    let mut prev1: dagx::TaskHandle<i64> = (&f1_builder).into();
+    let mut prev2: dagx::TaskHandle<i64> = f0_builder.into();
+    let mut prev1: dagx::TaskHandle<i64> = f1_builder.into();
 
     for _ in 2..50 {
         let next = dag
@@ -226,7 +226,7 @@ async fn test_deep_chain_with_accumulator() -> DagResult<()> {
 
     // Use a simpler accumulation pattern - just sum
     let first = dag.add_task(task_fn(|_: ()| async { 0i64 }));
-    let mut current: dagx::TaskHandle<i64> = (&first).into();
+    let mut current: dagx::TaskHandle<i64> = first.into();
 
     for i in 1..=200 {
         current = dag
@@ -250,8 +250,8 @@ async fn test_zigzag_dependencies() -> DagResult<()> {
     let a_first = dag.add_task(task_fn(|_: ()| async { 1 }));
     let b_first = dag.add_task(task_fn(|_: ()| async { 2 }));
 
-    let mut chain_a: dagx::TaskHandle<i32> = (&a_first).into();
-    let mut chain_b: dagx::TaskHandle<i32> = (&b_first).into();
+    let mut chain_a: dagx::TaskHandle<i32> = a_first.into();
+    let mut chain_b: dagx::TaskHandle<i32> = b_first.into();
 
     for i in 0..100 {
         if i % 2 == 0 {
@@ -287,7 +287,7 @@ async fn test_10000_level_chain_stress() -> DagResult<()> {
     let dag = DagRunner::new();
 
     let first = dag.add_task(task_fn(|_: ()| async { 0u64 }));
-    let mut current: dagx::TaskHandle<u64> = (&first).into();
+    let mut current: dagx::TaskHandle<u64> = first.into();
 
     for _ in 1..10_000 {
         current = dag

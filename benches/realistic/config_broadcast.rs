@@ -1,7 +1,7 @@
 //! Configuration broadcast pattern benchmark - one config shared across many workers
 
 use criterion::{BenchmarkId, Criterion};
-use dagx::{task_fn, DagRunner};
+use dagx::{task_fn, DagRunner, TaskHandle};
 use futures::FutureExt;
 use std::collections::HashMap;
 use std::hint::black_box;
@@ -20,18 +20,20 @@ pub fn bench_config_broadcast(c: &mut Criterion) {
                         let dag = DagRunner::new();
 
                         // Configuration source - framework wraps HashMap in Arc automatically
-                        let config = dag.add_task(task_fn(|_: ()| async {
-                            HashMap::from([
-                                ("max_connections".to_string(), "100".to_string()),
-                                ("timeout_ms".to_string(), "5000".to_string()),
-                                ("batch_size".to_string(), "50".to_string()),
-                                ("retry_count".to_string(), "3".to_string()),
-                                ("worker_threads".to_string(), "4".to_string()),
-                                ("buffer_size".to_string(), "8192".to_string()),
-                                ("compression".to_string(), "true".to_string()),
-                                ("log_level".to_string(), "info".to_string()),
-                            ])
-                        }));
+                        let config: TaskHandle<_> = dag
+                            .add_task(task_fn(|_: ()| async {
+                                HashMap::from([
+                                    ("max_connections".to_string(), "100".to_string()),
+                                    ("timeout_ms".to_string(), "5000".to_string()),
+                                    ("batch_size".to_string(), "50".to_string()),
+                                    ("retry_count".to_string(), "3".to_string()),
+                                    ("worker_threads".to_string(), "4".to_string()),
+                                    ("buffer_size".to_string(), "8192".to_string()),
+                                    ("compression".to_string(), "true".to_string()),
+                                    ("log_level".to_string(), "info".to_string()),
+                                ])
+                            }))
+                            .into();
 
                         // Workers receive and process based on shared config
                         for worker_id in 0..workers {
@@ -49,7 +51,7 @@ pub fn bench_config_broadcast(c: &mut Criterion) {
                                 // Simulate some computation
                                 black_box(worker_id * batch_size + timeout / 100)
                             }))
-                            .depends_on(&config);
+                            .depends_on(config);
                         }
 
                         dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
