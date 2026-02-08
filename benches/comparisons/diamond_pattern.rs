@@ -18,15 +18,15 @@ pub fn bench_diamond_pattern(c: &mut Criterion) {
 
                 let dag = DagRunner::new();
 
-                let a: TaskHandle<_> = dag.add_task(task_fn(|_: ()| async { 10 })).into();
+                let a: TaskHandle<_> = dag.add_task(task_fn::<(), _, _>(|_: ()| 10)).into();
                 let b = dag
-                    .add_task(task_fn(|x: i32| async move { x * 2 }))
+                    .add_task(task_fn::<i32, _, _>(|&x: &i32| x * 2))
                     .depends_on(a);
                 let c = dag
-                    .add_task(task_fn(|x: i32| async move { x + 5 }))
+                    .add_task(task_fn::<i32, _, _>(|&x: &i32| x + 5))
                     .depends_on(a);
                 let d = dag
-                    .add_task(task_fn(|(x, y): (i32, i32)| async move { x + y }))
+                    .add_task(task_fn::<(i32, i32), _, _>(|(x, y): (&i32, &i32)| x + y))
                     .depends_on((&b, &c));
 
                 dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))

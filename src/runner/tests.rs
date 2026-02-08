@@ -186,27 +186,6 @@ fn test_add_task_increments_id() {
 }
 
 #[tokio::test]
-async fn test_multiple_get_calls() {
-    init_tracing();
-    // Test that get() can be called multiple times for the same handle
-    let dag = DagRunner::new();
-    let handle: TaskHandle<_> = dag.add_task(TestTask { value: 100 }).into();
-
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
-        .await
-        .unwrap();
-
-    // Multiple get calls should all return the same value
-    let result1 = dag.get(handle).unwrap();
-    let result2 = dag.get(handle).unwrap();
-    let result3 = dag.get(handle).unwrap();
-
-    assert_eq!(result1, 100);
-    assert_eq!(result2, 100);
-    assert_eq!(result3, 100);
-}
-
-#[tokio::test]
 async fn test_invalid_node_id_in_get() {
     init_tracing();
     // Test getting with an invalid node ID

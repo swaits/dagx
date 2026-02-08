@@ -1,12 +1,22 @@
 //! Concurrent access tests
 
 use crate::common::task_fn;
-use dagx::DagRunner;
+use dagx::{task, DagRunner};
 use futures::FutureExt;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::task::JoinSet;
+
+struct SleepTask(usize);
+
+#[task]
+impl SleepTask {
+    async fn run(&self) -> usize {
+        tokio::time::sleep(Duration::from_millis(5)).await;
+        self.0
+    }
+}
 
 #[tokio::test]
 async fn test_concurrent_run_calls() {
@@ -14,14 +24,7 @@ async fn test_concurrent_run_calls() {
     let dag = Arc::new(DagRunner::new());
 
     // Add some tasks
-    let tasks: Vec<_> = (0..10)
-        .map(|i| {
-            dag.add_task(task_fn(move |_: ()| async move {
-                tokio::time::sleep(Duration::from_millis(5)).await;
-                i
-            }))
-        })
-        .collect();
+    let tasks: Vec<_> = (0..10).map(|i| dag.add_task(SleepTask(i))).collect();
 
     // Try to run the DAG multiple times concurrently
     let mut handles = JoinSet::new();
@@ -59,7 +62,7 @@ async fn test_concurrent_execution_and_building() {
 
     // Start with some initial tasks
     let initial: Vec<_> = (0..10)
-        .map(|i| dag.add_task(task_fn(move |_: ()| async move { i })))
+        .map(|i| dag.add_task(task_fn::<(), _, _>(move |_: ()| i)))
         .collect();
 
     // Execute the initial DAG
@@ -81,7 +84,7 @@ async fn test_concurrent_execution_and_building() {
     for i in 10..20 {
         let dag = Arc::clone(&dag);
         handles.spawn(async move {
-            dag.add_task(task_fn(move |_: ()| async move { i }));
+            dag.add_task(task_fn::<(), _, _>(move |_: ()| i));
             i
         });
     }
@@ -112,14 +115,14 @@ async fn test_dag_builder_thread_safety() {
 
         handles.spawn(async move {
             // Each thread creates a small pipeline
-            let source = dag.add_task(task_fn(move |_: ()| async move { thread_id }));
+            let source = dag.add_task(task_fn::<(), _, _>(move |_: ()| thread_id));
 
             let transform1 = dag
-                .add_task(task_fn(move |x: i32| async move { x * 10 }))
+                .add_task(task_fn::<i32, _, _>(move |&x: &i32| x * 10))
                 .depends_on(source);
 
             let transform2 = dag
-                .add_task(task_fn(move |x: i32| async move { x + thread_id }))
+                .add_task(task_fn::<i32, _, _>(move |&x: &i32| x + thread_id))
                 .depends_on(transform1);
 
             counter.fetch_add(1, Ordering::SeqCst);
@@ -155,7 +158,7 @@ async fn test_concurrent_get_operations() {
 
     // Create and execute tasks
     let tasks: Vec<_> = (0..100)
-        .map(|i| dag.add_task(task_fn(move |_: ()| async move { i })))
+        .map(|i| dag.add_task(task_fn::<(), _, _>(move |_: ()| i)))
         .collect();
 
     dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
@@ -188,7 +191,7 @@ async fn test_concurrent_get_operations() {
 async fn test_no_race_in_dependency_tracking() {
     // Test that concurrent dependency modifications don't cause races
     let dag = Arc::new(DagRunner::new());
-    let source = dag.add_task(task_fn(|_: ()| async { 42 }));
+    let source = dag.add_task(task_fn::<(), _, _>(|_: ()| 42));
 
     let mut handles = JoinSet::new();
 
@@ -199,7 +202,7 @@ async fn test_no_race_in_dependency_tracking() {
         let source_clone = source_handle;
 
         handles.spawn(async move {
-            dag.add_task(task_fn(move |x: i32| async move { x + i }))
+            dag.add_task(task_fn::<i32, _, _>(move |&x: &i32| x + i))
                 .depends_on(source_clone)
         });
     }
@@ -239,20 +242,22 @@ async fn test_high_concurrency_stress() {
             match i % 3 {
                 0 => {
                     // Add a source task
-                    dag.add_task(task_fn(move |_: ()| async move { i }));
+                    dag.add_task(task_fn::<(), _, _>(move |_: ()| i));
                 }
                 1 => {
                     // Add a task with a simple dependency
-                    let source = dag.add_task(task_fn(move |_: ()| async move { i }));
-                    dag.add_task(task_fn(move |x: i32| async move { x * 2 }))
+                    let source = dag.add_task(task_fn::<(), _, _>(move |_: ()| i));
+                    dag.add_task(task_fn::<i32, _, _>(move |&x: &i32| x * 2))
                         .depends_on(source);
                 }
                 2 => {
                     // Add a more complex subgraph
-                    let a = dag.add_task(task_fn(move |_: ()| async move { i }));
-                    let b = dag.add_task(task_fn(move |_: ()| async move { i + 1 }));
-                    dag.add_task(task_fn(move |(x, y): (i32, i32)| async move { x + y }))
-                        .depends_on((a, b));
+                    let a = dag.add_task(task_fn::<(), _, _>(move |_: ()| i));
+                    let b = dag.add_task(task_fn::<(), _, _>(move |_: ()| i + 1));
+                    dag.add_task(task_fn::<(i32, i32), _, _>(move |(x, y): (&i32, &i32)| {
+                        x + y
+                    }))
+                    .depends_on((a, b));
                 }
                 _ => unreachable!(),
             }
@@ -289,7 +294,7 @@ async fn test_lock_contention_measurement() {
 
         handles.spawn(async move {
             for j in 0..10 {
-                dag.add_task(task_fn(move |_: ()| async move { i * 10 + j }));
+                dag.add_task(task_fn::<(), _, _>(move |_: ()| i * 10 + j));
                 ops.fetch_add(1, Ordering::SeqCst);
 
                 // Small yield to increase contention likelihood
@@ -326,7 +331,7 @@ async fn test_atomic_dag_operations() {
     let dag = Arc::new(DagRunner::new());
 
     // Create a base task
-    let base = dag.add_task(task_fn(|_: ()| async { 100 }));
+    let base = dag.add_task(task_fn::<(), _, _>(|_: ()| 100));
 
     // Try to create dependent tasks concurrently
     let mut handles = JoinSet::new();
@@ -340,7 +345,7 @@ async fn test_atomic_dag_operations() {
 
         handles.spawn(async move {
             let dep = dag
-                .add_task(task_fn(move |x: i32| async move { x + i }))
+                .add_task(task_fn::<i32, _, _>(move |&x: &i32| x + i))
                 .depends_on(base_clone);
 
             success.fetch_add(1, Ordering::SeqCst);
@@ -381,12 +386,12 @@ async fn test_no_deadlock_on_circular_waiting() {
 
         handles.spawn(async move {
             // Each thread creates a chain of tasks
-            let first = dag.add_task(task_fn(move |_: ()| async move { i }));
+            let first = dag.add_task(task_fn::<(), _, _>(move |_: ()| i));
             let mut chain = vec![first.into()];
 
             for j in 0..5 {
                 let next = dag
-                    .add_task(task_fn(move |x: i32| async move { x + j }))
+                    .add_task(task_fn::<i32, _, _>(move |&x: &i32| x + j))
                     .depends_on(chain.last().unwrap());
                 chain.push(next);
 

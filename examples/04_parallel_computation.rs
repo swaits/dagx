@@ -52,7 +52,7 @@
 //! This proves dagx runs tasks on multiple CPU cores simultaneously.
 //! ```
 
-use dagx::{task, DagResult, DagRunner, Task};
+use dagx::{task, DagResult, DagRunner, Task, TaskInput};
 use futures::FutureExt;
 use std::time::{Duration, Instant};
 use tokio::time::sleep;
@@ -152,10 +152,10 @@ async fn main() -> DagResult<()> {
         let task3 = ComputeSum::new(501, 751, WORK_DELAY);
         let task4 = ComputeSum::new(751, 1001, WORK_DELAY);
 
-        let r1 = task1.run(()).await;
-        let r2 = task2.run(()).await;
-        let r3 = task3.run(()).await;
-        let r4 = task4.run(()).await;
+        let r1 = task1.run(TaskInput::empty()).await;
+        let r2 = task2.run(TaskInput::empty()).await;
+        let r3 = task3.run(TaskInput::empty()).await;
+        let r4 = task4.run(TaskInput::empty()).await;
 
         let result = r1 + r2 + r3 + r4;
         let elapsed = start.elapsed();

@@ -207,7 +207,7 @@ fn test_deps_handle_ref_explicit() {
 
     // Create a reference and explicitly call to_node_ids
     let handle_ref = &handle;
-    let node_ids = DepsTuple::<i32>::to_node_ids(handle_ref);
+    let node_ids = DepsTuple::<(i32,)>::to_node_ids(handle_ref);
 
     assert_eq!(node_ids.len(), 1);
     assert_eq!(node_ids[0], NodeId(77));

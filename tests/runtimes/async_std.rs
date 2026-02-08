@@ -37,7 +37,7 @@ async fn test_parallel_execution_async_std() {
     let dag = DagRunner::new();
 
     let tasks: Vec<_> = (0..10)
-        .map(|i| dag.add_task(task_fn(move |_: ()| async move { i * 2 })))
+        .map(|i| dag.add_task(task_fn::<(), _, _>(move |_: ()| i * 2)))
         .collect();
 
     dag.run(async_std::task::spawn).await.unwrap();
@@ -55,10 +55,10 @@ async fn test_complex_dependencies_async_std() {
     let b = dag.add_task(Value(20));
     let sum = dag.add_task(Add).depends_on((a, b));
     let double = dag
-        .add_task(task_fn(|x: i32| async move { x * 2 }))
+        .add_task(task_fn::<i32, _, _>(|&x: &i32| x * 2))
         .depends_on(sum);
 
     dag.run(async_std::task::spawn).await.unwrap();
 
-    assert_eq!(dag.get(double).unwrap(), 60);
+    assert_eq!(dag.get(double).unwrap().clone(), 60);
 }

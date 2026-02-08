@@ -41,8 +41,8 @@ async fn test_all_three_task_patterns() {
     let dag = DagRunner::new();
 
     // Create initial values
-    let x = dag.add_task(task_fn(|_: ()| async { 5 }));
-    let y = dag.add_task(task_fn(|_: ()| async { 3 }));
+    let x = dag.add_task(task_fn::<(), _, _>(|_: ()| 5));
+    let y = dag.add_task(task_fn::<(), _, _>(|_: ()| 3));
 
     // Pattern 1: Stateless addition
     let sum = dag.add_task(StatelessAdd).depends_on((x, y)); // 5 + 3 = 8
@@ -72,28 +72,22 @@ async fn test_parallel_execution() {
     let c2 = counter.clone();
     let c3 = counter.clone();
 
-    let t1 = dag.add_task(task_fn(move |_: ()| {
+    let t1 = dag.add_task(task_fn::<(), _, _>(move |_: ()| {
         let c = c1.clone();
-        async move {
-            c.fetch_add(1, Ordering::SeqCst);
-            1
-        }
+        c.fetch_add(1, Ordering::SeqCst);
+        1
     }));
 
-    let t2 = dag.add_task(task_fn(move |_: ()| {
+    let t2 = dag.add_task(task_fn::<(), _, _>(move |_: ()| {
         let c = c2.clone();
-        async move {
-            c.fetch_add(1, Ordering::SeqCst);
-            2
-        }
+        c.fetch_add(1, Ordering::SeqCst);
+        2
     }));
 
-    let t3 = dag.add_task(task_fn(move |_: ()| {
+    let t3 = dag.add_task(task_fn::<(), _, _>(move |_: ()| {
         let c = c3.clone();
-        async move {
-            c.fetch_add(1, Ordering::SeqCst);
-            3
-        }
+        c.fetch_add(1, Ordering::SeqCst);
+        3
     }));
 
     dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
@@ -112,9 +106,9 @@ async fn test_task_fn_with_captured_state() {
     let dag = DagRunner::new();
 
     let multiplier = 7;
-    let base = dag.add_task(task_fn(|_: ()| async { 5 }));
+    let base = dag.add_task(task_fn::<(), _, _>(|_: ()| 5));
     let scaled = dag
-        .add_task(task_fn(move |x: i32| async move { x * multiplier }))
+        .add_task(task_fn::<i32, _, _>(move |&x: &i32| x * multiplier))
         .depends_on(base);
 
     dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))

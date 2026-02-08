@@ -1,6 +1,5 @@
 //! Unit tests for builder module
 
-use crate::builder::IsUnitType;
 use crate::runner::DagRunner;
 use crate::types::TaskHandle;
 
@@ -52,22 +51,10 @@ fn test_task_builder_from_conversion() {
     let builder = dag.add_task(TestTask { value: 42 });
 
     // Convert builder to TaskHandle
-    let handle: TaskHandle<i32> = builder.into();
+    let handle: TaskHandle<_> = builder.into();
 
     // Check that the ID is preserved
     assert_eq!(handle.id.0, 0); // First task should have ID 0
-}
-
-#[test]
-fn test_is_unit_type_trait() {
-    // Test that IsUnitType is correctly implemented for ()
-    fn assert_is_unit_type<T: IsUnitType>() {}
-
-    // This should compile - () implements IsUnitType
-    assert_is_unit_type::<()>();
-
-    // We can't test the negative case (non-unit types don't implement it)
-    // because that would be a compile error
 }
 
 #[test]
@@ -79,7 +66,7 @@ fn test_task_builder_depends_on_returns_handle() {
     let dependent = dag.add_task(TestTaskWithInput).depends_on(source);
 
     // depends_on should return a TaskHandle
-    let _handle: TaskHandle<i32> = dependent;
+    let _handle: TaskHandle<_> = dependent;
 }
 
 #[test]
@@ -92,9 +79,9 @@ fn test_task_builder_chain() {
     let t3 = dag.add_task(TestTaskWithInput).depends_on(t2);
 
     // All should return TaskHandles
-    let _: TaskHandle<i32> = t1;
-    let _: TaskHandle<i32> = t2;
-    let _: TaskHandle<i32> = t3;
+    let _: TaskHandle<_> = t1;
+    let _: TaskHandle<_> = t2;
+    let _: TaskHandle<_> = t3;
 }
 
 #[test]
@@ -118,7 +105,7 @@ fn test_multiple_dependencies() {
     let sum = dag.add_task(AddTask).depends_on((a, b));
 
     // Should return a TaskHandle
-    let _: TaskHandle<i32> = sum;
+    let _: TaskHandle<_> = sum;
 }
 
 #[test]

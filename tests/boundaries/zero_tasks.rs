@@ -5,6 +5,7 @@ use dagx::{task, DagResult, DagRunner};
 use futures::FutureExt;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
+use tokio::task::yield_now;
 
 #[tokio::test]
 async fn test_empty_dag_execution() -> DagResult<()> {
@@ -22,7 +23,7 @@ async fn test_single_task_no_deps() -> DagResult<()> {
     // Test the absolute minimum: one task with no dependencies
     let dag = DagRunner::new();
 
-    let task = dag.add_task(task_fn(|_: ()| async { 42 }));
+    let task = dag.add_task(task_fn::<(), _, _>(|_: ()| 42));
 
     dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 
@@ -38,11 +39,9 @@ async fn test_single_task_unit_input_output() -> DagResult<()> {
     let executed = Arc::new(AtomicUsize::new(0));
     let exec_clone = executed.clone();
 
-    let task = dag.add_task(task_fn(move |_: ()| {
+    let task = dag.add_task(task_fn::<(), _, _>(move |_: ()| {
         let exec = exec_clone.clone();
-        async move {
-            exec.fetch_add(1, Ordering::SeqCst);
-        }
+        exec.fetch_add(1, Ordering::SeqCst);
     }));
 
     dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
@@ -60,7 +59,7 @@ async fn test_zero_sized_type_task() -> DagResult<()> {
 
     let dag = DagRunner::new();
 
-    let task = dag.add_task(task_fn(|_: ()| async { ZeroSized }));
+    let task = dag.add_task(task_fn::<(), _, _>(|_: ()| ZeroSized));
 
     dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 
@@ -86,7 +85,7 @@ async fn test_dag_with_only_source_tasks() -> DagResult<()> {
     let dag = DagRunner::new();
 
     let tasks: Vec<_> = (0..100)
-        .map(|i| dag.add_task(task_fn(move |_: ()| async move { i })))
+        .map(|i| dag.add_task(task_fn::<(), _, _>(move |_: ()| i)))
         .collect();
 
     dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
@@ -132,7 +131,7 @@ async fn test_alternating_empty_and_filled_dag_runs() -> DagResult<()> {
             dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
         } else {
             // DAG with a task
-            let task = dag.add_task(task_fn(move |_: ()| async move { i }));
+            let task = dag.add_task(task_fn::<(), _, _>(move |_: ()| i));
             dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
             assert_eq!(dag.get(task)?, i);
         }
@@ -151,7 +150,7 @@ async fn test_dag_with_never_type_simulation() -> DagResult<()> {
     let dag = DagRunner::new();
 
     // This task completes immediately but returns a Result containing "never" type
-    let task = dag.add_task(task_fn(|_: ()| async { Result::<i32, Never>::Ok(42) }));
+    let task = dag.add_task(task_fn::<(), _, _>(|_: ()| Result::<i32, Never>::Ok(42)));
 
     dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 
@@ -164,11 +163,17 @@ async fn test_minimal_task_with_minimal_async_work() -> DagResult<()> {
     // Test a task that does the absolute minimum async work
     let dag = DagRunner::new();
 
-    let task = dag.add_task(task_fn(|_: ()| async {
-        // Just yield once to the runtime
-        tokio::task::yield_now().await;
-        1337
-    }));
+    struct YieldTask;
+
+    #[task]
+    impl YieldTask {
+        async fn run() -> i32 {
+            yield_now().await;
+            1337
+        }
+    }
+
+    let task = dag.add_task(YieldTask);
 
     dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 

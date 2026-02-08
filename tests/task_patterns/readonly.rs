@@ -54,7 +54,7 @@ async fn test_readonly_state_with_input() {
     // Test read-only state task with input using &self
     let dag = DagRunner::new();
 
-    let input = dag.add_task(task_fn(|_: ()| async { 5 }));
+    let input = dag.add_task(task_fn::<(), _, _>(|_: ()| 5));
     let result = dag.add_task(ReadOnlyMultiplier(7)).depends_on(input);
 
     dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
@@ -68,8 +68,8 @@ async fn test_readonly_state_multiple_uses() {
     // Test that read-only state can be used multiple times
     let dag = DagRunner::new();
 
-    let input1 = dag.add_task(task_fn(|_: ()| async { 10 }));
-    let input2 = dag.add_task(task_fn(|_: ()| async { 20 }));
+    let input1 = dag.add_task(task_fn::<(), _, _>(|_: ()| 10));
+    let input2 = dag.add_task(task_fn::<(), _, _>(|_: ()| 20));
 
     let config = ReadOnlyConfig {
         multiplier: 3,

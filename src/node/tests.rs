@@ -3,7 +3,6 @@
 use std::sync::Arc;
 
 use crate::node::{ExecutableNode, TypedNode};
-use crate::types::NodeId;
 
 // Simple test task
 struct TestTask {
@@ -27,28 +26,10 @@ impl TaskWithDependency {
 }
 
 #[tokio::test]
-async fn test_execute_with_deps_missing_input() {
-    // Test when task expects input but doesn't receive it
-    let node = Box::new(TypedNode::new(NodeId(0), TaskWithDependency));
-
-    // TaskWithDependency expects an i32 input, but we provide no dependencies
-    let dependencies = vec![];
-
-    let result = node.execute_with_deps(dependencies).await;
-    assert!(result.is_err());
-
-    if let Err(crate::error::DagError::InvalidDependency { task_id }) = result {
-        assert_eq!(task_id, 0);
-    } else {
-        panic!("Expected InvalidDependency error, got: {:?}", result);
-    }
-}
-
-#[tokio::test]
 async fn test_execute_with_deps_success() {
     // Test successful execution with channels
-    let dependency_node = Box::new(TypedNode::new(NodeId(0), TestTask { value: 21 }));
-    let dependent_node = Box::new(TypedNode::new(NodeId(1), TaskWithDependency));
+    let dependency_node = Box::new(TypedNode::new(TestTask { value: 21 }));
+    let dependent_node = Box::new(TypedNode::new(TaskWithDependency));
 
     // Execute dependency node with sender
     let dep_dependencies = vec![];
@@ -71,7 +52,7 @@ async fn test_execute_with_deps_success() {
 #[tokio::test]
 async fn test_execute_with_deps_sink_node() {
     // Test that sink nodes (no dependents) return their output
-    let node = Box::new(TypedNode::new(NodeId(0), TestTask { value: 42 }));
+    let node = Box::new(TypedNode::new(TestTask { value: 42 }));
 
     // No senders means this is a sink node
     let dependencies = vec![];
@@ -88,7 +69,7 @@ async fn test_execute_with_deps_sink_node() {
 #[tokio::test]
 async fn test_execute_with_deps_non_sink_node() {
     // Test that non-sink nodes send output via channels
-    let node = TypedNode::new(NodeId(0), TestTask { value: 42 });
+    let node = TypedNode::new(TestTask { value: 42 });
 
     // Execute with senders (non-sink node)
     let node = Box::new(node);

@@ -1,10 +1,11 @@
 //! Tests for concurrent access patterns and race conditions
 
 use crate::common::task_fn;
-use dagx::{DagResult, DagRunner, TaskHandle};
+use dagx::{task, DagResult, DagRunner, TaskHandle};
 use futures::FutureExt;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::sync::RwLock;
 
 #[tokio::test]
@@ -12,13 +13,20 @@ async fn test_concurrent_result_retrieval() -> DagResult<()> {
     // Test concurrent get() calls after execution
     let dag = Arc::new(DagRunner::new());
 
+    struct DelayTask(usize, Duration);
+
+    #[task]
+    impl DelayTask {
+        async fn run(&self) -> usize {
+            tokio::time::sleep(self.1).await;
+            self.0
+        }
+    }
+
     // Add tasks with minimal delays
     let tasks: Vec<dagx::TaskHandle<usize>> = (0..10)
         .map(|i| {
-            let task = dag.add_task(task_fn(move |_: ()| async move {
-                tokio::time::sleep(tokio::time::Duration::from_millis(1)).await;
-                i as usize
-            }));
+            let task = dag.add_task(DelayTask(i, Duration::from_millis(1)));
             task.into()
         })
         .collect();
@@ -54,7 +62,7 @@ async fn test_simultaneous_dag_building_and_execution() -> DagResult<()> {
 
     // Start with a few initial tasks
     let initial: Vec<_> = (0..5)
-        .map(|i| dag.add_task(task_fn(move |_: ()| async move { i })))
+        .map(|i| dag.add_task(task_fn::<(), _, _>(move |_: ()| i)))
         .collect();
 
     // Start building more tasks in background
@@ -63,7 +71,7 @@ async fn test_simultaneous_dag_building_and_execution() -> DagResult<()> {
     let build_handle = tokio::spawn(async move {
         let mut tasks: Vec<dagx::TaskHandle<i32>> = Vec::new();
         for i in 5..50 {
-            let task = dag_build.add_task(task_fn(move |_: ()| async move { i }));
+            let task = dag_build.add_task(task_fn::<(), _, _>(move |_: ()| i));
             tasks.push(task.into());
             tokio::time::sleep(tokio::time::Duration::from_millis(1)).await;
         }
@@ -108,14 +116,12 @@ async fn test_concurrent_dependency_resolution() -> DagResult<()> {
 
     // Create a source task
     let source: TaskHandle<_> = dag
-        .add_task(task_fn({
+        .add_task(task_fn::<(), _, _>({
             let counter = resolution_counter.clone();
             move |_: ()| {
                 let counter = counter.clone();
-                async move {
-                    counter.fetch_add(1, Ordering::SeqCst);
-                    42
-                }
+                counter.fetch_add(1, Ordering::SeqCst);
+                42
             }
         }))
         .into();
@@ -124,12 +130,10 @@ async fn test_concurrent_dependency_resolution() -> DagResult<()> {
     let dependents: Vec<_> = (0..100)
         .map(|i| {
             let counter = resolution_counter.clone();
-            dag.add_task(task_fn(move |val: i32| {
+            dag.add_task(task_fn::<i32, _, _>(move |val: &i32| {
                 let counter = counter.clone();
-                async move {
-                    counter.fetch_add(1, Ordering::SeqCst);
-                    val + i
-                }
+                counter.fetch_add(1, Ordering::SeqCst);
+                val + i
             }))
             .depends_on(source)
         })
@@ -154,38 +158,56 @@ async fn test_read_write_race_patterns() -> DagResult<()> {
     let dag = DagRunner::new();
     let shared_state = Arc::new(RwLock::new(Vec::new()));
 
+    struct WriterTask {
+        state: Arc<RwLock<Vec<i32>>>,
+        idx: i32,
+    }
+
+    #[task]
+    impl WriterTask {
+        async fn run(&self) -> i32 {
+            let mut guard = self.state.write().await;
+            guard.push(self.idx);
+            tokio::task::yield_now().await; // Force potential race
+            guard.push(self.idx * 10);
+            self.idx
+        }
+    }
+
     // Writers
     let writers: Vec<_> = (0..10)
         .map(|i| {
-            let state = shared_state.clone();
-            dag.add_task(task_fn(move |_: ()| {
-                let state = state.clone();
-                async move {
-                    let mut guard = state.write().await;
-                    guard.push(i);
-                    tokio::task::yield_now().await; // Force potential race
-                    guard.push(i * 10);
-                    i
-                }
-            }))
+            dag.add_task(WriterTask {
+                state: shared_state.clone(),
+                idx: i,
+            })
             .into()
         })
         .collect();
+
+    struct ReaderTask {
+        state: Arc<RwLock<Vec<i32>>>,
+    }
+
+    struct ReaderTaskOutput((i32, bool, usize));
+
+    #[task]
+    impl ReaderTask {
+        async fn run(&self, writer_id: &i32) -> ReaderTaskOutput {
+            let guard = self.state.read().await;
+            let contains_writer = guard.contains(&writer_id);
+            let len = guard.len();
+            ReaderTaskOutput((*writer_id, contains_writer, len))
+        }
+    }
 
     // Readers (depend on writers to ensure ordering)
     let readers: Vec<_> = writers
         .iter()
         .map(|writer| {
-            let state = shared_state.clone();
-            dag.add_task(task_fn(move |writer_id: i32| {
-                let state = state.clone();
-                async move {
-                    let guard = state.read().await;
-                    let contains_writer = guard.contains(&writer_id);
-                    let len = guard.len();
-                    (writer_id, contains_writer, len)
-                }
-            }))
+            dag.add_task(ReaderTask {
+                state: shared_state.clone(),
+            })
             .depends_on(writer)
         })
         .collect();
@@ -194,7 +216,7 @@ async fn test_read_write_race_patterns() -> DagResult<()> {
 
     // Verify readers saw their writer's data
     for reader in &readers {
-        let (writer_id, saw_writer, _len) = dag.get(reader)?;
+        let ReaderTaskOutput((writer_id, saw_writer, _len)) = dag.get(reader)?;
         assert!(saw_writer, "Reader didn't see writer {}", writer_id);
     }
 
@@ -217,30 +239,27 @@ async fn test_atomic_counter_races() -> DagResult<()> {
         .map(|_| {
             let counter = counter.clone();
             let max_seen = max_seen.clone();
-            dag.add_task(task_fn(move |_: ()| {
+            dag.add_task(task_fn::<(), _, _>(move |_: ()| {
                 let counter = counter.clone();
                 let max_seen = max_seen.clone();
-                async move {
-                    let mut local_max = 0;
-                    for _ in 0..100 {
-                        let val = counter.fetch_add(1, Ordering::SeqCst);
-                        local_max = local_max.max(val);
+                let mut local_max = 0;
+                for _ in 0..100 {
+                    let val = counter.fetch_add(1, Ordering::SeqCst);
+                    local_max = local_max.max(val);
 
-                        // Update global max
-                        let mut current_max = max_seen.load(Ordering::SeqCst);
-                        while val > current_max {
-                            match max_seen.compare_exchange_weak(
-                                current_max,
-                                val,
-                                Ordering::SeqCst,
-                                Ordering::SeqCst,
-                            ) {
-                                Ok(_) => break,
-                                Err(x) => current_max = x,
-                            }
+                    // Update global max
+                    let mut current_max = max_seen.load(Ordering::SeqCst);
+                    while val > current_max {
+                        match max_seen.compare_exchange_weak(
+                            current_max,
+                            val,
+                            Ordering::SeqCst,
+                            Ordering::SeqCst,
+                        ) {
+                            Ok(_) => break,
+                            Err(x) => current_max = x,
                         }
                     }
-                    local_max
                 }
             }))
         })
@@ -272,12 +291,10 @@ async fn test_multiple_dag_runners_interaction() -> DagResult<()> {
             let tasks: Vec<_> = (0..20)
                 .map(|task_id| {
                     let counter = counter.clone();
-                    dag.add_task(task_fn(move |_: ()| {
+                    dag.add_task(task_fn::<(), _, _>(move |_: ()| {
                         let counter = counter.clone();
-                        async move {
-                            counter.fetch_add(1, Ordering::SeqCst);
-                            (dag_id, task_id)
-                        }
+                        counter.fetch_add(1, Ordering::SeqCst);
+                        (dag_id, task_id)
                     }))
                 })
                 .collect();

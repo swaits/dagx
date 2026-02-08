@@ -446,7 +446,7 @@ async fn main() {
             .unwrap();
 
         // Check results
-        match dag.get(payment).unwrap() {
+        match dag.get(payment).unwrap().as_ref() {
             Ok(_) => println!("\nPayment validation succeeded"),
             Err(trace) => {
                 println!("\n[{}] Payment validation failed:", correlation_id);

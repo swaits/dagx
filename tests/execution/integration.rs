@@ -170,7 +170,7 @@ async fn integration_test_wide_and_deep() -> DagResult<()> {
     for source in &sources {
         let step1 = dag.add_task(Multiply::new(2)).depends_on(source);
         let step2 = dag
-            .add_task(task_fn(|x: i32| async move { x + 5 }))
+            .add_task(task_fn::<i32, _, _>(|&x: &i32| x + 5))
             .depends_on(step1);
         let step3 = dag.add_task(Multiply::new(3)).depends_on(step2);
         final_nodes.push(step3);
@@ -276,7 +276,7 @@ async fn integration_test_parallel_execution_timing() -> DagResult<()> {
     // Create 5 independent tasks that each sleep for 100ms
     let tasks: Vec<_> = (0..num_parallel_tasks)
         .map(|i| {
-            dag.add_task(task_fn(move |_: ()| async move {
+            dag.add_task(task_fn::<(), _, _>(move |_: ()| {
                 sleep(sleep_duration).await;
                 i
             }))
@@ -314,7 +314,7 @@ async fn integration_test_parallel_vs_sequential_timing() -> DagResult<()> {
     // Layer 1: 4 parallel tasks (should take ~50ms)
     let parallel_tasks: Vec<_> = (0..4)
         .map(|i| {
-            dag.add_task(task_fn(move |_: ()| async move {
+            dag.add_task(task_fn::<(), _, _>(move |_: ()| {
                 sleep(sleep_duration).await;
                 i * 10
             }))
@@ -324,21 +324,21 @@ async fn integration_test_parallel_vs_sequential_timing() -> DagResult<()> {
     // Layer 2: Sequential chain of 3 tasks depending on the first parallel task
     // (should add ~150ms)
     let seq1 = dag
-        .add_task(task_fn(move |x: i32| async move {
+        .add_task(task_fn::<i32, _, _>(move |&x: &i32| {
             sleep(sleep_duration).await;
             x + 1
         }))
         .depends_on(parallel_tasks[0]);
 
     let seq2 = dag
-        .add_task(task_fn(move |x: i32| async move {
+        .add_task(task_fn::<i32, _, _>(move |&x: &i32| {
             sleep(sleep_duration).await;
             x + 1
         }))
         .depends_on(seq1);
 
     let seq3 = dag
-        .add_task(task_fn(move |x: i32| async move {
+        .add_task(task_fn::<i32, _, _>(move |&x: &i32| {
             sleep(sleep_duration).await;
             x + 1
         }))

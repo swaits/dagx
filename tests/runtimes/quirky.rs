@@ -32,10 +32,10 @@ fn test_async_executor_basic() {
     let future = async {
         let dag = DagRunner::new();
 
-        let x = dag.add_task(task_fn(|_: ()| async { 10 }));
-        let y = dag.add_task(task_fn(|_: ()| async { 20 }));
+        let x = dag.add_task(task_fn::<(), _, _>(|_: ()| 10));
+        let y = dag.add_task(task_fn::<(), _, _>(|_: ()| 20));
         let sum = dag
-            .add_task(task_fn(|(a, b): (i32, i32)| async move { a + b }))
+            .add_task(task_fn::<(i32, i32), _, _>(|(a, b): (&i32, &i32)| a + b))
             .depends_on((x, y));
 
         dag.run(|fut| executor.spawn(fut)).await.unwrap();
@@ -54,18 +54,18 @@ fn test_async_executor_complex_dag() {
         let dag = DagRunner::new();
 
         // Create a diamond pattern
-        let source: TaskHandle<_> = dag.add_task(task_fn(|_: ()| async { 5 })).into();
+        let source: TaskHandle<_> = dag.add_task(task_fn::<(), _, _>(|_: ()| 5)).into();
 
         let left = dag
-            .add_task(task_fn(|x: i32| async move { x * 2 }))
+            .add_task(task_fn::<i32, _, _>(|&x: &i32| x * 2))
             .depends_on(source);
 
         let right = dag
-            .add_task(task_fn(|x: i32| async move { x * 3 }))
+            .add_task(task_fn::<i32, _, _>(|&x: &i32| x * 3))
             .depends_on(source);
 
         let sink = dag
-            .add_task(task_fn(|(l, r): (i32, i32)| async move { l + r }))
+            .add_task(task_fn::<(i32, i32), _, _>(|(l, r): (&i32, &i32)| l + r))
             .depends_on((&left, &right));
 
         dag.run(|fut| executor.spawn(fut)).await.unwrap();
@@ -88,12 +88,10 @@ fn test_async_executor_parallel_tasks() {
         let tasks: Vec<_> = (0..10)
             .map(|i| {
                 let c = counter.clone();
-                dag.add_task(task_fn(move |_: ()| {
+                dag.add_task(task_fn::<(), _, _>(move |_: ()| {
                     let c = c.clone();
-                    async move {
-                        c.fetch_add(1, Ordering::SeqCst);
-                        i
-                    }
+                    c.fetch_add(1, Ordering::SeqCst);
+                    i
                 }))
             })
             .collect();
@@ -120,7 +118,7 @@ fn test_async_executor_with_local_spawn() {
     let future = async {
         let dag = DagRunner::new();
 
-        let x = dag.add_task(task_fn(|_: ()| async { 42 }));
+        let x = dag.add_task(task_fn::<(), _, _>(|_: ()| 42));
 
         dag.run(|fut| executor.spawn(fut)).await.unwrap();
 
@@ -138,14 +136,14 @@ fn test_async_executor_deep_chain() {
         let dag = DagRunner::new();
 
         // Build a chain of 50 tasks
-        let start = dag.add_task(task_fn(|_: ()| async { 0 }));
+        let start = dag.add_task(task_fn::<(), _, _>(|_: ()| 0));
         let mut current = dag
-            .add_task(task_fn(|x: i32| async move { x + 1 }))
+            .add_task(task_fn::<i32, _, _>(|&x: &i32| x + 1))
             .depends_on(start);
 
         for _ in 1..50 {
             current = dag
-                .add_task(task_fn(|x: i32| async move { x + 1 }))
+                .add_task(task_fn::<i32, _, _>(|&x: &i32| x + 1))
                 .depends_on(current);
         }
 
@@ -167,9 +165,9 @@ fn test_pollster_basic() {
     pollster::block_on(async {
         let dag = DagRunner::new();
 
-        let x = dag.add_task(task_fn(|_: ()| async { 100 }));
+        let x = dag.add_task(task_fn::<(), _, _>(|_: ()| 100));
         let doubled = dag
-            .add_task(task_fn(|x: i32| async move { x * 2 }))
+            .add_task(task_fn::<i32, _, _>(|&x: &i32| x * 2))
             .depends_on(x);
 
         dag.run(|fut| async { pollster::block_on(fut) })
@@ -186,11 +184,11 @@ fn test_pollster_complex() {
         let dag = DagRunner::new();
 
         // Fan-out pattern
-        let source: TaskHandle<_> = dag.add_task(task_fn(|_: ()| async { 7 })).into();
+        let source: TaskHandle<_> = dag.add_task(task_fn::<(), _, _>(|_: ()| 7)).into();
 
         let tasks: Vec<_> = (0..5)
             .map(|i| {
-                dag.add_task(task_fn(move |x: i32| async move { x * i }))
+                dag.add_task(task_fn::<i32, _, _>(move |&x: &i32| x * i))
                     .depends_on(source)
             })
             .collect();
@@ -211,7 +209,7 @@ fn test_pollster_error_handling() {
         let dag = DagRunner::new();
 
         // Task that returns Result
-        let task = dag.add_task(task_fn(|_: ()| async { Ok::<i32, String>(42) }));
+        let task = dag.add_task(task_fn::<(), _, _>(|_: ()| Ok::<i32, String>(42)));
 
         dag.run(|fut| async { pollster::block_on(fut) })
             .await
@@ -230,10 +228,10 @@ fn test_futures_executor_basic() {
     futures_executor::block_on(async {
         let dag = DagRunner::new();
 
-        let x = dag.add_task(task_fn(|_: ()| async { 15 }));
-        let y = dag.add_task(task_fn(|_: ()| async { 25 }));
+        let x = dag.add_task(task_fn::<(), _, _>(|_: ()| 15));
+        let y = dag.add_task(task_fn::<(), _, _>(|_: ()| 25));
         let product = dag
-            .add_task(task_fn(|(a, b): (i32, i32)| async move { a * b }))
+            .add_task(task_fn::<(i32, i32), _, _>(|(a, b): (&i32, &i32)| a * b))
             .depends_on((x, y));
 
         let spawner = ThreadPool::new().unwrap();
@@ -256,7 +254,7 @@ fn test_futures_executor_threadpool() {
 
         // Create multiple independent tasks
         let tasks: Vec<_> = (0..20)
-            .map(|i| dag.add_task(task_fn(move |_: ()| async move { i * i })))
+            .map(|i| dag.add_task(task_fn::<(), _, _>(move |_: ()| i * i)))
             .collect();
 
         dag.run(|fut| spawner.spawn_with_handle(fut).unwrap())
@@ -281,18 +279,18 @@ fn test_futures_executor_diamond_pattern() {
     futures_executor::block_on(async {
         let dag = DagRunner::new();
 
-        let a: TaskHandle<_> = dag.add_task(task_fn(|_: ()| async { 8 })).into();
+        let a: TaskHandle<_> = dag.add_task(task_fn::<(), _, _>(|_: ()| 8)).into();
 
         let b = dag
-            .add_task(task_fn(|x: i32| async move { x + 2 }))
+            .add_task(task_fn::<i32, _, _>(|&x: &i32| x + 2))
             .depends_on(a);
 
         let c = dag
-            .add_task(task_fn(|x: i32| async move { x - 2 }))
+            .add_task(task_fn::<i32, _, _>(|&x: &i32| x - 2))
             .depends_on(a);
 
         let d = dag
-            .add_task(task_fn(|(x, y): (i32, i32)| async move { x * y }))
+            .add_task(task_fn::<(i32, i32), _, _>(|(x, y): (&i32, &i32)| x * y))
             .depends_on((&b, &c));
 
         let spawner = ThreadPool::new().unwrap();
@@ -318,7 +316,7 @@ fn test_all_runtimes_compatibility() {
         let executor = async_executor::Executor::new();
         executor.run(async {
             let dag = DagRunner::new();
-            let x = dag.add_task(task_fn(|_: ()| async { 123 }));
+            let x = dag.add_task(task_fn::<(), _, _>(|_: ()| 123));
             dag.run(|fut| executor.spawn(fut)).await.unwrap();
             assert_eq!(dag.get(x).unwrap(), 123);
         });
@@ -328,7 +326,7 @@ fn test_all_runtimes_compatibility() {
     {
         pollster::block_on(async {
             let dag = DagRunner::new();
-            let x = dag.add_task(task_fn(|_: ()| async { 123 }));
+            let x = dag.add_task(task_fn::<(), _, _>(|_: ()| 123));
             dag.run(|fut| async { pollster::block_on(fut) })
                 .await
                 .unwrap();
@@ -340,7 +338,7 @@ fn test_all_runtimes_compatibility() {
     {
         futures_executor::block_on(async {
             let dag = DagRunner::new();
-            let x = dag.add_task(task_fn(|_: ()| async { 123 }));
+            let x = dag.add_task(task_fn::<(), _, _>(|_: ()| 123));
             let spawner = ThreadPool::new().unwrap();
             dag.run(|fut| spawner.spawn_with_handle(fut).unwrap())
                 .await
@@ -360,7 +358,7 @@ fn test_runtime_edge_cases() {
         let dag = DagRunner::new();
 
         // This tests that our API works even with !Send futures
-        let x = dag.add_task(task_fn(|_: ()| async {
+        let x = dag.add_task(task_fn::<(), _, _>(|_: ()| {
             // Local state
 
             42
@@ -386,7 +384,7 @@ fn test_async_executor_stress() {
         // Create 100 tasks
         let tasks: Vec<_> = (0..100)
             .map(|i| {
-                dag.add_task(task_fn(move |_: ()| async move {
+                dag.add_task(task_fn::<(), _, _>(move |_: ()| {
                     // Small delay to test executor scheduling
                     i
                 }))
@@ -406,7 +404,7 @@ fn test_pollster_nested_blocks() {
     // Test nested blocking - edge case
     pollster::block_on(async {
         let dag1 = DagRunner::new();
-        let x = dag1.add_task(task_fn(|_: ()| async { 10 }));
+        let x = dag1.add_task(task_fn::<(), _, _>(|_: ()| 10));
 
         dag1.run(|fut| async { pollster::block_on(fut) })
             .await
@@ -425,7 +423,7 @@ fn test_futures_executor_multi_pool() {
     pool1.spawn_ok(async move {
         let dag = DagRunner::new();
 
-        let x = dag.add_task(task_fn(|_: ()| async { 50 }));
+        let x = dag.add_task(task_fn::<(), _, _>(|_: ()| 50));
 
         dag.run(|fut| spawner.spawn_with_handle(fut).unwrap())
             .await
@@ -459,8 +457,8 @@ fn test_sync_tasks_on_async_executor() {
     executor.run(async {
         let dag = DagRunner::new();
 
-        let x = dag.add_task(task_fn(|_: ()| async { 5 }));
-        let y = dag.add_task(task_fn(|_: ()| async { 7 }));
+        let x = dag.add_task(task_fn::<(), _, _>(|_: ()| 5));
+        let y = dag.add_task(task_fn::<(), _, _>(|_: ()| 7));
         let sum = dag.add_task(SyncAdd).depends_on((x, y));
 
         dag.run(|fut| executor.spawn(fut)).await.unwrap();
@@ -483,7 +481,7 @@ fn test_sync_tasks_on_pollster() {
     pollster::block_on(async {
         let dag = DagRunner::new();
 
-        let x = dag.add_task(task_fn(|_: ()| async { 21 }));
+        let x = dag.add_task(task_fn::<(), _, _>(|_: ()| 21));
         let doubled = dag.add_task(SyncDouble).depends_on(x);
 
         dag.run(|fut| async { pollster::block_on(fut) })

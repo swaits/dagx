@@ -54,7 +54,7 @@ fn test_handle_is_immutable_reference() {
     let builder = dag.add_task(NoInput);
 
     // Convert to handle (only works because Input = ())
-    let handle: TaskHandle<i32> = builder.into();
+    let handle: TaskHandle<_> = builder.into();
 
     // TaskHandle is Copy/Clone - just an ID wrapper
     let _copy1 = handle;
@@ -108,7 +108,7 @@ fn test_ordering_prevents_cycles() {
     // So we can only create DAGs, never cycles!
 
     // Let's create a valid DAG instead: A→B (B depends on A)
-    let a_handle: TaskHandle<i32> = a_builder.into(); // A has no deps (unit input)
+    let a_handle: TaskHandle<_> = a_builder.into(); // A has no deps (unit input)
     let _b_handle = b_builder.depends_on(a_handle);
     // Now we could try: a_handle.depends_on(b_handle)?
     // But TaskHandle has no such method!
@@ -138,8 +138,8 @@ fn test_unit_tasks_cannot_create_cycles() {
     let task2 = dag.add_task(Task2);
 
     // Both have unit input, so we can convert to handles
-    let _handle1: TaskHandle<i32> = task1.into();
-    let _handle2: TaskHandle<i32> = task2.into();
+    let _handle1: TaskHandle<_> = task1.into();
+    let _handle2: TaskHandle<_> = task2.into();
 
     // Now we have two handles, but...
     // TaskHandle has no methods to add dependencies!

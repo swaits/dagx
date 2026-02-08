@@ -21,24 +21,26 @@ pub fn bench_etl_pipeline(c: &mut Criterion) {
                         let dag = DagRunner::new();
 
                         // Extract: Load JSON-like data (framework wraps in Arc automatically)
-                        let extract: TaskHandle<_> = dag.add_task(task_fn(move |_: ()| async move {
-                            (0..count)
-                                .map(|i| {
-                                    format!(
-                                        "{{\"id\":{},\"name\":\"User{}\",\"score\":{}}}",
-                                        i,
-                                        i,
-                                        i * 10
-                                    )
-                                })
-                                .collect::<Vec<_>>()
-                        })).into();
+                        let extract: TaskHandle<_> = dag
+                            .add_task(task_fn::<(), _, _>(move |_: ()| {
+                                (0..count)
+                                    .map(|i| {
+                                        format!(
+                                            "{{\"id\":{},\"name\":\"User{}\",\"score\":{}}}",
+                                            i,
+                                            i,
+                                            i * 10
+                                        )
+                                    })
+                                    .collect::<Vec<_>>()
+                            }))
+                            .into();
 
                         // Transform: Three parallel transformations
 
                         // T1: Parse and validate
                         let validate = dag
-                            .add_task(task_fn(move |data: Vec<String>| async move {
+                            .add_task(task_fn::<Vec<_>, _, _>(move |data: &Vec<String>| {
                                 data.iter()
                                     .filter(|s| {
                                         s.contains("\"id\"")
@@ -51,7 +53,7 @@ pub fn bench_etl_pipeline(c: &mut Criterion) {
 
                         // T2: Extract scores
                         let scores = dag
-                            .add_task(task_fn(move |data: Vec<String>| async move {
+                            .add_task(task_fn::<Vec<_>, _, _>(move |data: &Vec<String>| {
                                 data.iter()
                                     .filter_map(|s| {
                                         s.split("\"score\":").nth(1).and_then(|part| {
@@ -64,7 +66,7 @@ pub fn bench_etl_pipeline(c: &mut Criterion) {
 
                         // T3: Extract names
                         let names = dag
-                            .add_task(task_fn(move |data: Vec<String>| async move {
+                            .add_task(task_fn::<Vec<_>, _, _>(move |data: &Vec<String>| {
                                 data.iter()
                                     .filter_map(|s| {
                                         s.split("\"name\":\"")
@@ -77,8 +79,8 @@ pub fn bench_etl_pipeline(c: &mut Criterion) {
                             .depends_on(extract);
 
                         // Load: Aggregate all transformations
-                        dag.add_task(task_fn(
-                            move |(valid, scores, names): (usize, Vec<i32>, Vec<String>)| async move {
+                        dag.add_task(task_fn::<(usize, Vec<_>, Vec<_>), _, _>(
+                            move |(valid, scores, names): (&usize, &Vec<i32>, &Vec<String>)| {
                                 let avg_score =
                                     scores.iter().sum::<i32>() / scores.len().max(1) as i32;
                                 format!(
@@ -91,9 +93,9 @@ pub fn bench_etl_pipeline(c: &mut Criterion) {
                         ))
                         .depends_on((&validate, &scores, &names));
 
-                dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
-                        .await
-                        .unwrap();
+                        dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+                            .await
+                            .unwrap();
                     })
                 });
             },

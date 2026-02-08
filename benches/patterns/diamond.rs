@@ -14,16 +14,16 @@ pub fn bench_diamond(c: &mut Criterion) {
 
                 for i in 0..50 {
                     let source: TaskHandle<_> =
-                        dag.add_task(task_fn(move |_: ()| async move { i })).into();
+                        dag.add_task(task_fn::<(), _, _>(move |_: ()| i)).into();
 
                     let left = dag
-                        .add_task(task_fn(|x: i32| async move { x * 2 }))
+                        .add_task(task_fn::<i32, _, _>(|&x: &i32| x * 2))
                         .depends_on(source);
                     let right = dag
-                        .add_task(task_fn(|x: i32| async move { x * 3 }))
+                        .add_task(task_fn::<i32, _, _>(|&x: &i32| x * 3))
                         .depends_on(source);
 
-                    dag.add_task(task_fn(|(l, r): (i32, i32)| async move { l + r }))
+                    dag.add_task(task_fn::<(i32, i32), _, _>(|(l, r): (&i32, &i32)| l + r))
                         .depends_on((&left, &right));
                 }
 

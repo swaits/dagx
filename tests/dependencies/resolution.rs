@@ -1,7 +1,7 @@
 //! Tests for dependency resolution order and transitive dependencies
 
 use crate::common::task_fn;
-use dagx::{DagResult, DagRunner, TaskHandle};
+use dagx::{task, DagResult, DagRunner, TaskHandle};
 use futures::FutureExt;
 use std::sync::{Arc, Mutex};
 
@@ -12,72 +12,69 @@ async fn test_dependency_resolution_order() -> DagResult<()> {
 
     let execution_log = Arc::new(Mutex::new(Vec::new()));
 
+    struct ATask {
+        log: Arc<Mutex<Vec<(&'static str, i32)>>>,
+    }
+
+    #[task]
+    impl ATask {
+        async fn run(&self) -> i32 {
+            self.log.lock().unwrap().push(("A_start", 0));
+            tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+            self.log.lock().unwrap().push(("A_end", 1));
+            1
+        }
+    }
+
     // Create a chain: A -> B -> C -> D -> E
-    let a = {
-        let log = execution_log.clone();
-        dag.add_task(task_fn(move |_: ()| {
-            let log = log.clone();
-            async move {
-                log.lock().unwrap().push(("A_start", 0));
-                tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
-                log.lock().unwrap().push(("A_end", 1));
-                1
-            }
-        }))
-    };
+    let a = dag.add_task(ATask {
+        log: execution_log.clone(),
+    });
 
     let b = {
         let log = execution_log.clone();
-        dag.add_task(task_fn(move |x: i32| {
+        dag.add_task(task_fn::<i32, _, _>(move |&x: &i32| {
             let log = log.clone();
-            async move {
-                log.lock().unwrap().push(("B_start", x));
-                assert_eq!(x, 1, "B should receive 1 from A");
-                log.lock().unwrap().push(("B_end", x + 1));
-                x + 1
-            }
+            log.lock().unwrap().push(("B_start", x));
+            assert_eq!(x, 1, "B should receive 1 from A");
+            log.lock().unwrap().push(("B_end", x + 1));
+            x + 1
         }))
         .depends_on(a)
     };
 
     let c = {
         let log = execution_log.clone();
-        dag.add_task(task_fn(move |x: i32| {
+        dag.add_task(task_fn::<i32, _, _>(move |&x: &i32| {
             let log = log.clone();
-            async move {
-                log.lock().unwrap().push(("C_start", x));
-                assert_eq!(x, 2, "C should receive 2 from B");
-                log.lock().unwrap().push(("C_end", x + 1));
-                x + 1
-            }
+            log.lock().unwrap().push(("C_start", x));
+            assert_eq!(x, 2, "C should receive 2 from B");
+            log.lock().unwrap().push(("C_end", x + 1));
+            x + 1
         }))
         .depends_on(b)
     };
 
     let d = {
         let log = execution_log.clone();
-        dag.add_task(task_fn(move |x: i32| {
+        dag.add_task(task_fn::<i32, _, _>(move |&x: &i32| {
             let log = log.clone();
-            async move {
-                log.lock().unwrap().push(("D_start", x));
-                assert_eq!(x, 3, "D should receive 3 from C");
-                log.lock().unwrap().push(("D_end", x + 1));
-                x + 1
-            }
+            log.lock().unwrap().push(("D_start", x));
+            assert_eq!(x, 3, "D should receive 3 from C");
+            log.lock().unwrap().push(("D_end", x + 1));
+            x + 1
         }))
         .depends_on(c)
     };
 
     let e = {
         let log = execution_log.clone();
-        dag.add_task(task_fn(move |x: i32| {
+        dag.add_task(task_fn::<i32, _, _>(move |&x: &i32| {
             let log = log.clone();
-            async move {
-                log.lock().unwrap().push(("E_start", x));
-                assert_eq!(x, 4, "E should receive 4 from D");
-                log.lock().unwrap().push(("E_end", x + 1));
-                x + 1
-            }
+            log.lock().unwrap().push(("E_start", x));
+            assert_eq!(x, 4, "E should receive 4 from D");
+            log.lock().unwrap().push(("E_end", x + 1));
+            x + 1
         }))
         .depends_on(d)
     };
@@ -108,12 +105,12 @@ async fn test_transitive_dependencies() -> DagResult<()> {
     // A -> B -> C (creates transitive A -> C relationship)
     let dag = DagRunner::new();
 
-    let a: TaskHandle<_> = dag.add_task(task_fn(|_: ()| async { 10 })).into();
+    let a: TaskHandle<_> = dag.add_task(task_fn::<(), _, _>(|_: ()| 10)).into();
     let b = dag
-        .add_task(task_fn(|x: i32| async move { x * 2 }))
+        .add_task(task_fn::<i32, _, _>(|&x: &i32| x * 2))
         .depends_on(a);
     let c = dag
-        .add_task(task_fn(|x: i32| async move { x + 5 }))
+        .add_task(task_fn::<i32, _, _>(|&x: &i32| x + 5))
         .depends_on(b);
 
     dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
@@ -129,12 +126,12 @@ async fn test_transitive_dependencies() -> DagResult<()> {
 async fn test_deep_chain_50_levels() -> DagResult<()> {
     let dag = DagRunner::new();
 
-    let first = dag.add_task(task_fn(|_: ()| async { 0 }));
+    let first = dag.add_task(task_fn::<(), _, _>(|_: ()| 0));
     let mut handles = vec![first.into()];
 
     for _i in 1..=50 {
         let next = dag
-            .add_task(task_fn(move |x: i32| async move { x + 1 }))
+            .add_task(task_fn::<i32, _, _>(move |&x: &i32| x + 1))
             .depends_on(handles.last().unwrap());
         handles.push(next);
     }
@@ -149,12 +146,12 @@ async fn test_deep_chain_50_levels() -> DagResult<()> {
 async fn test_deep_chain_200_levels() -> DagResult<()> {
     let dag = DagRunner::new();
 
-    let first = dag.add_task(task_fn(|_: ()| async { 1 }));
+    let first = dag.add_task(task_fn::<(), _, _>(|_: ()| 1));
     let mut current = first.into();
 
     for _ in 0..200 {
         current = dag
-            .add_task(task_fn(|x: i32| async move { x + 1 }))
+            .add_task(task_fn::<i32, _, _>(|&x: &i32| x + 1))
             .depends_on(current);
     }
 

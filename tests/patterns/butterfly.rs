@@ -14,7 +14,7 @@ async fn test_butterfly_network() -> DagResult<()> {
     // Layer 0: inputs
     let inputs: Vec<_> = (0..8)
         .map(|i| {
-            dag.add_task(task_fn(move |_: ()| async move { i as f64 }))
+            dag.add_task(task_fn::<(), _, _>(move |_: ()| i as f64))
                 .into()
         })
         .collect();
@@ -26,25 +26,29 @@ async fn test_butterfly_network() -> DagResult<()> {
         let idx2 = i * 2 + 1;
         // Sum operation
         layer1.push(
-            dag.add_task(task_fn(|(a, b): (f64, f64)| async move { (a + b) / 2.0 }))
-                .depends_on((&inputs[idx1], &inputs[idx2])),
+            dag.add_task(task_fn::<(f64, f64), _, _>(|(a, b): (&f64, &f64)| {
+                (a + b) / 2.0
+            }))
+            .depends_on((&inputs[idx1], &inputs[idx2])),
         );
         // Difference operation
         layer1.push(
-            dag.add_task(task_fn(|(a, b): (f64, f64)| async move { (a - b) / 2.0 }))
-                .depends_on((&inputs[idx1], &inputs[idx2])),
+            dag.add_task(task_fn::<(f64, f64), _, _>(|(a, b): (&f64, &f64)| {
+                (a - b) / 2.0
+            }))
+            .depends_on((&inputs[idx1], &inputs[idx2])),
         );
     }
 
     // Layer 2: crossover connections
     let layer2: Vec<_> = vec![
-        dag.add_task(task_fn(|(a, b): (f64, f64)| async move { a + b }))
+        dag.add_task(task_fn::<(f64, f64), _, _>(|(a, b): (&f64, &f64)| a + b))
             .depends_on((&layer1[0], &layer1[4])),
-        dag.add_task(task_fn(|(a, b): (f64, f64)| async move { a - b }))
+        dag.add_task(task_fn::<(f64, f64), _, _>(|(a, b): (&f64, &f64)| a - b))
             .depends_on((&layer1[1], &layer1[5])),
-        dag.add_task(task_fn(|(a, b): (f64, f64)| async move { a + b }))
+        dag.add_task(task_fn::<(f64, f64), _, _>(|(a, b): (&f64, &f64)| a + b))
             .depends_on((&layer1[2], &layer1[6])),
-        dag.add_task(task_fn(|(a, b): (f64, f64)| async move { a - b }))
+        dag.add_task(task_fn::<(f64, f64), _, _>(|(a, b): (&f64, &f64)| a - b))
             .depends_on((&layer1[3], &layer1[7])),
     ];
 
@@ -76,11 +80,13 @@ async fn test_recursive_butterfly() -> DagResult<()> {
         // Butterfly connections
         for i in 0..mid {
             let sum = dag
-                .add_task(task_fn(|(a, b): (i32, i32)| async move { a + b }))
+                .add_task(task_fn::<(i32, i32), _, _>(|(a, b): (&i32, &i32)| a + b))
                 .depends_on((&inputs[i], &inputs[i + mid]));
 
             let diff = dag
-                .add_task(task_fn(|(a, b): (i32, i32)| async move { (a - b).abs() }))
+                .add_task(task_fn::<(i32, i32), _, _>(|(a, b): (&i32, &i32)| {
+                    (a - b).abs()
+                }))
                 .depends_on((&inputs[i], &inputs[i + mid]));
 
             outputs.push(sum);
@@ -94,7 +100,7 @@ async fn test_recursive_butterfly() -> DagResult<()> {
     let inputs: Vec<dagx::TaskHandle<i32>> = vec![10, 20, 30, 40]
         .into_iter()
         .map(|val| {
-            let task = dag.add_task(task_fn(move |_: ()| async move { val }));
+            let task = dag.add_task(task_fn::<(), _, _>(move |_: ()| val));
             task.into()
         })
         .collect();
@@ -119,28 +125,36 @@ async fn test_benes_network() -> DagResult<()> {
     // 4 inputs
     let inputs: Vec<_> = (0..4)
         .map(|i| {
-            dag.add_task(task_fn(move |_: ()| async move { 1 << i }))
+            dag.add_task(task_fn::<(), _, _>(move |_: ()| 1 << i))
                 .into()
         }) // Powers of 2
         .collect();
 
     // First stage: sort pairs
     let stage1: Vec<_> = vec![
-        dag.add_task(task_fn(|(a, b): (i32, i32)| async move { a.min(b) }))
-            .depends_on((&inputs[0], &inputs[1])),
-        dag.add_task(task_fn(|(a, b): (i32, i32)| async move { a.max(b) }))
-            .depends_on((&inputs[0], &inputs[1])),
-        dag.add_task(task_fn(|(a, b): (i32, i32)| async move { a.min(b) }))
-            .depends_on((&inputs[2], &inputs[3])),
-        dag.add_task(task_fn(|(a, b): (i32, i32)| async move { a.max(b) }))
-            .depends_on((&inputs[2], &inputs[3])),
+        dag.add_task(task_fn::<(i32, i32), _, _>(|(&a, &b): (&i32, &i32)| {
+            a.min(b)
+        }))
+        .depends_on((&inputs[0], &inputs[1])),
+        dag.add_task(task_fn::<(i32, i32), _, _>(|(&a, &b): (&i32, &i32)| {
+            a.max(b)
+        }))
+        .depends_on((&inputs[0], &inputs[1])),
+        dag.add_task(task_fn::<(i32, i32), _, _>(|(&a, &b): (&i32, &i32)| {
+            a.min(b)
+        }))
+        .depends_on((&inputs[2], &inputs[3])),
+        dag.add_task(task_fn::<(i32, i32), _, _>(|(&a, &b): (&i32, &i32)| {
+            a.max(b)
+        }))
+        .depends_on((&inputs[2], &inputs[3])),
     ];
 
     // Second stage with crossover
     let outputs: Vec<_> = vec![
-        dag.add_task(task_fn(|(a, b): (i32, i32)| async move { a | b }))
+        dag.add_task(task_fn::<(i32, i32), _, _>(|(a, b): (&i32, &i32)| a | b))
             .depends_on((&stage1[0], &stage1[2])),
-        dag.add_task(task_fn(|(a, b): (i32, i32)| async move { a | b }))
+        dag.add_task(task_fn::<(i32, i32), _, _>(|(a, b): (&i32, &i32)| a | b))
             .depends_on((&stage1[1], &stage1[3])),
     ];
 
@@ -162,12 +176,10 @@ async fn test_shuffle_exchange_network() -> DagResult<()> {
     let inputs: Vec<TaskHandle<_>> = (0..8)
         .map(|i| {
             let counter = counter.clone();
-            dag.add_task(task_fn(move |_: ()| {
+            dag.add_task(task_fn::<(), _, _>(move |_: ()| {
                 let counter = counter.clone();
-                async move {
-                    counter.fetch_add(1, Ordering::Relaxed);
-                    i
-                }
+                counter.fetch_add(1, Ordering::Relaxed);
+                i
             }))
             .into()
         })
@@ -178,7 +190,7 @@ async fn test_shuffle_exchange_network() -> DagResult<()> {
         .map(|i| {
             // Shuffle pattern: rotate bits
             let source = ((i << 1) | (i >> 2)) & 0x7;
-            dag.add_task(task_fn(move |x: i32| async move { x }))
+            dag.add_task(task_fn::<i32, _, _>(move |&x: &i32| x))
                 .depends_on(inputs[source])
         })
         .collect();
@@ -188,21 +200,13 @@ async fn test_shuffle_exchange_network() -> DagResult<()> {
         .flat_map(|i| {
             let idx = i * 2;
             vec![
-                dag.add_task(task_fn(|(a, b): (i32, i32)| async move {
-                    if a > b {
-                        b
-                    } else {
-                        a
-                    }
-                }))
+                dag.add_task(task_fn::<(i32, i32), _, _>(
+                    |(&a, &b): (&i32, &i32)| if a > b { b } else { a },
+                ))
                 .depends_on((&shuffled[idx], &shuffled[idx + 1])),
-                dag.add_task(task_fn(|(a, b): (i32, i32)| async move {
-                    if a > b {
-                        a
-                    } else {
-                        b
-                    }
-                }))
+                dag.add_task(task_fn::<(i32, i32), _, _>(
+                    |(&a, &b): (&i32, &i32)| if a > b { a } else { b },
+                ))
                 .depends_on((&shuffled[idx], &shuffled[idx + 1])),
             ]
         })

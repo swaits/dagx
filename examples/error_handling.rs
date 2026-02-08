@@ -227,7 +227,7 @@ async fn main() {
             .await
             .unwrap();
 
-        match dag.get(logged).unwrap() {
+        match dag.get(logged).unwrap().as_ref() {
             Ok(result) => println!("Final result: {}\n", result),
             Err(e) => eprintln!("Final error: {}\n", e),
         }
@@ -253,7 +253,7 @@ async fn main() {
             .await
             .unwrap();
 
-        match dag.get(logged).unwrap() {
+        match dag.get(logged).unwrap().as_ref() {
             Ok(result) => println!("Final result: {}\n", result),
             Err(e) => eprintln!("Final error: {}\n", e),
         }
@@ -279,7 +279,7 @@ async fn main() {
             .await
             .unwrap();
 
-        match dag.get(logged).unwrap() {
+        match dag.get(logged).unwrap().as_ref() {
             Ok(result) => println!("Final result: {}\n", result),
             Err(e) => eprintln!("Final error: {}\n", e),
         }

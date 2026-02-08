@@ -82,8 +82,8 @@ async fn test_stateless_basic() {
     // Test basic stateless task with two inputs
     let dag = DagRunner::new();
 
-    let x = dag.add_task(task_fn(|_: ()| async { 10 }));
-    let y = dag.add_task(task_fn(|_: ()| async { 20 }));
+    let x = dag.add_task(task_fn::<(), _, _>(|_: ()| 10));
+    let y = dag.add_task(task_fn::<(), _, _>(|_: ()| 20));
     let sum = dag.add_task(StatelessAdd).depends_on((x, y));
 
     dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
@@ -97,7 +97,7 @@ async fn test_stateless_single_input() {
     // Test stateless task with single input
     let dag = DagRunner::new();
 
-    let input = dag.add_task(task_fn(|_: ()| async { 21 }));
+    let input = dag.add_task(task_fn::<(), _, _>(|_: ()| 21));
     let doubled = dag.add_task(StatelessDouble).depends_on(input);
 
     dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
@@ -124,9 +124,9 @@ async fn test_stateless_multiple_inputs() {
     // Test stateless task with multiple inputs of different types
     let dag = DagRunner::new();
 
-    let num = dag.add_task(task_fn(|_: ()| async { 42 }));
-    let text = dag.add_task(task_fn(|_: ()| async { "test".to_string() }));
-    let flag = dag.add_task(task_fn(|_: ()| async { true }));
+    let num = dag.add_task(task_fn::<(), _, _>(|_: ()| 42));
+    let text = dag.add_task(task_fn::<(), _, _>(|_: ()| "test".to_string()));
+    let flag = dag.add_task(task_fn::<(), _, _>(|_: ()| true));
 
     let result = dag.add_task(StatelessFormat).depends_on((num, text, flag));
 
@@ -160,8 +160,8 @@ async fn test_stateless_mixed_with_stateful() {
 
     let dag = DagRunner::new();
 
-    let x = dag.add_task(task_fn(|_: ()| async { 5 }));
-    let y = dag.add_task(task_fn(|_: ()| async { 3 }));
+    let x = dag.add_task(task_fn::<(), _, _>(|_: ()| 5));
+    let y = dag.add_task(task_fn::<(), _, _>(|_: ()| 3));
 
     // Stateless multiplication
     let product = dag.add_task(StatelessMultiply).depends_on((x, y));
@@ -182,7 +182,7 @@ async fn test_stateless_chain() {
     // Test chaining stateless tasks
     let dag = DagRunner::new();
 
-    let start = dag.add_task(task_fn(|_: ()| async { 0 }));
+    let start = dag.add_task(task_fn::<(), _, _>(|_: ()| 0));
     let step1 = dag.add_task(StatelessInc).depends_on(start);
     let step2 = dag.add_task(StatelessInc).depends_on(step1);
     let step3 = dag.add_task(StatelessInc).depends_on(step2);
@@ -203,7 +203,7 @@ async fn test_stateless_parallel() {
 
     let tasks: Vec<_> = (1..=5)
         .map(|i| {
-            let source = dag.add_task(task_fn(move |_: ()| async move { i }));
+            let source = dag.add_task(task_fn::<(), _, _>(move |_: ()| i));
             dag.add_task(StatelessSquare).depends_on(source)
         })
         .collect();
@@ -224,8 +224,8 @@ async fn test_stateless_with_string_types() {
     // Test stateless tasks with complex types
     let dag = DagRunner::new();
 
-    let hello = dag.add_task(task_fn(|_: ()| async { "Hello, ".to_string() }));
-    let world = dag.add_task(task_fn(|_: ()| async { "World!".to_string() }));
+    let hello = dag.add_task(task_fn::<(), _, _>(|_: ()| "Hello, ".to_string()));
+    let world = dag.add_task(task_fn::<(), _, _>(|_: ()| "World!".to_string()));
 
     let greeting = dag.add_task(StatelessConcat).depends_on((hello, world));
 
