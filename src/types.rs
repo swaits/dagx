@@ -3,7 +3,7 @@
 //! This module defines the fundamental types used throughout the DAG system,
 //! including node identifiers, task handles, and type-state markers.
 
-use crate::builder::{IsUnitType, TaskBuilder};
+use crate::builder::TaskBuilder;
 use crate::task::Task;
 
 /// Opaque node identifier
@@ -63,10 +63,7 @@ pub struct Pending;
 
 // TaskBuilder can be converted to a TaskHandle ONLY if Input is () (unit type)
 // This enforces at compile time that tasks with non-unit inputs MUST call .depends_on()
-impl<'a, Tk: Task, Deps> From<TaskBuilder<'a, Tk, Deps>> for TaskHandle<Tk::Output>
-where
-    Tk::Input: IsUnitType,
-{
+impl<'a, Tk: Task<Input = ()>, Deps> From<TaskBuilder<'a, Tk, Deps>> for TaskHandle<Tk::Output> {
     fn from(node: TaskBuilder<'a, Tk, Deps>) -> Self {
         TaskHandle {
             id: node.id,

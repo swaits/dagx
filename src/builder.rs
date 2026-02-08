@@ -11,15 +11,6 @@ use crate::types::{NodeId, TaskHandle};
 #[cfg(feature = "tracing")]
 use tracing::debug;
 
-/// Marker trait to identify the unit type at compile time.
-///
-/// This is used to enforce that tasks with non-unit inputs MUST call `.depends_on()`,
-/// while tasks with unit inputs can be used directly.
-pub trait IsUnitType {}
-
-/// Only the unit type implements IsUnitType
-impl IsUnitType for () {}
-
 /// Node builder that tracks dependency completion via type state.
 ///
 /// A `TaskBuilder<Tk, Deps>` is returned from [`DagRunner::add_task`] and uses the type-state

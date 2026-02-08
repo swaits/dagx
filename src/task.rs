@@ -3,7 +3,9 @@
 //! This module defines the core Task trait that all DAG nodes must implement,
 //! along with convenience functions for creating tasks from closures.
 
-use std::{future::Future, sync::Arc};
+use std::{any::Any, future::Future, marker::PhantomData, slice::Iter, sync::Arc};
+
+use crate::extract::ExtractInput;
 
 /// A unit of async work with typed inputs and outputs.
 ///
@@ -96,18 +98,82 @@ pub trait Task: Send {
     type Input: Send;
     type Output: Send + Sync; // Sync required for Arc-wrapping and cross-thread sharing
 
-    fn run(self, input: Self::Input) -> impl Future<Output = Self::Output> + Send;
+    fn run(self, input: TaskInput<Self::Input>) -> impl Future<Output = Self::Output> + Send;
+}
 
-    /// Internal method: Extract input from list of type-erased dependencies and execute the task.
-    ///
-    /// This method is implemented automatically by the #[task] macro with inline
-    /// extraction logic based on the task's parameter signature. This allows ANY
-    /// type to work without requiring trait implementations.
-    #[doc(hidden)]
-    fn extract_and_run(
-        self,
-        dependencies: Vec<Arc<dyn std::any::Any + Send + Sync>>,
-    ) -> impl Future<Output = Result<Self::Output, String>> + Send;
+pub struct TaskInput<'inputs, Input: Send> {
+    inputs: Iter<'inputs, Arc<dyn Any + Send + Sync + 'static>>,
+    phantom: PhantomData<Input>,
+}
+
+impl<'inputs, Input: Send> TaskInput<'inputs, Input> {
+    pub(crate) fn new(inputs: Iter<'inputs, Arc<dyn Any + Send + Sync + 'static>>) -> Self {
+        Self {
+            inputs,
+            phantom: PhantomData,
+        }
+    }
+}
+
+macro_rules! impl_task_input {
+    ($First:ident $(, $T:ident)*) => {
+        impl<'inputs, $First: 'static + Send, $($T: 'static + Send),*> TaskInput<'inputs, ($First, $($T,)*)> {
+            #[must_use]
+            pub fn next(mut self) -> (&'inputs $First, TaskInput<'inputs, ($($T,)*)>) {
+                let value = self.inputs.next().and_then(|value| value.downcast_ref()).unwrap();
+                let next_inputs = TaskInput {
+                    inputs: self.inputs,
+                    phantom: PhantomData,
+                };
+                (value, next_inputs)
+            }
+        }
+    };
+}
+
+impl_task_input!(A);
+impl_task_input!(A, B);
+impl_task_input!(A, B, C);
+impl_task_input!(A, B, C, D);
+impl_task_input!(A, B, C, D, E);
+impl_task_input!(A, B, C, D, E, F);
+impl_task_input!(A, B, C, D, E, F, G);
+impl_task_input!(A, B, C, D, E, F, G, H);
+
+impl TaskInput<'static, ()> {
+    pub fn empty() -> Self {
+        Self {
+            inputs: [].iter(),
+            phantom: PhantomData,
+        }
+    }
+}
+
+/// **INTERNAL USE ONLY**: This struct is for testing purposes only and should
+/// not be used in production code. Use the `#[task]` macro instead.
+#[doc(hidden)]
+pub struct TaskFn<I, O, F>
+where
+    for<'input> F: FnMut(I::Retv<'input>) -> O + Send,
+    I: ExtractInput + Send + Sync + 'static,
+    O: Send,
+{
+    f: F,
+    _phantom: std::marker::PhantomData<fn(I) -> O>,
+}
+
+impl<I, O, F> Task for TaskFn<I, O, F>
+where
+    for<'input> F: FnMut(I::Retv<'input>) -> O + Send,
+    I: ExtractInput + Send + Sync + 'static,
+    O: Send + Sync,
+{
+    type Input = I::Input;
+    type Output = O;
+
+    async fn run(mut self, input: TaskInput<'_, I::Input>) -> O {
+        (self.f)(I::extract_from_task_input(input).unwrap())
+    }
 }
 
 /// Convenience function to create a task from a closure.
@@ -115,51 +181,13 @@ pub trait Task: Send {
 /// **INTERNAL USE ONLY**: This function is for testing purposes only and should
 /// not be used in production code. Use the `#[task]` macro instead.
 #[doc(hidden)]
-pub fn task_fn<I, O, Fut, F>(f: F) -> impl Task<Input = I, Output = O>
+pub fn task_fn<I, O, F>(f: F) -> TaskFn<I, O, F>
 where
-    F: FnMut(I) -> Fut + Send + 'static,
-    Fut: Future<Output = O> + Send + 'static,
-    I: Send + crate::extract::ExtractInput + 'static,
+    for<'input> F: FnMut(I::Retv<'input>) -> O + Send,
+    I: ExtractInput + Send + Sync + 'static,
+    I::Input: Send + Sync + 'static,
     O: Send + Sync + 'static,
 {
-    struct TaskFn<I, O, Fut, F>
-    where
-        F: FnMut(I) -> Fut + Send,
-        Fut: Future<Output = O> + Send,
-        I: Send,
-        O: Send,
-    {
-        f: F,
-        _phantom: std::marker::PhantomData<fn(I) -> O>,
-    }
-
-    impl<I, O, Fut, F> Task for TaskFn<I, O, Fut, F>
-    where
-        F: FnMut(I) -> Fut + Send,
-        Fut: Future<Output = O> + Send,
-        I: Send + crate::extract::ExtractInput,
-        O: Send + Sync,
-    {
-        type Input = I;
-        type Output = O;
-
-        async fn run(mut self, input: I) -> O {
-            (self.f)(input).await
-        }
-
-        async fn extract_and_run(
-            self,
-            dependencies: Vec<Arc<dyn std::any::Any + Send + Sync>>,
-        ) -> Result<Self::Output, String> {
-            // For task_fn, we use ExtractInput since we don't have macro-generated extraction
-            let input = I::extract_from_deps(dependencies)
-                .await
-                .map_err(|e| format!("Failed to extract input: {}", e))?;
-
-            Ok(self.run(input).await)
-        }
-    }
-
     TaskFn {
         f,
         _phantom: std::marker::PhantomData,

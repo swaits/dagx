@@ -4,8 +4,9 @@
 //! the `Task` trait by deriving Input and Output types from the `run()` method signature.
 
 use proc_macro::TokenStream;
+use proc_macro2::Span;
 use quote::quote;
-use syn::{parse_macro_input, FnArg, ImplItem, ItemImpl, Pat, PatType, ReturnType, Type};
+use syn::{parse_macro_input, FnArg, Ident, ImplItem, ItemImpl, Pat, PatType, ReturnType, Type};
 
 /// Attribute macro to automatically implement the `Task` trait.
 ///
@@ -18,8 +19,7 @@ use syn::{parse_macro_input, FnArg, ImplItem, ItemImpl, Pat, PatType, ReturnType
 /// - Handles various input patterns (no inputs, single input, multiple inputs)
 ///
 /// **Key Feature**: Custom types work automatically without implementing any traits!
-/// The macro generates inline extraction logic in `extract_and_run()` specific to your
-/// task's parameter types. Just derive `Clone` on your types and they'll work seamlessly.
+/// The macro generates inline extraction logic specific to your task's parameter types.
 ///
 /// # Task Patterns
 ///
@@ -135,8 +135,6 @@ use syn::{parse_macro_input, FnArg, ImplItem, ItemImpl, Pat, PatType, ReturnType
 /// - The impl block must contain exactly one `async fn run()` method
 /// - The `run()` method can be stateless (no self parameter) or stateful (`&mut self`)
 /// - All input parameters must be references (e.g., `&i32`, not `i32`)
-/// - The macro requires `Task` to be in scope: `use dagx::Task;`
-/// - For stateless tasks, the struct must implement `Default` (e.g., unit structs)
 ///
 /// # Generated Code
 ///
@@ -232,9 +230,6 @@ pub fn task(_attr: TokenStream, item: TokenStream) -> TokenStream {
         }
     };
 
-    // Check if the method is async or sync
-    let is_async = run_method.sig.asyncness.is_some();
-
     // Extract parameters (excluding self)
     let params_result: Result<Vec<_>, _> = run_method
         .sig
@@ -280,32 +275,39 @@ pub fn task(_attr: TokenStream, item: TokenStream) -> TokenStream {
     // Extract return type
     let output_type = match &run_method.sig.output {
         ReturnType::Default => syn::parse_quote!(()),
-        ReturnType::Type(_, ty) => ty.clone(),
+        ReturnType::Type(_, ty) => {
+            if let Type::Tuple(_tuple) = &**ty {
+                return syn::Error::new_spanned(
+                    ty,
+                    "Returning bare tuples from task functions is currently not supported.\n\n\
+                         Please wrap this in a newtype or struct.",
+                )
+                .into_compile_error()
+                .into();
+            }
+            ty.clone()
+        }
     };
 
     // Build Input type based on parameter count
-    let input_type = match params.len() {
-        0 => quote! { () },
-        1 => {
-            let (_name, ty) = &params[0];
-            quote! { #ty }
-        }
-        _ => {
-            let types: Vec<_> = params.iter().map(|(_, ty)| ty).collect();
-            quote! { ( #(#types),* ) }
-        }
-    };
+    let types: Vec<_> = params.iter().map(|(_, ty)| ty).collect();
+    let input_type = quote! { ( #(#types,)* ) };
 
-    // Generate parameter destructuring for the wrapper run() method
-    let (param_destructure, param_refs) = if params.is_empty() {
-        (quote! { _ }, quote! {})
-    } else if params.len() == 1 {
-        let (name, _) = &params[0];
-        (quote! { #name }, quote! { &#name })
-    } else {
-        let names: Vec<_> = params.iter().map(|(name, _)| name).collect();
-        let refs: Vec<_> = params.iter().map(|(name, _)| quote! { &#name }).collect();
-        (quote! { ( #(#names),* ) }, quote! { #(#refs),* })
+    // Generate parameter references for the wrapper run() method
+    let (param_destructure, param_refs) = {
+        let (destructure, refs): (Vec<_>, Vec<_>) = params
+            .iter()
+            .map(|(ident, _ty)| {
+                let ident = Ident::new(&format!("__dagx_extract_{}", ident), Span::mixed_site());
+                (
+                    quote! {
+                        let (#ident, input) = input.next();
+                    },
+                    ident,
+                )
+            })
+            .unzip();
+        (quote! { #(#destructure)* }, quote! { #(#refs),* })
     };
 
     // Clone the run method and rename it to run_impl
@@ -319,179 +321,30 @@ pub fn task(_attr: TokenStream, item: TokenStream) -> TokenStream {
         .iter()
         .any(|arg| matches!(arg, FnArg::Receiver(_)));
 
-    // Generate extract_and_run implementation based on parameter count
-    let extract_and_run_impl = match params.len() {
-        0 => {
-            // Zero parameters - no extraction needed
-            quote! {
-                fn extract_and_run(
-                    self,
-                    _dependencies: Vec<std::sync::Arc<dyn std::any::Any + Send + Sync>>,
-                ) -> impl std::future::Future<Output = Result<Self::Output, String>> + Send {
-                    async move {
-                        let input = ();
-                        Ok(self.run(input).await)
-                    }
-                }
-            }
-        }
-        1 => {
-            // Single parameter
-            let param_type = &params[0].1;
-            quote! {
-                fn extract_and_run(
-                    self,
-                    mut dependencies: Vec<std::sync::Arc<dyn std::any::Any + Send + Sync>>,
-                ) -> impl std::future::Future<Output = Result<Self::Output, String>> + Send {
-                    async move {
-                        use std::sync::Arc;
+    let is_async = run_method.sig.asyncness.is_some();
 
-                        if dependencies.len() != 1 {
-                            return Err(format!("Expected 1 dependency, got {}", dependencies.len()));
-                        }
-
-                        let arc_value = dependencies.pop()
-                            .unwrap()
-                            .downcast::<#param_type>()
-                            .map_err(|_| format!("Type mismatch: expected Arc<{}>", std::any::type_name::<#param_type>()))?;
-
-                        let input = (*arc_value).clone();
-                        Ok(self.run(input).await)
-                    }
-                }
-            }
-        }
-        _ => {
-            // Multiple parameters
-            let param_count = params.len();
-            let param_types: Vec<_> = params.iter().map(|(_, ty)| ty).collect();
-            let indices: Vec<_> = (0..param_count).collect();
-
-            // Create syn::Index for tuple field access (avoids the suffix warning)
-            let syn_indices: Vec<_> = (0..param_count).map(syn::Index::from).collect();
-
-            quote! {
-                fn extract_and_run(
-                    self,
-                    dependencies: Vec<std::sync::Arc<dyn std::any::Any + Send + Sync>>,
-                ) -> impl std::future::Future<Output = Result<Self::Output, String>> + Send {
-                    async move {
-                        use std::sync::Arc;
-
-                        let expected_count = #param_count;
-                        if dependencies.len() != expected_count {
-                            return Err(format!("Expected {} dependencies, got {}", expected_count, dependencies.len()));
-                        }
-
-                        let mut iter = dependencies.into_iter();
-
-                        // Extract each parameter
-                        let arc_results = (#(
-                            iter.next()
-                                .ok_or_else(|| format!("Missing parameter at index {}", #indices))?
-                                .downcast::<#param_types>()
-                                .map_err(|_| format!("Type mismatch at index {}: expected Arc<{}>",
-                                    #indices, std::any::type_name::<#param_types>()))?,
-                        )*);
-
-                        // Clone inner values and build tuple
-                        let input = (#(
-                            (*arc_results.#syn_indices).clone()
-                        ),*);
-
-                        Ok(self.run(input).await)
-                    }
-                }
-            }
-        }
+    let run_call = match (has_self_receiver, is_async) {
+        (true, true) => quote! { self.run_impl(#param_refs).await },
+        (true, false) => quote! { self.run_impl(#param_refs) },
+        (false, true) => quote! { Self::run_impl(#param_refs).await },
+        (false, false) => quote! { Self::run_impl(#param_refs) },
     };
 
     // Generate the Task trait implementation based on whether we have self and async/sync
-    let expanded = if has_self_receiver {
-        // Stateful task - consumes self but delegates to a method that borrows
-        if is_async {
-            // Async with self
-            quote! {
-                impl ::dagx::Task for #struct_name {
-                    type Input = #input_type;
-                    type Output = #output_type;
+    quote! {
+        impl ::dagx::Task for #struct_name {
+            type Input = #input_type;
+            type Output = #output_type;
 
-                    async fn run(mut self, input: Self::Input) -> Self::Output {
-                        let #param_destructure = input;
-                        self.run_impl(#param_refs).await
-                    }
-
-                    #extract_and_run_impl
-                }
-
-                impl #struct_name {
-                    #run_impl_method
-                }
-            }
-        } else {
-            // Sync with self - wrap in async block
-            quote! {
-                impl ::dagx::Task for #struct_name {
-                    type Input = #input_type;
-                    type Output = #output_type;
-
-                    async fn run(mut self, input: Self::Input) -> Self::Output {
-                        let #param_destructure = input;
-                        self.run_impl(#param_refs)
-                    }
-
-                    #extract_and_run_impl
-                }
-
-                impl #struct_name {
-                    #run_impl_method
-                }
+            async fn run(mut self, mut input: ::dagx::TaskInput<'_, Self::Input>) -> Self::Output {
+                #param_destructure
+                #run_call
             }
         }
-    } else {
-        // Stateless task
-        if is_async {
-            // Async stateless
-            quote! {
-                impl ::dagx::Task for #struct_name {
-                    type Input = #input_type;
-                    type Output = #output_type;
 
-                    async fn run(self, input: Self::Input) -> Self::Output {
-                        let #param_destructure = input;
-                        Self::run_impl(#param_refs).await
-                    }
-
-                    #extract_and_run_impl
-                }
-
-                impl #struct_name {
-                    #[inline]
-                    #run_impl_method
-                }
-            }
-        } else {
-            // Sync stateless
-            quote! {
-                impl ::dagx::Task for #struct_name {
-                    type Input = #input_type;
-                    type Output = #output_type;
-
-                    async fn run(self, input: Self::Input) -> Self::Output {
-                        let #param_destructure = input;
-                        Self::run_impl(#param_refs)
-                    }
-
-                    #extract_and_run_impl
-                }
-
-                impl #struct_name {
-                    #[inline]
-                    #run_impl_method
-                }
-            }
+        impl #struct_name {
+            #run_impl_method
         }
-    };
-
-    TokenStream::from(expanded)
+    }
+    .into()
 }

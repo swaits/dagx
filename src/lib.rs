@@ -645,7 +645,7 @@
 //! }
 //!
 //! // Downstream tasks receive &Vec<String> as normal
-//! // Behind the scenes: Arc<Vec<String>> is cloned cheaply, then inner Vec extracted
+//! // Behind the scenes: Arc<Vec<String>> is cloned cheaply, then a reference to the inner Vec is extracted
 //! struct ProcessData;
 //! #[task]
 //! impl ProcessData {
@@ -791,7 +791,7 @@ mod types;
 pub use builder::TaskBuilder;
 pub use error::{DagError, DagResult};
 pub use runner::DagRunner;
-pub use task::Task;
+pub use task::{Task, TaskInput};
 pub use types::{Pending, TaskHandle};
 
 // Re-export the procedural macro
