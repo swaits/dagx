@@ -227,7 +227,7 @@ impl Task<String, Bytes> for MyTask {
 let mut dag = Dag::default();
 dag.add_vertex("one", || async move { /* task */ });
 dag.add_edge("one", "two");
-dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
+dag.run().await?;
 ```
 
 ### tasksitter (Dynamic Workflows)

@@ -13,7 +13,7 @@ use syn::{parse_macro_input, FnArg, Ident, ImplItem, ItemImpl, Pat, PatType, Ret
 /// Apply this to an `impl` block containing a `run()` method (sync or async). The macro:
 /// - Derives `Input` and `Output` types from the `run()` signature
 /// - Automatically implements the `Task` trait
-/// - **Generates type-specific extraction logic** - works with ANY type (Clone + Send + Sync)!
+/// - **Generates type-specific extraction logic** - works with ANY type (Send + Sync + 'static)!
 /// - Supports both sync and async run methods
 /// - Supports stateless (no self) and stateful (&self, &mut self) tasks
 /// - Handles various input patterns (no inputs, single input, multiple inputs)

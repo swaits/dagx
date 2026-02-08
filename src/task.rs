@@ -11,10 +11,10 @@ use crate::extract::ExtractInput;
 ///
 /// Use the [`task`](crate::task) macro to implement this trait. The macro automatically
 /// derives `Input` and `Output` types from your `run()` method signature and generates
-/// type-specific extraction logic in `extract_and_run()`.
+/// type-specific extraction logic in `run()`.
 ///
 /// **Custom types work automatically!** As long as your output type implements
-/// `Clone + Send + Sync + 'static`, the macro handles everything. No trait implementations needed!
+/// `Send + Sync + 'static`, the macro handles everything. No trait implementations needed!
 ///
 /// # Task Patterns
 ///

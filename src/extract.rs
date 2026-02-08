@@ -5,8 +5,8 @@
 //! **NOTE**: This module is now primarily for internal use. The `ExtractInput` trait is only
 //! used by the internal `task_fn` test helper function.
 //!
-//! **For regular tasks**: The `#[task]` macro generates inline `extract_and_run()` methods with
-//! type-specific extraction logic. This means **ANY type** implementing `Clone + Send + Sync`
+//! **For regular tasks**: The `#[task]` macro generates inline `run()` methods with
+//! type-specific extraction logic. This means **ANY type** implementing `Send + Sync`
 //! works automatically without needing `ExtractInput` implementations!
 //!
 //! # How it works
@@ -15,8 +15,8 @@
 //! Outputs are wrapped in Arc for efficient fanout (cheap Arc clones instead of data clones).
 //!
 //! **Modern approach (via `#[task]` macro)**:
-//! - The macro generates custom extraction logic inline in `extract_and_run()`
-//! - Works with ANY type (just needs `Clone + Send + Sync`)
+//! - The macro generates custom extraction logic inline in `run()`
+//! - Works with ANY type (just needs `Send + Sync + 'static`)
 //! - No trait implementations needed!
 //!
 //! **Legacy approach (via `ExtractInput` trait)**:
@@ -40,10 +40,6 @@ use crate::TaskInput;
 ///
 /// Type erasure occurs only at the ExecutableNode trait boundary - by the time
 /// we're in ExtractInput, we know the concrete type and can safely downcast.
-///
-/// NOTE: This trait is now primarily used by the internal `task_fn` test helper.
-/// The `#[task]` macro generates inline extraction logic via `extract_and_run()`,
-/// which allows ANY type to work without requiring ExtractInput implementations.
 #[allow(dead_code)]
 pub trait ExtractInput: Sized + Clone {
     type Input: Send;

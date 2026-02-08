@@ -114,7 +114,7 @@ See [design philosophy](docs/DESIGN_PHILOSOPHY.md) for details.
 
 - **Compile-time cycle prevention**: Type system makes cycles impossible — no runtime checks
 - **Compile-time type safety**: Dependencies validated at compile time, no runtime type errors
-- **Works with ANY type**: Custom types work automatically — just `Clone + Send + Sync`, no trait implementations needed
+- **Works with ANY type**: Custom types work automatically — just `Send + Sync + 'static`, no trait implementations needed
 - **Runtime-agnostic**: Works with Tokio, async-std, smol, or any async runtime
 - **True parallelism**: Tasks spawn to multiple threads for genuine parallel execution
 - **Type-state pattern**: API prevents incorrect wiring through compile-time errors
@@ -189,10 +189,9 @@ let task = dag.add_task(my_task).depends_on((&upstream1, &upstream2));
 
 ### Custom Types
 
-**dagx works with ANY type automatically!** As long as your type implements `Clone + Send + Sync + 'static`, it works seamlessly:
+**dagx works with ANY type automatically!** As long as your type implements `Send + Sync + 'static`, it works seamlessly:
 
 ```rust
-#[derive(Clone)]  // Just derive Clone!
 struct User {
     name: String,
     age: u32,

@@ -1,20 +1,18 @@
 //! # Custom Types: Using Your Own Structs
 //!
 //! This example demonstrates that **ANY custom type** works in dagx as long as it implements
-//! `Clone + Send + Sync + 'static`. You don't need to implement any special traits!
+//! ` Send + Sync + 'static`. You don't need to implement any special traits!
 //!
 //! ## What You'll Learn
 //! - How to use custom structs as task outputs
 //! - How custom types flow through the DAG automatically
 //! - How one task's output can be consumed by multiple downstream tasks
-//! - No trait implementations required (just derive Clone!)
 //!
 //! ## Key Insight
 //!
 //! **dagx works with ANY type automatically!** The `#[task]` macro generates type-specific
 //! extraction logic, so you don't need to implement any special traits. Just make sure your
 //! type implements:
-//! - `Clone` (so it can be extracted from Arc)
 //! - `Send + Sync` (required for async tasks)
 //! - `'static` (no lifetime constraints)
 //!
@@ -39,8 +37,7 @@
 use dagx::{task, DagRunner, TaskHandle};
 use futures::FutureExt;
 
-// Custom type - just derive Clone!
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 struct User {
     name: String,
     age: u32,

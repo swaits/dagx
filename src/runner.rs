@@ -527,9 +527,6 @@ impl DagRunner {
     /// - The task hasn't been executed yet
     /// - The handle is invalid
     ///
-    /// Returns `DagError::TaskPanicked` if:
-    /// - A task executing in the
-    ///
     /// # Examples
     ///
     /// ```no_run
