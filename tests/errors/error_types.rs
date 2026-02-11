@@ -8,7 +8,7 @@ use futures::FutureExt;
 async fn test_result_not_found_error() {
     let dag = DagRunner::new();
 
-    let t1: TaskHandle<_> = dag.add_task(task_fn(|_: ()| async { 42 })).into();
+    let t1: TaskHandle<_> = dag.add_task(task_fn::<(), _, _>(|_: ()| 42)).into();
 
     // Try to get result before running
     let result = dag.get(t1);
@@ -27,11 +27,11 @@ async fn test_nested_result_error_handling() {
     let dag = DagRunner::new();
 
     // Task that returns a Result
-    let task1 = dag.add_task(task_fn(|_: ()| async {
+    let task1 = dag.add_task(task_fn::<(), _, _>(|_: ()| {
         Result::<i32, String>::Err("Internal error".to_string())
     }));
 
-    let task2 = dag.add_task(task_fn(|_: ()| async { Result::<i32, String>::Ok(42) }));
+    let task2 = dag.add_task(task_fn::<(), _, _>(|_: ()| Result::<i32, String>::Ok(42)));
 
     dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
         .await
@@ -46,7 +46,7 @@ async fn test_nested_result_error_handling() {
 async fn test_option_none_not_error() {
     let dag = DagRunner::new();
 
-    let task = dag.add_task(task_fn(|_: ()| async { None::<i32> }));
+    let task = dag.add_task(task_fn::<(), _, _>(|_: ()| None::<i32>));
 
     dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
         .await
@@ -66,11 +66,11 @@ async fn test_custom_error_types() {
 
     let dag = DagRunner::new();
 
-    let task1 = dag.add_task(task_fn(|_: ()| async {
+    let task1 = dag.add_task(task_fn::<(), _, _>(|_: ()| {
         Result::<i32, CustomError>::Err(CustomError::ValidationError("Invalid input".to_string()))
     }));
 
-    let task2 = dag.add_task(task_fn(|_: ()| async {
+    let task2 = dag.add_task(task_fn::<(), _, _>(|_: ()| {
         Result::<i32, CustomError>::Err(CustomError::ProcessingError {
             code: 500,
             details: "Processing failed".to_string(),
@@ -82,13 +82,13 @@ async fn test_custom_error_types() {
         .unwrap();
 
     // Check custom errors are preserved
-    match dag.get(task1).unwrap() {
+    match dag.get(task1).unwrap().as_ref() {
         Err(CustomError::ValidationError(msg)) => assert_eq!(msg, "Invalid input"),
         _ => panic!("Wrong error type"),
     }
 
-    match dag.get(task2).unwrap() {
-        Err(CustomError::ProcessingError { code, .. }) => assert_eq!(code, 500),
+    match dag.get(task2).unwrap().as_ref() {
+        Err(CustomError::ProcessingError { code, .. }) => assert_eq!(*code, 500),
         _ => panic!("Wrong error type"),
     }
 }
@@ -97,13 +97,13 @@ async fn test_custom_error_types() {
 async fn test_error_in_tuple_dependency() {
     let dag = DagRunner::new();
 
-    let ok_task = dag.add_task(task_fn(|_: ()| async { 10 }));
-    let err_task = dag.add_task(task_fn(|_: ()| async {
+    let ok_task = dag.add_task(task_fn::<(), _, _>(|_: ()| 10));
+    let err_task = dag.add_task(task_fn::<(), _, _>(|_: ()| {
         panic!("Error in dependency");
     }));
 
     let dependent = dag
-        .add_task(task_fn(|(a, b): (i32, i32)| async move { a + b }))
+        .add_task(task_fn::<(i32, i32), _, _>(|(a, b): (&i32, &i32)| a + b))
         .depends_on((ok_task, err_task));
 
     let result = dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await;
@@ -116,11 +116,11 @@ async fn test_error_in_tuple_dependency() {
 async fn test_string_panic_vs_structured_panic() {
     let dag = DagRunner::new();
 
-    let string_panic = dag.add_task(task_fn(|_: ()| async {
+    let string_panic = dag.add_task(task_fn::<(), _, _>(|_: ()| {
         panic!("String panic message");
     }));
 
-    let formatted_panic = dag.add_task(task_fn(|_: ()| async {
+    let formatted_panic = dag.add_task(task_fn::<(), _, _>(|_: ()| {
         panic!("Formatted panic: value={}, code={}", 42, "ERROR");
     }));
 
@@ -136,7 +136,7 @@ async fn test_anyhow_like_error_chain() {
     // Test error chains with simple string-based errors
     let dag = DagRunner::new();
 
-    let task = dag.add_task(task_fn(|_: ()| async {
+    let task = dag.add_task(task_fn::<(), _, _>(|_: ()| {
         // Simulate an error chain with nested Results
         let _inner: Result<i32, String> = Err("Inner error".to_string());
         let outer: Result<Result<i32, String>, String> = Err("Outer error".to_string());
@@ -152,7 +152,7 @@ async fn test_anyhow_like_error_chain() {
     let result = dag.get(task).unwrap();
     assert!(result.is_err());
 
-    if let Err(e) = result {
+    if let Err(e) = result.as_ref() {
         assert_eq!(e, "Outer error");
     }
 }

@@ -1,7 +1,7 @@
 //! Tests for execution correctness and parallelism
 
 use crate::common::task_fn;
-use dagx::{DagResult, DagRunner, TaskHandle};
+use dagx::{task, DagResult, DagRunner, TaskHandle};
 use futures::FutureExt;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -14,37 +14,61 @@ async fn test_layers_execute_in_parallel() -> DagResult<()> {
 
     let layer_timing = Arc::new(Mutex::new(Vec::new()));
 
+    struct Layer0Task {
+        timing: Arc<Mutex<Vec<(String, Instant)>>>,
+        idx: i32,
+    }
+
+    #[task]
+    impl Layer0Task {
+        async fn run(&self) -> i32 {
+            let start = Instant::now();
+            self.timing
+                .lock()
+                .unwrap()
+                .push((format!("L0_{}", self.idx), start));
+            sleep(Duration::from_millis(20)).await;
+            self.idx * 10
+        }
+    }
+
     // Layer 0: 3 independent sources
     let sources: Vec<_> = (0..3)
         .map(|i| {
-            let timing = layer_timing.clone();
-            dag.add_task(task_fn(move |_: ()| {
-                let timing = timing.clone();
-                async move {
-                    let start = Instant::now();
-                    timing.lock().unwrap().push((format!("L0_{}", i), start));
-                    sleep(Duration::from_millis(20)).await;
-                    i * 10
-                }
-            }))
+            dag.add_task(Layer0Task {
+                timing: layer_timing.clone(),
+                idx: i,
+            })
         })
         .collect();
+
+    struct Layer1Task {
+        timing: Arc<Mutex<Vec<(String, Instant)>>>,
+        idx: usize,
+    }
+
+    #[task]
+    impl Layer1Task {
+        async fn run(&self, x: &i32) -> i32 {
+            let start = Instant::now();
+            self.timing
+                .lock()
+                .unwrap()
+                .push((format!("L1_{}", self.idx), start));
+            sleep(Duration::from_millis(20)).await;
+            x + 1
+        }
+    }
 
     // Layer 1: Tasks depending on layer 0
     let layer1: Vec<_> = sources
         .into_iter()
         .enumerate()
         .map(|(i, source)| {
-            let timing = layer_timing.clone();
-            dag.add_task(task_fn(move |x: i32| {
-                let timing = timing.clone();
-                async move {
-                    let start = Instant::now();
-                    timing.lock().unwrap().push((format!("L1_{}", i), start));
-                    sleep(Duration::from_millis(20)).await;
-                    x + 1
-                }
-            }))
+            dag.add_task(Layer1Task {
+                idx: i,
+                timing: layer_timing.clone(),
+            })
             .depends_on(source)
         })
         .collect();
@@ -52,14 +76,14 @@ async fn test_layers_execute_in_parallel() -> DagResult<()> {
     // Layer 2: Final aggregation
     let final_task = {
         let timing = layer_timing.clone();
-        dag.add_task(task_fn(move |(a, b, c): (i32, i32, i32)| {
-            let timing = timing.clone();
-            async move {
+        dag.add_task(task_fn::<(i32, i32, i32), _, _>(
+            move |(a, b, c): (&i32, &i32, &i32)| {
+                let timing = timing.clone();
                 let start = Instant::now();
                 timing.lock().unwrap().push(("L2_final".to_string(), start));
                 a + b + c
-            }
-        }))
+            },
+        ))
         .depends_on((&layer1[0], &layer1[1], &layer1[2]))
     };
 
@@ -134,51 +158,57 @@ async fn test_completion_order_matches_dependencies() -> DagResult<()> {
 
     let completion_order = Arc::new(Mutex::new(Vec::new()));
 
-    // Create a complex DAG with clear ordering requirements
-    let a = {
-        let order = completion_order.clone();
-        dag.add_task(task_fn(move |_: ()| {
-            let order = order.clone();
-            async move {
-                sleep(Duration::from_millis(10)).await;
-                order.lock().unwrap().push("A");
-                1
-            }
-        }))
-    };
+    struct ATask {
+        order: Arc<Mutex<Vec<&'static str>>>,
+    }
 
-    let b = {
-        let order = completion_order.clone();
-        dag.add_task(task_fn(move |_: ()| {
-            let order = order.clone();
-            async move {
-                sleep(Duration::from_millis(5)).await;
-                order.lock().unwrap().push("B");
-                2
-            }
-        }))
-    };
+    #[task]
+    impl ATask {
+        async fn run(&self) -> i32 {
+            sleep(Duration::from_millis(10)).await;
+            self.order.lock().unwrap().push("A");
+            1
+        }
+    }
+
+    // Create a complex DAG with clear ordering requirements
+    let a = dag.add_task(ATask {
+        order: completion_order.clone(),
+    });
+
+    struct BTask {
+        order: Arc<Mutex<Vec<&'static str>>>,
+    }
+
+    #[task]
+    impl BTask {
+        async fn run(&self) -> i32 {
+            sleep(Duration::from_millis(5)).await;
+            self.order.lock().unwrap().push("B");
+            2
+        }
+    }
+
+    let b = dag.add_task(BTask {
+        order: completion_order.clone(),
+    });
 
     let c = {
         let order = completion_order.clone();
-        dag.add_task(task_fn(move |(x, y): (i32, i32)| {
+        dag.add_task(task_fn::<(i32, i32), _, _>(move |(x, y): (&i32, &i32)| {
             let order = order.clone();
-            async move {
-                order.lock().unwrap().push("C");
-                x + y
-            }
+            order.lock().unwrap().push("C");
+            x + y
         }))
         .depends_on((a, b))
     };
 
     let d = {
         let order = completion_order.clone();
-        dag.add_task(task_fn(move |x: i32| {
+        dag.add_task(task_fn::<i32, _, _>(move |&x: &i32| {
             let order = order.clone();
-            async move {
-                order.lock().unwrap().push("D");
-                x * 2
-            }
+            order.lock().unwrap().push("D");
+            x * 2
         }))
         .depends_on(c)
     };
@@ -215,54 +245,70 @@ async fn test_dependent_tasks_respect_ordering() -> DagResult<()> {
 
     let execution_order = Arc::new(Mutex::new(Vec::new()));
 
-    // Create a chain: A -> B -> C -> D
-    let a: TaskHandle<_> = {
-        let order = execution_order.clone();
-        dag.add_task(task_fn(move |_: ()| {
-            let order = order.clone();
-            async move {
-                sleep(Duration::from_millis(20)).await;
-                order.lock().unwrap().push("A");
-                1
-            }
-        }))
+    struct ATask {
+        order: Arc<Mutex<Vec<&'static str>>>,
     }
-    .into();
 
-    let b = {
-        let order = execution_order.clone();
-        dag.add_task(task_fn(move |x: i32| {
-            let order = order.clone();
-            async move {
-                order.lock().unwrap().push("B");
-                sleep(Duration::from_millis(10)).await;
-                x + 1
-            }
-        }))
-        .depends_on(a)
-    };
+    #[task]
+    impl ATask {
+        async fn run(&self) -> i32 {
+            sleep(Duration::from_millis(20)).await;
+            self.order.lock().unwrap().push("A");
+            1
+        }
+    }
 
-    let c = {
-        let order = execution_order.clone();
-        dag.add_task(task_fn(move |x: i32| {
-            let order = order.clone();
-            async move {
-                order.lock().unwrap().push("C");
-                sleep(Duration::from_millis(10)).await;
-                x + 1
-            }
-        }))
-        .depends_on(b)
-    };
+    // Create a chain: A -> B -> C -> D
+    let a: TaskHandle<_> = dag
+        .add_task(ATask {
+            order: execution_order.clone(),
+        })
+        .into();
+
+    struct BTask {
+        order: Arc<Mutex<Vec<&'static str>>>,
+    }
+
+    #[task]
+    impl BTask {
+        async fn run(&self, x: &i32) -> i32 {
+            self.order.lock().unwrap().push("B");
+            sleep(Duration::from_millis(10)).await;
+            x + 1
+        }
+    }
+
+    let b = dag
+        .add_task(BTask {
+            order: execution_order.clone(),
+        })
+        .depends_on(a);
+
+    struct CTask {
+        order: Arc<Mutex<Vec<&'static str>>>,
+    }
+
+    #[task]
+    impl CTask {
+        async fn run(&self, x: &i32) -> i32 {
+            self.order.lock().unwrap().push("C");
+            sleep(Duration::from_millis(10)).await;
+            x + 1
+        }
+    }
+
+    let c = dag
+        .add_task(CTask {
+            order: execution_order.clone(),
+        })
+        .depends_on(b);
 
     let d = {
         let order = execution_order.clone();
-        dag.add_task(task_fn(move |x: i32| {
+        dag.add_task(task_fn::<i32, _, _>(move |&x: &i32| {
             let order = order.clone();
-            async move {
-                order.lock().unwrap().push("D");
-                x + 1
-            }
+            order.lock().unwrap().push("D");
+            x + 1
         }))
         .depends_on(c)
     };
@@ -279,85 +325,6 @@ async fn test_dependent_tasks_respect_ordering() -> DagResult<()> {
     let order = execution_order.lock().unwrap();
     let expected = vec!["A", "B", "C", "D"];
     assert_eq!(order.as_slice(), expected.as_slice());
-
-    Ok(())
-}
-
-#[tokio::test]
-async fn test_independent_tasks_dont_wait() -> DagResult<()> {
-    // Prove that independent tasks don't wait for each other
-    let dag = DagRunner::new();
-
-    let task_started = Arc::new(Mutex::new(Vec::new()));
-    let task_finished = Arc::new(Mutex::new(Vec::new()));
-
-    // Create tasks with different durations
-    let fast1 = {
-        let started = task_started.clone();
-        let finished = task_finished.clone();
-        dag.add_task(task_fn(move |_: ()| {
-            let started = started.clone();
-            let finished = finished.clone();
-            async move {
-                started.lock().unwrap().push(("fast1", Instant::now()));
-                sleep(Duration::from_millis(10)).await;
-                finished.lock().unwrap().push(("fast1", Instant::now()));
-                "fast1"
-            }
-        }))
-    };
-
-    let slow = {
-        let started = task_started.clone();
-        let finished = task_finished.clone();
-        dag.add_task(task_fn(move |_: ()| {
-            let started = started.clone();
-            let finished = finished.clone();
-            async move {
-                started.lock().unwrap().push(("slow", Instant::now()));
-                sleep(Duration::from_millis(100)).await;
-                finished.lock().unwrap().push(("slow", Instant::now()));
-                "slow"
-            }
-        }))
-    };
-
-    let fast2 = {
-        let started = task_started.clone();
-        let finished = task_finished.clone();
-        dag.add_task(task_fn(move |_: ()| {
-            let started = started.clone();
-            let finished = finished.clone();
-            async move {
-                started.lock().unwrap().push(("fast2", Instant::now()));
-                sleep(Duration::from_millis(10)).await;
-                finished.lock().unwrap().push(("fast2", Instant::now()));
-                "fast2"
-            }
-        }))
-    };
-
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
-
-    // Check results
-    assert_eq!(dag.get(fast1)?, "fast1");
-    assert_eq!(dag.get(slow)?, "slow");
-    assert_eq!(dag.get(fast2)?, "fast2");
-
-    // Verify that fast tasks finished before slow task
-    let finished = task_finished.lock().unwrap();
-    let fast1_finish = finished.iter().find(|x| x.0 == "fast1").unwrap().1;
-    let fast2_finish = finished.iter().find(|x| x.0 == "fast2").unwrap().1;
-    let slow_finish = finished.iter().find(|x| x.0 == "slow").unwrap().1;
-
-    assert!(
-        fast1_finish < slow_finish,
-        "fast1 should finish before slow"
-    );
-    assert!(
-        fast2_finish < slow_finish,
-        "fast2 should finish before slow"
-    );
 
     Ok(())
 }

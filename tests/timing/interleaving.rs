@@ -1,7 +1,7 @@
 //! Tests for forced execution interleaving patterns
 
 use crate::common::task_fn;
-use dagx::{DagResult, DagRunner, TaskHandle};
+use dagx::{task, DagResult, DagRunner, TaskHandle};
 use futures::FutureExt;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
@@ -14,56 +14,47 @@ async fn test_forced_interleaving_with_barriers() -> DagResult<()> {
     let barrier = Arc::new(Barrier::new(3));
     let order = Arc::new(parking_lot::Mutex::new(Vec::new()));
 
+    struct InterleaveTask {
+        barrier: Arc<Barrier>,
+        order: Arc<parking_lot::Mutex<Vec<String>>>,
+        prefix: &'static str,
+        value: i32,
+    }
+
+    #[task]
+    impl InterleaveTask {
+        async fn run(&self) -> i32 {
+            self.order.lock().push(format!("{}_start", self.prefix));
+            self.barrier.wait().await;
+            self.order.lock().push(format!("{}_end", self.prefix));
+            self.value
+        }
+    }
+
     // Three parallel tasks that synchronize at barrier
-    let t1 = dag.add_task(task_fn({
-        let barrier = barrier.clone();
-        let order = order.clone();
-        move |_: ()| {
-            let barrier = barrier.clone();
-            let order = order.clone();
-            async move {
-                order.lock().push("t1_start");
-                barrier.wait().await;
-                order.lock().push("t1_end");
-                1
-            }
-        }
-    }));
-
-    let t2 = dag.add_task(task_fn({
-        let barrier = barrier.clone();
-        let order = order.clone();
-        move |_: ()| {
-            let barrier = barrier.clone();
-            let order = order.clone();
-            async move {
-                order.lock().push("t2_start");
-                barrier.wait().await;
-                order.lock().push("t2_end");
-                2
-            }
-        }
-    }));
-
-    let t3 = dag.add_task(task_fn({
-        let barrier = barrier.clone();
-        let order = order.clone();
-        move |_: ()| {
-            let barrier = barrier.clone();
-            let order = order.clone();
-            async move {
-                order.lock().push("t3_start");
-                barrier.wait().await;
-                order.lock().push("t3_end");
-                3
-            }
-        }
-    }));
+    let t1 = dag.add_task(InterleaveTask {
+        barrier: barrier.clone(),
+        order: order.clone(),
+        prefix: "t1",
+        value: 1,
+    });
+    let t2 = dag.add_task(InterleaveTask {
+        barrier: barrier.clone(),
+        order: order.clone(),
+        prefix: "t2",
+        value: 2,
+    });
+    let t3 = dag.add_task(InterleaveTask {
+        barrier: barrier.clone(),
+        order: order.clone(),
+        prefix: "t2",
+        value: 3,
+    });
 
     // Collector
     let collector = dag
-        .add_task(task_fn(
-            |(a, b, c): (i32, i32, i32)| async move { a + b + c },
+        .add_task(task_fn::<(i32, i32, i32), _, _>(
+            |(a, b, c): (&i32, &i32, &i32)| a + b + c,
         ))
         .depends_on((t1, t2, t3));
 
@@ -93,76 +84,105 @@ async fn test_alternating_execution_pattern() -> DagResult<()> {
     let events: Arc<parking_lot::Mutex<Vec<String>>> =
         Arc::new(parking_lot::Mutex::new(Vec::new()));
 
-    // Two chains that alternate execution
-    let first_a = dag.add_task(task_fn({
-        let turn = turn.clone();
-        let events = events.clone();
-        move |_: ()| {
-            let turn = turn.clone();
-            let events = events.clone();
-            async move {
-                while turn.load(Ordering::SeqCst) != 0 {
-                    tokio::task::yield_now().await;
-                }
-                events.lock().push("A0".to_string());
-                turn.store(1, Ordering::SeqCst);
-                0
+    struct FirstA {
+        turn: Arc<AtomicUsize>,
+        events: Arc<parking_lot::Mutex<Vec<String>>>,
+    }
+
+    #[task]
+    impl FirstA {
+        async fn run(&self) -> i32 {
+            while self.turn.load(Ordering::SeqCst) != 0 {
+                tokio::task::yield_now().await;
             }
+            self.events.lock().push("A0".to_string());
+            self.turn.store(1, Ordering::SeqCst);
+            0
         }
-    }));
+    }
+
+    let first_a = dag.add_task(FirstA {
+        turn: turn.clone(),
+        events: events.clone(),
+    });
+
     let mut chain_a: dagx::TaskHandle<i32> = first_a.into();
 
-    let first_b = dag.add_task(task_fn({
-        let turn = turn.clone();
-        let events = events.clone();
-        move |_: ()| {
-            let turn = turn.clone();
-            let events = events.clone();
-            async move {
-                while turn.load(Ordering::SeqCst) != 1 {
-                    tokio::task::yield_now().await;
-                }
-                events.lock().push("B0".to_string());
-                turn.store(2, Ordering::SeqCst);
-                0
+    struct FirstB {
+        turn: Arc<AtomicUsize>,
+        events: Arc<parking_lot::Mutex<Vec<String>>>,
+    }
+
+    #[task]
+    impl FirstB {
+        async fn run(&self) -> i32 {
+            while self.turn.load(Ordering::SeqCst) != 1 {
+                tokio::task::yield_now().await;
             }
+            self.events.lock().push("B0".to_string());
+            self.turn.store(2, Ordering::SeqCst);
+            0
         }
-    }));
+    }
+
+    let first_b = dag.add_task(FirstB {
+        turn: turn.clone(),
+        events: events.clone(),
+    });
+
     let mut chain_b: dagx::TaskHandle<i32> = first_b.into();
 
+    struct ChainA {
+        turn: Arc<AtomicUsize>,
+        events: Arc<parking_lot::Mutex<Vec<String>>>,
+        idx: usize,
+    }
+
+    #[task]
+    impl ChainA {
+        async fn run(&self, x: &i32) -> i32 {
+            while self.turn.load(Ordering::SeqCst) != self.idx * 2 {
+                tokio::task::yield_now().await;
+            }
+            self.events.lock().push(format!("A{}", self.idx));
+            self.turn.store(self.idx * 2 + 1, Ordering::SeqCst);
+            x + 1
+        }
+    }
+
+    struct ChainB {
+        turn: Arc<AtomicUsize>,
+        events: Arc<parking_lot::Mutex<Vec<String>>>,
+        idx: usize,
+    }
+
+    #[task]
+    impl ChainB {
+        async fn run(&self, x: &i32) -> i32 {
+            while self.turn.load(Ordering::SeqCst) != self.idx * 2 + 1 {
+                tokio::task::yield_now().await;
+            }
+            self.events.lock().push(format!("B{}", self.idx));
+            self.turn.store(self.idx * 2 + 2, Ordering::SeqCst);
+            x + 1
+        }
+    }
+
     for i in 1..5 {
-        let turn_clone = turn.clone();
-        let events_clone = events.clone();
         chain_a = dag
-            .add_task(task_fn(move |x: i32| {
-                let turn_clone = turn_clone.clone();
-                let events_clone = events_clone.clone();
-                async move {
-                    while turn_clone.load(Ordering::SeqCst) != i * 2 {
-                        tokio::task::yield_now().await;
-                    }
-                    events_clone.lock().push(format!("A{}", i));
-                    turn_clone.store(i * 2 + 1, Ordering::SeqCst);
-                    x + 1
-                }
-            }))
+            .add_task(ChainA {
+                events: events.clone(),
+                turn: turn.clone(),
+                idx: i,
+            })
             .depends_on(chain_a);
 
-        let turn_clone = turn.clone();
-        let events_clone = events.clone();
         chain_b = dag
-            .add_task(task_fn(move |x: i32| {
-                let turn_clone = turn_clone.clone();
-                let events_clone = events_clone.clone();
-                async move {
-                    while turn_clone.load(Ordering::SeqCst) != i * 2 + 1 {
-                        tokio::task::yield_now().await;
-                    }
-                    events_clone.lock().push(format!("B{}", i));
-                    turn_clone.store(i * 2 + 2, Ordering::SeqCst);
-                    x + 1
-                }
-            }))
+            .add_task(ChainB {
+                turn: turn.clone(),
+                events: events.clone(),
+                idx: i,
+            })
             .depends_on(chain_b);
     }
 
@@ -184,55 +204,62 @@ async fn test_layered_interleaving() -> DagResult<()> {
     let dag = DagRunner::new();
     let layer_active = Arc::new(AtomicUsize::new(0));
 
+    struct Layer1Task {
+        active: Arc<AtomicUsize>,
+        idx: usize,
+    }
+
+    #[task]
+    impl Layer1Task {
+        async fn run(&self) -> i32 {
+            assert_eq!(self.active.fetch_add(1, Ordering::SeqCst), self.idx);
+            tokio::task::yield_now().await;
+            self.active.fetch_sub(1, Ordering::SeqCst);
+            self.idx as i32
+        }
+    }
+
     // Layer 1: 4 tasks
     let layer1: Vec<_> = (0..4)
         .map(|i| {
-            let active = layer_active.clone();
-            dag.add_task(task_fn(move |_: ()| {
-                let active = active.clone();
-                async move {
-                    assert_eq!(active.fetch_add(1, Ordering::SeqCst), i);
-                    tokio::task::yield_now().await;
-                    active.fetch_sub(1, Ordering::SeqCst);
-                    i as i32
-                }
-            }))
+            dag.add_task(Layer1Task {
+                active: layer_active.clone(),
+                idx: i,
+            })
             .into()
         })
         .collect();
 
+    struct Layer23Task {
+        active: Arc<AtomicUsize>,
+    }
+
+    #[task]
+    impl Layer23Task {
+        async fn run(&self, a: &i32, b: &i32) -> i32 {
+            self.active.fetch_add(1, Ordering::SeqCst);
+            tokio::task::yield_now().await;
+            self.active.fetch_sub(1, Ordering::SeqCst);
+            a + b
+        }
+    }
+
     // Layer 2: 2 tasks, each depends on 2 from layer1
     let layer2: Vec<_> = (0..2)
         .map(|i| {
-            let active = layer_active.clone();
             let idx = i * 2;
-            dag.add_task(task_fn(move |(a, b): (i32, i32)| {
-                let active = active.clone();
-                async move {
-                    active.fetch_add(1, Ordering::SeqCst);
-                    tokio::task::yield_now().await;
-                    active.fetch_sub(1, Ordering::SeqCst);
-                    a + b
-                }
-            }))
+            dag.add_task(Layer23Task {
+                active: layer_active.clone(),
+            })
             .depends_on((&layer1[idx], &layer1[idx + 1]))
         })
         .collect();
 
     // Layer 3: 1 task depends on both layer2
     let layer3 = dag
-        .add_task(task_fn({
-            let active = layer_active.clone();
-            move |(a, b): (i32, i32)| {
-                let active = active.clone();
-                async move {
-                    active.fetch_add(1, Ordering::SeqCst);
-                    tokio::task::yield_now().await;
-                    active.fetch_sub(1, Ordering::SeqCst);
-                    a + b
-                }
-            }
-        }))
+        .add_task(Layer23Task {
+            active: layer_active.clone(),
+        })
         .depends_on((&layer2[0], &layer2[1]));
 
     dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
@@ -252,82 +279,93 @@ async fn test_cross_branch_synchronization() -> DagResult<()> {
 
     // Branch A
     let a1: TaskHandle<_> = dag
-        .add_task(task_fn({
+        .add_task(task_fn::<(), _, _>({
             let sync = sync_point.clone();
             let events = events.clone();
             move |_: ()| {
-                let sync = sync.clone();
-                let events = events.clone();
-                async move {
-                    events.lock().push("A1");
-                    sync.fetch_add(1, Ordering::SeqCst);
-                    1
-                }
+                events.lock().push("A1");
+                sync.fetch_add(1, Ordering::SeqCst);
+                1
             }
         }))
         .into();
 
-    let a2 = dag
-        .add_task(task_fn({
-            let sync = sync_point.clone();
-            let events = events.clone();
-            move |x: i32| {
-                let sync = sync.clone();
-                let events = events.clone();
-                async move {
-                    // Wait for B1
-                    while sync.load(Ordering::SeqCst) < 2 {
-                        tokio::task::yield_now().await;
-                    }
-                    events.lock().push("A2");
-                    sync.fetch_add(1, Ordering::SeqCst);
-                    x + 1
-                }
+    struct A2Task {
+        sync: Arc<AtomicUsize>,
+        events: Arc<parking_lot::Mutex<Vec<&'static str>>>,
+    }
+
+    #[task]
+    impl A2Task {
+        async fn run(&self, x: &i32) -> i32 {
+            // Wait for B1
+            while self.sync.load(Ordering::SeqCst) < 2 {
+                tokio::task::yield_now().await;
             }
-        }))
+            self.events.lock().push("A2");
+            self.sync.fetch_add(1, Ordering::SeqCst);
+            x + 1
+        }
+    }
+
+    let a2 = dag
+        .add_task(A2Task {
+            sync: sync_point.clone(),
+            events: events.clone(),
+        })
         .depends_on(a1);
 
-    // Branch B
-    let b1 = dag.add_task(task_fn({
-        let sync = sync_point.clone();
-        let events = events.clone();
-        move |_: ()| {
-            let sync = sync.clone();
-            let events = events.clone();
-            async move {
-                // Wait for A1
-                while sync.load(Ordering::SeqCst) < 1 {
-                    tokio::task::yield_now().await;
-                }
-                events.lock().push("B1");
-                sync.fetch_add(1, Ordering::SeqCst);
-                10
+    struct B1Task {
+        sync: Arc<AtomicUsize>,
+        events: Arc<parking_lot::Mutex<Vec<&'static str>>>,
+    }
+
+    #[task]
+    impl B1Task {
+        async fn run(&self) -> i32 {
+            // Wait for A1
+            while self.sync.load(Ordering::SeqCst) < 1 {
+                tokio::task::yield_now().await;
             }
+            self.events.lock().push("B1");
+            self.sync.fetch_add(1, Ordering::SeqCst);
+            10
         }
-    }));
+    }
+
+    // Branch B
+    let b1 = dag.add_task(B1Task {
+        events: events.clone(),
+        sync: sync_point.clone(),
+    });
+
+    struct B2Task {
+        sync: Arc<AtomicUsize>,
+        events: Arc<parking_lot::Mutex<Vec<&'static str>>>,
+    }
+
+    #[task]
+    impl B2Task {
+        async fn run(&self, x: &i32) -> i32 {
+            // Wait for A2
+            while self.sync.load(Ordering::SeqCst) < 3 {
+                tokio::task::yield_now().await;
+            }
+            self.events.lock().push("B2");
+            x + 1
+        }
+    }
 
     let b2 = dag
-        .add_task(task_fn({
-            let sync = sync_point.clone();
-            let events = events.clone();
-            move |x: i32| {
-                let sync = sync.clone();
-                let events = events.clone();
-                async move {
-                    // Wait for A2
-                    while sync.load(Ordering::SeqCst) < 3 {
-                        tokio::task::yield_now().await;
-                    }
-                    events.lock().push("B2");
-                    x + 1
-                }
-            }
-        }))
+        .add_task(B2Task {
+            events: events.clone(),
+            sync: sync_point.clone(),
+        })
         .depends_on(b1);
 
     // Merge
     let merge = dag
-        .add_task(task_fn(|(a, b): (i32, i32)| async move { a + b }))
+        .add_task(task_fn::<(i32, i32), _, _>(|(a, b): (&i32, &i32)| a + b))
         .depends_on((&a2, &b2));
 
     dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;

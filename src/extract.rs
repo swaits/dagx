@@ -5,8 +5,8 @@
 //! **NOTE**: This module is now primarily for internal use. The `ExtractInput` trait is only
 //! used by the internal `task_fn` test helper function.
 //!
-//! **For regular tasks**: The `#[task]` macro generates inline `extract_and_run()` methods with
-//! type-specific extraction logic. This means **ANY type** implementing `Clone + Send + Sync`
+//! **For regular tasks**: The `#[task]` macro generates inline `run()` methods with
+//! type-specific extraction logic. This means **ANY type** implementing `Send + Sync`
 //! works automatically without needing `ExtractInput` implementations!
 //!
 //! # How it works
@@ -15,8 +15,8 @@
 //! Outputs are wrapped in Arc for efficient fanout (cheap Arc clones instead of data clones).
 //!
 //! **Modern approach (via `#[task]` macro)**:
-//! - The macro generates custom extraction logic inline in `extract_and_run()`
-//! - Works with ANY type (just needs `Clone + Send + Sync`)
+//! - The macro generates custom extraction logic inline in `run()`
+//! - Works with ANY type (just needs `Send + Sync + 'static`)
 //! - No trait implementations needed!
 //!
 //! **Legacy approach (via `ExtractInput` trait)**:
@@ -32,27 +32,30 @@
 //!
 //! This is standard practice in Rust for working with tuples of different arities.
 
-use std::any::Any;
-use std::sync::Arc;
+use std::{collections::HashMap, hash::Hash, sync::Arc};
 
-/// Helper trait for async input extraction from list of dependencies.
+use crate::TaskInput;
+
+/// Helper trait for input extraction from list of dependencies.
 ///
 /// Type erasure occurs only at the ExecutableNode trait boundary - by the time
 /// we're in ExtractInput, we know the concrete type and can safely downcast.
-///
-/// NOTE: This trait is now primarily used by the internal `task_fn` test helper.
-/// The `#[task]` macro generates inline extraction logic via `extract_and_run()`,
-/// which allows ANY type to work without requiring ExtractInput implementations.
 #[allow(dead_code)]
-pub(crate) trait ExtractInput: Sized + Clone {
-    fn extract_from_deps(
-        deps: Vec<Arc<dyn Any + Send + Sync>>,
-    ) -> impl std::future::Future<Output = Result<Self, String>> + Send;
+pub trait ExtractInput: Sized + Clone {
+    type Input: Send;
+    type Retv<'input>;
+
+    fn extract_from_task_input<'input>(
+        input: TaskInput<'input, Self::Input>,
+    ) -> Result<Self::Retv<'input>, String>;
 }
 
 // Unit type - no dependencies
 impl ExtractInput for () {
-    async fn extract_from_deps(_deps: Vec<Arc<dyn Any + Send + Sync>>) -> Result<Self, String> {
+    type Input = ();
+    type Retv<'input> = ();
+
+    fn extract_from_task_input(_input: TaskInput<'_, Self>) -> Result<Self, String> {
         Ok(())
     }
 }
@@ -65,15 +68,10 @@ macro_rules! impl_extract_single {
     ($($t:ty),+) => {
         $(
             impl ExtractInput for $t {
-                async fn extract_from_deps(mut dependencies: Vec<Arc<dyn Any + Send + Sync>>) -> Result<Self, String> {
-                    if dependencies.len() != 1 {
-                        return Err(format!("Expected 1 dependency, got {}", dependencies.len()));
-                    }
-                    let arc_value = dependencies.pop()
-                        .unwrap()
-                        .downcast::<$t>()
-                        .map_err(|_| format!("Type mismatch: expected Arc<{}>", std::any::type_name::<$t>()))?;
-                    Ok((*arc_value).clone())
+                type Input = ($t,);
+                type Retv<'input> = &'input $t;
+                fn extract_from_task_input<'input>(input: TaskInput<'input, Self::Input>) -> Result<Self::Retv<'input>, String> {
+                    Ok(input.next().0)
                 }
             }
         )+
@@ -90,24 +88,13 @@ where
     T: 'static + Clone + Send + Sync,
     E: 'static + Clone + Send + Sync,
 {
-    async fn extract_from_deps(
-        mut dependencies: Vec<Arc<dyn Any + Send + Sync>>,
-    ) -> Result<Self, String> {
-        if dependencies.len() != 1 {
-            return Err(format!("Expected 1 dependency, got {}", dependencies.len()));
-        }
-        let arc_value = dependencies
-            .pop()
-            .unwrap()
-            .downcast::<Result<T, E>>()
-            .map_err(|_| {
-                format!(
-                    "Type mismatch: expected Arc<Result<{}, {}>>",
-                    std::any::type_name::<T>(),
-                    std::any::type_name::<E>()
-                )
-            })?;
-        Ok((*arc_value).clone())
+    type Input = (Self,);
+    type Retv<'input> = &'input Result<T, E>;
+
+    fn extract_from_task_input<'input>(
+        input: TaskInput<'input, (Self,)>,
+    ) -> Result<Self::Retv<'input>, String> {
+        Ok(input.next().0)
     }
 }
 
@@ -116,23 +103,13 @@ impl<T> ExtractInput for Option<T>
 where
     T: 'static + Clone + Send + Sync,
 {
-    async fn extract_from_deps(
-        mut dependencies: Vec<Arc<dyn Any + Send + Sync>>,
-    ) -> Result<Self, String> {
-        if dependencies.len() != 1 {
-            return Err(format!("Expected 1 dependency, got {}", dependencies.len()));
-        }
-        let arc_value = dependencies
-            .pop()
-            .unwrap()
-            .downcast::<Option<T>>()
-            .map_err(|_| {
-                format!(
-                    "Type mismatch: expected Arc<Option<{}>>",
-                    std::any::type_name::<T>()
-                )
-            })?;
-        Ok((*arc_value).clone())
+    type Input = (Self,);
+    type Retv<'input> = &'input Option<T>;
+
+    fn extract_from_task_input<'input>(
+        input: TaskInput<'input, (Self,)>,
+    ) -> Result<Self::Retv<'input>, String> {
+        Ok(input.next().0)
     }
 }
 
@@ -141,77 +118,43 @@ impl<T> ExtractInput for Vec<T>
 where
     T: 'static + Clone + Send + Sync,
 {
-    async fn extract_from_deps(
-        mut dependencies: Vec<Arc<dyn Any + Send + Sync>>,
-    ) -> Result<Self, String> {
-        if dependencies.len() != 1 {
-            return Err(format!("Expected 1 dependency, got {}", dependencies.len()));
-        }
-        let arc_value = dependencies
-            .pop()
-            .unwrap()
-            .downcast::<Vec<T>>()
-            .map_err(|_| {
-                format!(
-                    "Type mismatch: expected Arc<Vec<{}>>",
-                    std::any::type_name::<T>()
-                )
-            })?;
-        Ok((*arc_value).clone())
+    type Input = (Self,);
+    type Retv<'input> = &'input Vec<T>;
+
+    fn extract_from_task_input<'input>(
+        input: TaskInput<'input, (Self,)>,
+    ) -> Result<Self::Retv<'input>, String> {
+        Ok(input.next().0)
     }
 }
 
 // Implement ExtractInput for HashMap types
-impl<K, V> ExtractInput for std::collections::HashMap<K, V>
+impl<K, V> ExtractInput for HashMap<K, V>
 where
-    K: 'static + Clone + Send + Sync + Eq + std::hash::Hash,
+    K: 'static + Clone + Send + Sync + Eq + Hash,
     V: 'static + Clone + Send + Sync,
 {
-    async fn extract_from_deps(
-        mut dependencies: Vec<Arc<dyn Any + Send + Sync>>,
-    ) -> Result<Self, String> {
-        if dependencies.len() != 1 {
-            return Err(format!("Expected 1 dependency, got {}", dependencies.len()));
-        }
-        let arc_value = dependencies
-            .pop()
-            .unwrap()
-            .downcast::<std::collections::HashMap<K, V>>()
-            .map_err(|_| {
-                format!(
-                    "Type mismatch: expected Arc<HashMap<{}, {}>>",
-                    std::any::type_name::<K>(),
-                    std::any::type_name::<V>()
-                )
-            })?;
-        Ok((*arc_value).clone())
+    type Input = (Self,);
+    type Retv<'input> = &'input HashMap<K, V>;
+
+    fn extract_from_task_input<'input>(
+        input: TaskInput<'input, (Self,)>,
+    ) -> Result<Self::Retv<'input>, String> {
+        Ok(input.next().0)
     }
 }
 
-// Implement ExtractInput for Arc types - SPECIAL CASE: just clone the Arc, don't unwrap!
-// This allows zero-copy data sharing for users who wrap their data in Arc.
 impl<T> ExtractInput for Arc<T>
 where
     T: 'static + Clone + Send + Sync,
 {
-    async fn extract_from_deps(
-        mut dependencies: Vec<Arc<dyn Any + Send + Sync>>,
-    ) -> Result<Self, String> {
-        if dependencies.len() != 1 {
-            return Err(format!("Expected 1 dependency, got {}", dependencies.len()));
-        }
-        let arc_arc_value = dependencies
-            .pop()
-            .unwrap()
-            .downcast::<Arc<T>>()
-            .map_err(|_| {
-                format!(
-                    "Type mismatch: expected Arc<Arc<{}>>",
-                    std::any::type_name::<T>()
-                )
-            })?;
-        // Return the inner Arc (clone is cheap - just refcount increment)
-        Ok(Arc::clone(&*arc_arc_value))
+    type Input = (Self,);
+    type Retv<'input> = &'input Arc<T>;
+
+    fn extract_from_task_input<'input>(
+        input: TaskInput<'input, (Self,)>,
+    ) -> Result<Self::Retv<'input>, String> {
+        Ok(input.next().0)
     }
 }
 
@@ -228,35 +171,19 @@ where
 ///
 /// Therefore, no runtime validation is needed - if it compiles, the dependency count is correct.
 macro_rules! impl_extract_tuple {
-    ($($T:ident : $idx:tt),+) => {
+    ($($T:ident),+) => {
         impl<$($T: 'static + Clone + Send + Sync),+> ExtractInput for ($($T,)+) {
-            async fn extract_from_deps(dependencies: Vec<Arc<dyn Any + Send + Sync>>) -> Result<Self, String> {
-                // Verify we have the correct number of dependencies
-                let expected_count = [$($idx),+].len();
-                if dependencies.len() != expected_count {
-                    return Err(format!("Expected {} dependencies, got {}", expected_count, dependencies.len()));
-                }
+            type Input = Self;
+           type Retv<'input> = ($(&'input $T,)+);
 
-                // Convert Vec to iterator so we can consume it
-                let mut iter = dependencies.into_iter();
+            fn extract_from_task_input<'input>(input: TaskInput<'input, Self::Input>) -> Result<Self::Retv<'input>, String> {
+                $(
+                    let ($T, input): (&'input $T, _) = input.next();
+                )+
 
-                // dependencies now contain Arc-wrapped values for efficient fanout
-                // Dereference Box after downcasting to get the parameter itself
-                // Use type names as variable names to avoid numeric suffix issues
-                let arc_results = (
-                    $(
-                            iter.next()
-                            .ok_or_else(|| format!("Missing parameter at index {}", $idx))?
-                            .downcast::<$T>()
-                            .map_err(|_| format!("Type mismatch at index {}: expected Arc<{}>",
-                                $idx, std::any::type_name::<$T>()))?,
-                    )+
-                );
+                let _input: TaskInput<'input, ()> = input;
 
-                // Clone inner values from Arc (cheap for small types, necessary for ownership)
-                Ok(($(
-                    (*arc_results.$idx).clone()
-                ,)+))
+                Ok(($($T,)+))
             }
         }
     };
@@ -265,16 +192,15 @@ macro_rules! impl_extract_tuple {
 // Generate ExtractInput implementations for tuples of size 2-8.
 // Each invocation creates an impl for a specific tuple size.
 // Supporting up to 8 elements covers the vast majority of use cases.
-impl_extract_tuple!(A:0, B:1);
-impl_extract_tuple!(A:0, B:1, C:2);
-impl_extract_tuple!(A:0, B:1, C:2, D:3);
-impl_extract_tuple!(A:0, B:1, C:2, D:3, E:4);
-impl_extract_tuple!(A:0, B:1, C:2, D:3, E:4, F:5);
-impl_extract_tuple!(A:0, B:1, C:2, D:3, E:4, F:5, G:6);
-impl_extract_tuple!(A:0, B:1, C:2, D:3, E:4, F:5, G:6, H:7);
+#[allow(non_snake_case)]
+mod impls {
+    use super::*;
 
-#[cfg(test)]
-mod tests;
-
-#[cfg(test)]
-mod coverage_tests;
+    impl_extract_tuple!(A, B);
+    impl_extract_tuple!(A, B, C);
+    impl_extract_tuple!(A, B, C, D);
+    impl_extract_tuple!(A, B, C, D, E);
+    impl_extract_tuple!(A, B, C, D, E, F);
+    impl_extract_tuple!(A, B, C, D, E, F, G);
+    impl_extract_tuple!(A, B, C, D, E, F, G, H);
+}

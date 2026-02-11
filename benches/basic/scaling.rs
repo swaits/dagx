@@ -17,7 +17,7 @@ pub fn bench_dag_scaling(c: &mut Criterion) {
                 rt.block_on(async {
                     let dag = DagRunner::new();
                     for i in 0..size {
-                        dag.add_task(task_fn(move |_: ()| async move { i }));
+                        dag.add_task(task_fn::<(), _, _>(move |_: ()| i));
                     }
                     dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
                         .await

@@ -11,17 +11,17 @@ async fn test_fallback_on_error() -> DagResult<()> {
     let dag = DagRunner::new();
 
     // Primary task that fails
-    let primary = dag.add_task(task_fn(|_: ()| async {
+    let primary = dag.add_task(task_fn::<(), _, _>(|_: ()| {
         panic!("Primary task failed");
         #[allow(unreachable_code)]
         42
     }));
 
     // Fallback task
-    let fallback = dag.add_task(task_fn(|_: ()| async { 100 }));
+    let fallback = dag.add_task(task_fn::<(), _, _>(|_: ()| 100));
 
     // Selector that uses fallback if primary fails
-    let _selector = dag.add_task(task_fn(|_: ()| async {}));
+    let _selector = dag.add_task(task_fn::<(), _, _>(|_: ()| {}));
 
     // Run DAG
     let _ = dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await;
@@ -41,22 +41,20 @@ async fn test_retry_pattern_simulation() -> DagResult<()> {
     let attempt_counter = Arc::new(AtomicUsize::new(0));
 
     // Task that would fail on first attempts (simulated)
-    let task = dag.add_task(task_fn({
+    let task = dag.add_task(task_fn::<(), _, _>({
         let counter = attempt_counter.clone();
         move |_: ()| {
             let counter = counter.clone();
-            async move {
-                let attempt = counter.fetch_add(1, Ordering::SeqCst);
+            let attempt = counter.fetch_add(1, Ordering::SeqCst);
 
-                // In real retry, this would be retried
-                // Here we simulate by not panicking
-                if attempt == 0 {
-                    // Would normally panic here
-                    return Err::<i32, &str>("Simulated failure");
-                }
-
-                Ok(42)
+            // In real retry, this would be retried
+            // Here we simulate by not panicking
+            if attempt == 0 {
+                // Would normally panic here
+                return Err::<i32, &str>("Simulated failure");
             }
+
+            Ok(42)
         }
     }));
 
@@ -79,26 +77,24 @@ async fn test_circuit_breaker_pattern() -> DagResult<()> {
         .map(|i| {
             let failures = failure_count.clone();
             let circuit = circuit_open.clone();
-            dag.add_task(task_fn(move |_: ()| {
+            dag.add_task(task_fn::<(), _, _>(move |_: ()| {
                 let failures = failures.clone();
                 let circuit = circuit.clone();
-                async move {
-                    // Check if circuit is open
-                    if circuit.load(Ordering::SeqCst) {
-                        return Err("Circuit breaker open");
-                    }
-
-                    // Simulate some failures
-                    if i < 3 {
-                        let count = failures.fetch_add(1, Ordering::SeqCst);
-                        if count >= 2 {
-                            circuit.store(true, Ordering::SeqCst);
-                        }
-                        return Err("Task failed");
-                    }
-
-                    Ok(i)
+                // Check if circuit is open
+                if circuit.load(Ordering::SeqCst) {
+                    return Err("Circuit breaker open");
                 }
+
+                // Simulate some failures
+                if i < 3 {
+                    let count = failures.fetch_add(1, Ordering::SeqCst);
+                    if count >= 2 {
+                        circuit.store(true, Ordering::SeqCst);
+                    }
+                    return Err("Task failed");
+                }
+
+                Ok(i)
             }))
         })
         .collect();
@@ -120,7 +116,7 @@ async fn test_partial_recovery_with_defaults() -> DagResult<()> {
     // Some tasks that might fail
     let _tasks: Vec<_> = (0..10)
         .map(|i| {
-            dag.add_task(task_fn(move |_: ()| async move {
+            dag.add_task(task_fn::<(), _, _>(move |_: ()| {
                 if i % 3 == 0 {
                     panic!("Task {} failed", i);
                 }
@@ -130,7 +126,7 @@ async fn test_partial_recovery_with_defaults() -> DagResult<()> {
         .collect();
 
     // Aggregator that handles failures gracefully
-    let aggregator = dag.add_task(task_fn(|_: ()| async {
+    let aggregator = dag.add_task(task_fn::<(), _, _>(|_: ()| {
         // In real scenario, would check task results and use defaults
         vec![0, 10, 20, 0, 40, 50, 0, 70, 80, 0] // 0 for failed tasks
     }));
@@ -152,15 +148,13 @@ async fn test_error_accumulation_pattern() -> DagResult<()> {
     let mut tasks: Vec<_> = (0..10)
         .map(|i| {
             let errors = errors.clone();
-            dag.add_task(task_fn(move |_: ()| {
+            dag.add_task(task_fn::<(), _, _>(move |_: ()| {
                 let errors = errors.clone();
-                async move {
-                    if i % 2 == 0 {
-                        errors.lock().push(format!("Error from task {}", i));
-                        return Err(format!("Task {} error", i));
-                    }
-                    Ok(i)
+                if i % 2 == 0 {
+                    errors.lock().push(format!("Error from task {}", i));
+                    return Err(format!("Task {} error", i));
                 }
+                Ok(i)
             }))
         })
         .collect();
@@ -187,16 +181,16 @@ async fn test_graceful_degradation() -> DagResult<()> {
     let dag = DagRunner::new();
 
     // Critical task
-    let critical = dag.add_task(task_fn(|_: ()| async { vec![1, 2, 3, 4, 5] }));
+    let critical = dag.add_task(task_fn::<(), _, _>(|_: ()| vec![1, 2, 3, 4, 5]));
 
     // Optional enhancement that fails - returns Result
-    let _enhancement = dag.add_task(task_fn(|_: ()| async {
+    let _enhancement = dag.add_task(task_fn::<(), _, _>(|_: ()| {
         Err::<Vec<i32>, &str>("Enhancement failed")
     }));
 
     // Final task that works with what's available
     let final_task = dag
-        .add_task(task_fn(|base: Vec<i32>| async move {
+        .add_task(task_fn::<Vec<_>, _, _>(|base: &Vec<i32>| {
             // Would combine with enhancement if available
             // Here just uses base
             base.iter().sum::<i32>()
@@ -216,22 +210,22 @@ async fn test_error_boundary_isolation() -> DagResult<()> {
     let dag = DagRunner::new();
 
     // Group A: contains an error - use Result
-    let a1 = dag.add_task(task_fn(|_: ()| async { 10 }));
+    let a1 = dag.add_task(task_fn::<(), _, _>(|_: ()| 10));
     let a2 = dag
-        .add_task(task_fn(|_x: i32| async move {
+        .add_task(task_fn::<i32, _, _>(|_x: &i32| {
             Err::<i32, &str>("Group A error")
         }))
         .depends_on(a1);
 
     // Group B: should be isolated from Group A's error
-    let b1 = dag.add_task(task_fn(|_: ()| async { 20 }));
+    let b1 = dag.add_task(task_fn::<(), _, _>(|_: ()| 20));
     let b2 = dag
-        .add_task(task_fn(|x: i32| async move { x * 2 }))
+        .add_task(task_fn::<i32, _, _>(|&x: &i32| x * 2))
         .depends_on(b1);
 
     // Group C: depends on B but not A
     let c1 = dag
-        .add_task(task_fn(|x: i32| async move { x + 5 }))
+        .add_task(task_fn::<i32, _, _>(|&x: &i32| x + 5))
         .depends_on(b2);
 
     dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
@@ -252,20 +246,18 @@ async fn test_compensation_action() -> DagResult<()> {
     let compensation_triggered = Arc::new(AtomicBool::new(false));
 
     // Action that fails
-    let action = dag.add_task(task_fn(|_: ()| async {
+    let action = dag.add_task(task_fn::<(), _, _>(|_: ()| {
         // Perform some action that fails
         panic!("Action failed");
     }));
 
     // Compensation task (runs independently)
-    let compensation = dag.add_task(task_fn({
+    let compensation = dag.add_task(task_fn::<(), _, _>({
         let triggered = compensation_triggered.clone();
         move |_: ()| {
             let triggered = triggered.clone();
-            async move {
-                triggered.store(true, Ordering::SeqCst);
-                "Compensation executed"
-            }
+            triggered.store(true, Ordering::SeqCst);
+            "Compensation executed"
         }
     }));
 

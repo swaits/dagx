@@ -15,7 +15,7 @@ async fn test_empty_dag() {
 #[tokio::test]
 async fn test_single_task() {
     let dag = DagRunner::new();
-    let task = dag.add_task(task_fn(|_: ()| async { 42 }));
+    let task = dag.add_task(task_fn::<(), _, _>(|_: ()| 42));
     dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
         .await
         .unwrap();
@@ -26,18 +26,18 @@ async fn test_single_task() {
 async fn test_deep_chain() {
     let dag = DagRunner::new();
 
-    let a = dag.add_task(task_fn(|_: ()| async { 1 }));
+    let a = dag.add_task(task_fn::<(), _, _>(|_: ()| 1));
     let b = dag
-        .add_task(task_fn(|x: i32| async move { x + 1 }))
+        .add_task(task_fn::<i32, _, _>(|&x: &i32| x + 1))
         .depends_on(a);
     let c = dag
-        .add_task(task_fn(|x: i32| async move { x + 1 }))
+        .add_task(task_fn::<i32, _, _>(|&x: &i32| x + 1))
         .depends_on(b);
     let d = dag
-        .add_task(task_fn(|x: i32| async move { x + 1 }))
+        .add_task(task_fn::<i32, _, _>(|&x: &i32| x + 1))
         .depends_on(c);
     let e = dag
-        .add_task(task_fn(|x: i32| async move { x + 1 }))
+        .add_task(task_fn::<i32, _, _>(|&x: &i32| x + 1))
         .depends_on(d);
 
     dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
@@ -54,7 +54,7 @@ async fn test_wide_parallel() {
     let dag = DagRunner::new();
 
     let tasks: Vec<_> = (0..10)
-        .map(|i| dag.add_task(task_fn(move |_: ()| async move { i * 2 })))
+        .map(|i| dag.add_task(task_fn::<(), _, _>(move |_: ()| i * 2)))
         .collect();
 
     dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
@@ -70,15 +70,15 @@ async fn test_wide_parallel() {
 async fn test_diamond_dependency() {
     let dag = DagRunner::new();
 
-    let a: TaskHandle<_> = dag.add_task(task_fn(|_: ()| async { 10 })).into();
+    let a: TaskHandle<_> = dag.add_task(task_fn::<(), _, _>(|_: ()| 10)).into();
     let b = dag
-        .add_task(task_fn(|x: i32| async move { x + 5 }))
+        .add_task(task_fn::<i32, _, _>(|&x: &i32| x + 5))
         .depends_on(a);
     let c = dag
-        .add_task(task_fn(|x: i32| async move { x * 2 }))
+        .add_task(task_fn::<i32, _, _>(|&x: &i32| x * 2))
         .depends_on(a);
     let d = dag
-        .add_task(task_fn(|(x, y): (i32, i32)| async move { x + y }))
+        .add_task(task_fn::<(i32, i32), _, _>(|(x, y): (&i32, &i32)| x + y))
         .depends_on((&b, &c));
 
     dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
@@ -100,13 +100,11 @@ struct User {
 async fn test_different_output_types() {
     let dag = DagRunner::new();
 
-    let string_task = dag.add_task(task_fn(|_: ()| async { "hello".to_string() }));
-    let vec_task = dag.add_task(task_fn(|_: ()| async { vec![1, 2, 3] }));
-    let struct_task = dag.add_task(task_fn(|_: ()| async {
-        User {
-            name: "Alice".to_string(),
-            age: 30,
-        }
+    let string_task = dag.add_task(task_fn::<(), _, _>(|_: ()| "hello".to_string()));
+    let vec_task = dag.add_task(task_fn::<(), _, _>(|_: ()| vec![1, 2, 3]));
+    let struct_task = dag.add_task(task_fn::<(), _, _>(|_: ()| User {
+        name: "Alice".to_string(),
+        age: 30,
     }));
 
     dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
@@ -124,22 +122,22 @@ async fn test_different_output_types() {
 async fn test_multiple_sinks() {
     let dag = DagRunner::new();
 
-    let source: TaskHandle<_> = dag.add_task(task_fn(|_: ()| async { 10 })).into();
+    let source: TaskHandle<_> = dag.add_task(task_fn::<(), _, _>(|_: ()| 10)).into();
 
     // Branch 1
     let branch1 = dag
-        .add_task(task_fn(|x: i32| async move { x * 2 }))
+        .add_task(task_fn::<i32, _, _>(|&x: &i32| x * 2))
         .depends_on(source);
     let sink1 = dag
-        .add_task(task_fn(|x: i32| async move { x + 1 }))
+        .add_task(task_fn::<i32, _, _>(|&x: &i32| x + 1))
         .depends_on(branch1);
 
     // Branch 2
     let branch2 = dag
-        .add_task(task_fn(|x: i32| async move { x + 5 }))
+        .add_task(task_fn::<i32, _, _>(|&x: &i32| x + 5))
         .depends_on(source);
     let sink2 = dag
-        .add_task(task_fn(|x: i32| async move { x * 3 }))
+        .add_task(task_fn::<i32, _, _>(|&x: &i32| x * 3))
         .depends_on(branch2);
 
     dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
@@ -156,12 +154,12 @@ async fn test_single_task_inline_path() {
     let dag = DagRunner::new();
 
     // Single task in its own layer
-    let t1: TaskHandle<_> = dag.add_task(task_fn(|_: ()| async { 10 })).into();
+    let t1: TaskHandle<_> = dag.add_task(task_fn::<(), _, _>(|_: ()| 10)).into();
     let t2 = dag
-        .add_task(task_fn(|x: i32| async move { x * 2 }))
+        .add_task(task_fn::<i32, _, _>(|&x: &i32| x * 2))
         .depends_on(t1);
     let t3 = dag
-        .add_task(task_fn(|x: i32| async move { x + 5 }))
+        .add_task(task_fn::<i32, _, _>(|&x: &i32| x + 5))
         .depends_on(t2);
 
     dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
@@ -176,17 +174,17 @@ async fn test_multi_task_spawn_path() {
     // Test multi-task layer spawn path (line 411-456 in runner.rs)
     let dag = DagRunner::new();
 
-    let source: TaskHandle<_> = dag.add_task(task_fn(|_: ()| async { 100 })).into();
+    let source: TaskHandle<_> = dag.add_task(task_fn::<(), _, _>(|_: ()| 100)).into();
 
     // Create multiple tasks in the same layer (all depend on source)
     let t1 = dag
-        .add_task(task_fn(|x: i32| async move { x + 1 }))
+        .add_task(task_fn::<i32, _, _>(|&x: &i32| x + 1))
         .depends_on(source);
     let t2 = dag
-        .add_task(task_fn(|x: i32| async move { x + 2 }))
+        .add_task(task_fn::<i32, _, _>(|&x: &i32| x + 2))
         .depends_on(source);
     let t3 = dag
-        .add_task(task_fn(|x: i32| async move { x + 3 }))
+        .add_task(task_fn::<i32, _, _>(|&x: &i32| x + 3))
         .depends_on(source);
 
     dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
@@ -205,14 +203,14 @@ async fn test_producer_consumer_channels() {
 
     // Producer
     let producer: TaskHandle<_> = dag
-        .add_task(task_fn(|_: ()| async { vec![1, 2, 3, 4, 5] }))
+        .add_task(task_fn::<(), _, _>(|_: ()| vec![1, 2, 3, 4, 5]))
         .into();
 
     // Consumer
     let consumer = dag
-        .add_task(task_fn(
-            |data: Vec<i32>| async move { data.iter().sum::<i32>() },
-        ))
+        .add_task(task_fn::<Vec<_>, _, _>(|data: &Vec<i32>| {
+            data.iter().sum::<i32>()
+        }))
         .depends_on(producer);
 
     dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
@@ -227,17 +225,17 @@ async fn test_multi_consumer_fanout() {
     // Test fanout with multiple consumers from one producer
     let dag = DagRunner::new();
 
-    let producer: TaskHandle<_> = dag.add_task(task_fn(|_: ()| async { 42 })).into();
+    let producer: TaskHandle<_> = dag.add_task(task_fn::<(), _, _>(|_: ()| 42)).into();
 
     // Multiple consumers
     let c1 = dag
-        .add_task(task_fn(|x: i32| async move { x * 2 }))
+        .add_task(task_fn::<i32, _, _>(|&x: &i32| x * 2))
         .depends_on(producer);
     let c2 = dag
-        .add_task(task_fn(|x: i32| async move { x + 10 }))
+        .add_task(task_fn::<i32, _, _>(|&x: &i32| x + 10))
         .depends_on(producer);
     let c3 = dag
-        .add_task(task_fn(|x: i32| async move { x - 5 }))
+        .add_task(task_fn::<i32, _, _>(|&x: &i32| x - 5))
         .depends_on(producer);
 
     dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
@@ -255,17 +253,17 @@ async fn test_compute_layers_with_dependents_tracking() {
     let dag = DagRunner::new();
 
     // Create diamond pattern to ensure dependents are tracked correctly
-    let source: TaskHandle<_> = dag.add_task(task_fn(|_: ()| async { 1 })).into();
+    let source: TaskHandle<_> = dag.add_task(task_fn::<(), _, _>(|_: ()| 1)).into();
 
     let left = dag
-        .add_task(task_fn(|x: i32| async move { x + 1 }))
+        .add_task(task_fn::<i32, _, _>(|&x: &i32| x + 1))
         .depends_on(source);
     let right = dag
-        .add_task(task_fn(|x: i32| async move { x + 2 }))
+        .add_task(task_fn::<i32, _, _>(|&x: &i32| x + 2))
         .depends_on(source);
 
     let sink = dag
-        .add_task(task_fn(|(l, r): (i32, i32)| async move { l + r }))
+        .add_task(task_fn::<(i32, i32), _, _>(|(l, r): (&i32, &i32)| l + r))
         .depends_on((&left, &right));
 
     dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
@@ -286,33 +284,27 @@ async fn test_layer_execution_order() {
     let dag = DagRunner::new();
 
     let order1 = execution_order.clone();
-    let t1 = dag.add_task(task_fn(move |_: ()| {
+    let t1 = dag.add_task(task_fn::<(), _, _>(move |_: ()| {
         let order = order1.clone();
-        async move {
-            order.lock().push(1);
-            1
-        }
+        order.lock().push(1);
+        1
     }));
 
     let order2 = execution_order.clone();
     let t2 = dag
-        .add_task(task_fn(move |x: i32| {
+        .add_task(task_fn::<i32, _, _>(move |&x: &i32| {
             let order = order2.clone();
-            async move {
-                order.lock().push(2);
-                x + 1
-            }
+            order.lock().push(2);
+            x + 1
         }))
         .depends_on(t1);
 
     let order3 = execution_order.clone();
     let t3 = dag
-        .add_task(task_fn(move |x: i32| {
+        .add_task(task_fn::<i32, _, _>(move |&x: &i32| {
             let order = order3.clone();
-            async move {
-                order.lock().push(3);
-                x + 1
-            }
+            order.lock().push(3);
+            x + 1
         }))
         .depends_on(t2);
 

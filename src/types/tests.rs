@@ -40,7 +40,7 @@ fn test_node_id_operations() {
 
 #[test]
 fn test_task_handle_clone() {
-    let handle: TaskHandle<i32> = TaskHandle {
+    let handle: TaskHandle<(i32,)> = TaskHandle {
         id: NodeId(42),
         _phantom: PhantomData,
     };
@@ -129,7 +129,7 @@ fn test_task_builder_from_conversion() {
     let builder_id = builder.id;
 
     // This conversion uses the From implementation
-    let handle: TaskHandle<i32> = builder.into();
+    let handle: TaskHandle<_> = builder.into();
     assert_eq!(handle.id, builder_id);
 }
 

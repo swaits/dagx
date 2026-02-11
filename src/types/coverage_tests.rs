@@ -29,7 +29,7 @@ async fn test_unit_type_taskbuilder_to_handle_conversion() {
     // Explicitly convert to TaskHandle using From implementation
     // This triggers the From<TaskBuilder> implementation at line 69-74,
     // specifically covering line 71
-    let handle: TaskHandle<i32> = builder.into();
+    let handle: TaskHandle<_> = builder.into();
 
     dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
         .await
@@ -76,7 +76,7 @@ async fn test_unit_type_conversion_with_multiple_tasks() {
 
     // Convert each builder to handle explicitly
     let first_handle: TaskHandle<String> = first_builder.into();
-    let second_handle: TaskHandle<i32> = second_builder.into();
+    let second_handle: TaskHandle<_> = second_builder.into();
     let third_handle: TaskHandle<bool> = third_builder.into();
 
     dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
@@ -116,7 +116,7 @@ async fn test_unit_struct_with_state() {
     let builder = dag.add_task(StatefulTask::new(21));
 
     // Explicit conversion - triggers line 71
-    let handle: TaskHandle<i32> = builder.into();
+    let handle: TaskHandle<_> = builder.into();
 
     dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
         .await
@@ -143,7 +143,6 @@ async fn test_taskbuilder_conversion_assignment() {
     // Conversion through type annotation and assignment
     // This also uses From<TaskBuilder> implementation
     let handle: TaskHandle<Vec<i32>> = builder.into();
-    let id = handle.id;
 
     dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
         .await
@@ -151,13 +150,6 @@ async fn test_taskbuilder_conversion_assignment() {
 
     let result = dag.get(handle).unwrap();
     assert_eq!(result, vec![1, 2, 3]);
-
-    // Verify the ID was preserved correctly through conversion
-    let another_handle = TaskHandle::<Vec<i32>> {
-        id,
-        _phantom: std::marker::PhantomData,
-    };
-    assert_eq!(dag.get(another_handle).unwrap(), vec![1, 2, 3]);
 }
 
 #[tokio::test]
@@ -184,7 +176,7 @@ async fn test_mixed_unit_and_dependent_tasks() {
 
     // Source is unit-type, can be converted
     let source_builder = dag.add_task(Source);
-    let source_handle: TaskHandle<i32> = source_builder.into(); // Covers line 71
+    let source_handle: TaskHandle<_> = source_builder.into(); // Covers line 71
 
     // Doubler needs dependencies, so we use it differently
     let doubler = dag.add_task(Doubler).depends_on(source_handle);
@@ -260,9 +252,9 @@ fn test_multiple_conversions_preserve_ids() {
     let id3 = builder3.id;
 
     // Convert all builders
-    let handle1: TaskHandle<i32> = builder1.into();
-    let handle2: TaskHandle<i32> = builder2.into();
-    let handle3: TaskHandle<i32> = builder3.into();
+    let handle1: TaskHandle<_> = builder1.into();
+    let handle2: TaskHandle<_> = builder2.into();
+    let handle3: TaskHandle<_> = builder3.into();
 
     // Verify IDs are preserved and sequential
     assert_eq!(handle1.id, id1);

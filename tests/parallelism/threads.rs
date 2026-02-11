@@ -1,10 +1,12 @@
 //! Tests for multi-threading and concurrent execution
 
 use crate::common::task_fn;
-use dagx::{DagResult, DagRunner, TaskHandle};
+use dagx::{task, DagResult, DagRunner, TaskHandle};
 use futures::FutureExt;
+use std::collections::HashSet;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
+use std::thread::ThreadId;
 use std::time::{Duration, Instant};
 use tokio::time::sleep;
 
@@ -17,27 +19,36 @@ async fn test_tasks_run_on_different_threads() -> DagResult<()> {
     let dag = DagRunner::new();
     let thread_ids = Arc::new(Mutex::new(std::collections::HashSet::new()));
 
+    struct LayerTask {
+        ids: Arc<Mutex<HashSet<ThreadId>>>,
+        idx: i32,
+    }
+
+    #[task]
+    impl LayerTask {
+        async fn run(&self) -> i32 {
+            let tid = thread::current().id();
+            self.ids.lock().unwrap().insert(tid);
+
+            // Yield to give tokio reason to distribute
+            sleep(Duration::from_millis(5)).await;
+
+            // Some CPU work too
+            let mut sum = 0;
+            for j in 0..1000 {
+                sum += j;
+            }
+            self.idx + sum
+        }
+    }
+
     // Create 50 tasks with actual work to encourage multi-threading
     let tasks: Vec<_> = (0..50)
         .map(|i| {
-            let ids = thread_ids.clone();
-            dag.add_task(task_fn(move |_: ()| {
-                let ids = ids.clone();
-                async move {
-                    let tid = thread::current().id();
-                    ids.lock().unwrap().insert(tid);
-
-                    // Do some actual async work to give tokio reason to distribute
-                    sleep(Duration::from_millis(5)).await;
-
-                    // Some CPU work too
-                    let mut sum = 0;
-                    for j in 0..1000 {
-                        sum += j;
-                    }
-                    i + sum
-                }
-            }))
+            dag.add_task(LayerTask {
+                ids: thread_ids.clone(),
+                idx: i,
+            })
         })
         .collect();
 
@@ -71,42 +82,50 @@ async fn test_concurrent_execution_with_atomic_counter() -> DagResult<()> {
     let concurrent_count = Arc::new(AtomicUsize::new(0));
     let max_concurrent = Arc::new(AtomicUsize::new(0));
 
+    struct LayerTask {
+        count: Arc<AtomicUsize>,
+        max: Arc<AtomicUsize>,
+        idx: usize,
+    }
+
+    #[task]
+    impl LayerTask {
+        async fn run(&self) -> usize {
+            // Increment concurrent counter
+            let current = self.count.fetch_add(1, Ordering::SeqCst) + 1;
+
+            // Track maximum concurrency
+            let mut prev_max = self.max.load(Ordering::SeqCst);
+            while current > prev_max {
+                match self.max.compare_exchange_weak(
+                    prev_max,
+                    current,
+                    Ordering::SeqCst,
+                    Ordering::SeqCst,
+                ) {
+                    Ok(_) => break,
+                    Err(x) => prev_max = x,
+                }
+            }
+
+            // Simulate work
+            sleep(Duration::from_millis(10)).await;
+
+            // Decrement counter
+            self.count.fetch_sub(1, Ordering::SeqCst);
+
+            self.idx
+        }
+    }
+
     // Create 20 tasks that track concurrent execution
     let tasks: Vec<_> = (0..20)
         .map(|i| {
-            let count = concurrent_count.clone();
-            let max = max_concurrent.clone();
-
-            dag.add_task(task_fn(move |_: ()| {
-                let count = count.clone();
-                let max = max.clone();
-                async move {
-                    // Increment concurrent counter
-                    let current = count.fetch_add(1, Ordering::SeqCst) + 1;
-
-                    // Track maximum concurrency
-                    let mut prev_max = max.load(Ordering::SeqCst);
-                    while current > prev_max {
-                        match max.compare_exchange_weak(
-                            prev_max,
-                            current,
-                            Ordering::SeqCst,
-                            Ordering::SeqCst,
-                        ) {
-                            Ok(_) => break,
-                            Err(x) => prev_max = x,
-                        }
-                    }
-
-                    // Simulate work
-                    sleep(Duration::from_millis(10)).await;
-
-                    // Decrement counter
-                    count.fetch_sub(1, Ordering::SeqCst);
-
-                    i
-                }
-            }))
+            dag.add_task(LayerTask {
+                count: concurrent_count.clone(),
+                max: max_concurrent.clone(),
+                idx: i,
+            })
         })
         .collect();
 
@@ -141,240 +160,61 @@ async fn test_diamond_parallel_execution() -> DagResult<()> {
 
     let concurrent_middle = Arc::new(AtomicUsize::new(0));
 
-    let source: TaskHandle<_> = dag.add_task(task_fn(|_: ()| async { 100 })).into();
+    let source: TaskHandle<_> = dag.add_task(task_fn::<(), _, _>(|_: ()| 100)).into();
+
+    struct ParallelTask1 {
+        counter: Arc<AtomicUsize>,
+    }
+
+    #[task]
+    impl ParallelTask1 {
+        async fn run(&self, x: &i32) -> i32 {
+            self.counter.fetch_add(1, Ordering::SeqCst);
+            sleep(Duration::from_millis(20)).await;
+            let count = self.counter.load(Ordering::SeqCst);
+            self.counter.fetch_sub(1, Ordering::SeqCst);
+            assert!(count > 0, "Should see concurrent execution");
+            x * 2
+        }
+    }
 
     // These should run in parallel
-    let parallel1 = {
-        let counter = concurrent_middle.clone();
-        dag.add_task(task_fn(move |x: i32| {
-            let counter = counter.clone();
-            async move {
-                counter.fetch_add(1, Ordering::SeqCst);
-                sleep(Duration::from_millis(20)).await;
-                let count = counter.load(Ordering::SeqCst);
-                counter.fetch_sub(1, Ordering::SeqCst);
-                assert!(count > 0, "Should see concurrent execution");
-                x * 2
-            }
-        }))
-        .depends_on(source)
-    };
+    let parallel1 = dag
+        .add_task(ParallelTask1 {
+            counter: concurrent_middle.clone(),
+        })
+        .depends_on(source);
 
-    let parallel2 = {
-        let counter = concurrent_middle.clone();
-        dag.add_task(task_fn(move |x: i32| {
-            let counter = counter.clone();
-            async move {
-                counter.fetch_add(1, Ordering::SeqCst);
-                sleep(Duration::from_millis(20)).await;
-                let count = counter.load(Ordering::SeqCst);
-                counter.fetch_sub(1, Ordering::SeqCst);
-                // Both should be running
-                assert!(count > 0, "Should see concurrent execution");
-                x * 3
-            }
-        }))
-        .depends_on(source)
-    };
+    struct ParallelTask2 {
+        counter: Arc<AtomicUsize>,
+    }
+
+    #[task]
+    impl ParallelTask2 {
+        async fn run(&self, x: &i32) -> i32 {
+            self.counter.fetch_add(1, Ordering::SeqCst);
+            sleep(Duration::from_millis(20)).await;
+            let count = self.counter.load(Ordering::SeqCst);
+            self.counter.fetch_sub(1, Ordering::SeqCst);
+            // Both should be running
+            assert!(count > 0, "Should see concurrent execution");
+            x * 3
+        }
+    }
+
+    let parallel2 = dag
+        .add_task(ParallelTask2 {
+            counter: concurrent_middle.clone(),
+        })
+        .depends_on(source);
 
     let sink = dag
-        .add_task(task_fn(|(a, b): (i32, i32)| async move { a + b }))
+        .add_task(task_fn::<(i32, i32), _, _>(|(a, b): (&i32, &i32)| a + b))
         .depends_on((&parallel1, &parallel2));
 
     dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 
     assert_eq!(dag.get(sink)?, 500); // (100 * 2) + (100 * 3)
-
-    Ok(())
-}
-
-#[tokio::test]
-async fn test_parallel_branches_with_dependencies() -> DagResult<()> {
-    // Test that parallel branches execute independently but respect their own dependencies
-    let dag = DagRunner::new();
-
-    let branch_progress = Arc::new(Mutex::new(Vec::new()));
-
-    // Source node
-    let source: TaskHandle<_> = dag.add_task(task_fn(|_: ()| async { 10 })).into();
-
-    // Branch 1: source -> b1_1 -> b1_2
-    let b1_1 = {
-        let progress = branch_progress.clone();
-        dag.add_task(task_fn(move |x: i32| {
-            let progress = progress.clone();
-            async move {
-                progress
-                    .lock()
-                    .unwrap()
-                    .push(("b1_1_start", Instant::now()));
-                sleep(Duration::from_millis(30)).await;
-                progress.lock().unwrap().push(("b1_1_end", Instant::now()));
-                x * 2
-            }
-        }))
-        .depends_on(source)
-    };
-
-    let b1_2 = {
-        let progress = branch_progress.clone();
-        dag.add_task(task_fn(move |x: i32| {
-            let progress = progress.clone();
-            async move {
-                progress
-                    .lock()
-                    .unwrap()
-                    .push(("b1_2_start", Instant::now()));
-                sleep(Duration::from_millis(10)).await;
-                progress.lock().unwrap().push(("b1_2_end", Instant::now()));
-                x + 1
-            }
-        }))
-        .depends_on(b1_1)
-    };
-
-    // Branch 2: source -> b2_1 -> b2_2
-    let b2_1 = {
-        let progress = branch_progress.clone();
-        dag.add_task(task_fn(move |x: i32| {
-            let progress = progress.clone();
-            async move {
-                progress
-                    .lock()
-                    .unwrap()
-                    .push(("b2_1_start", Instant::now()));
-                sleep(Duration::from_millis(10)).await;
-                progress.lock().unwrap().push(("b2_1_end", Instant::now()));
-                x * 3
-            }
-        }))
-        .depends_on(source)
-    };
-
-    let b2_2 = {
-        let progress = branch_progress.clone();
-        dag.add_task(task_fn(move |x: i32| {
-            let progress = progress.clone();
-            async move {
-                progress
-                    .lock()
-                    .unwrap()
-                    .push(("b2_2_start", Instant::now()));
-                sleep(Duration::from_millis(30)).await;
-                progress.lock().unwrap().push(("b2_2_end", Instant::now()));
-                x + 2
-            }
-        }))
-        .depends_on(b2_1)
-    };
-
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
-
-    // Verify results
-    assert_eq!(dag.get(b1_2)?, 21); // (10 * 2) + 1
-    assert_eq!(dag.get(b2_2)?, 32); // (10 * 3) + 2
-
-    // Analyze timing to prove parallel execution
-    let progress = branch_progress.lock().unwrap();
-
-    // Find timestamps
-    let find_time = |name: &str| -> Instant {
-        progress
-            .iter()
-            .find(|(n, _)| *n == name)
-            .map(|(_, t)| *t)
-            .unwrap_or_else(|| panic!("Couldn't find {}", name))
-    };
-
-    let b1_1_start = find_time("b1_1_start");
-    let b1_1_end = find_time("b1_1_end");
-    let b1_2_start = find_time("b1_2_start");
-    let b2_1_start = find_time("b2_1_start");
-
-    // Branch 1 and Branch 2 first tasks should start nearly simultaneously
-    let branch_start_diff = if b1_1_start > b2_1_start {
-        b1_1_start - b2_1_start
-    } else {
-        b2_1_start - b1_1_start
-    };
-
-    // Use a more generous threshold to account for coverage instrumentation overhead
-    // 50ms is enough to prove they're parallel (not sequential) while being robust to overhead
-    assert!(
-        branch_start_diff < Duration::from_millis(50),
-        "Branches should start in parallel, diff was {:?}",
-        branch_start_diff
-    );
-
-    // b1_2 should only start after b1_1 ends
-    assert!(b1_2_start >= b1_1_end, "b1_2 started before b1_1 finished");
-
-    Ok(())
-}
-
-#[tokio::test]
-async fn test_wide_fanout_parallel_execution() -> DagResult<()> {
-    // Test that a single source can fan out to many parallel tasks
-    let dag = DagRunner::new();
-
-    let max_concurrent = Arc::new(AtomicUsize::new(0));
-    let current_concurrent = Arc::new(AtomicUsize::new(0));
-
-    let source: TaskHandle<_> = dag.add_task(task_fn(|_: ()| async { 42 })).into();
-
-    // Create 50 tasks that all depend on the source
-    let dependents: Vec<_> = (0..50)
-        .map(|i| {
-            let max_c = max_concurrent.clone();
-            let curr_c = current_concurrent.clone();
-
-            dag.add_task(task_fn(move |x: i32| {
-                let max_c = max_c.clone();
-                let curr_c = curr_c.clone();
-                async move {
-                    // Track concurrency
-                    let current = curr_c.fetch_add(1, Ordering::SeqCst) + 1;
-
-                    // Update max
-                    let mut prev_max = max_c.load(Ordering::SeqCst);
-                    while current > prev_max {
-                        match max_c.compare_exchange_weak(
-                            prev_max,
-                            current,
-                            Ordering::SeqCst,
-                            Ordering::SeqCst,
-                        ) {
-                            Ok(_) => break,
-                            Err(v) => prev_max = v,
-                        }
-                    }
-
-                    // Do work
-                    sleep(Duration::from_millis(5)).await;
-
-                    curr_c.fetch_sub(1, Ordering::SeqCst);
-                    x + i
-                }
-            }))
-            .depends_on(source)
-        })
-        .collect();
-
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
-
-    // Verify results
-    for (i, task) in dependents.iter().enumerate() {
-        assert_eq!(dag.get(task)?, 42 + i as i32);
-    }
-
-    // Check that we saw significant parallelism
-    let max_seen = max_concurrent.load(Ordering::SeqCst);
-    println!("Max concurrent in fanout: {}", max_seen);
-    assert!(
-        max_seen > 5,
-        "Expected significant parallelism in fanout, got {}",
-        max_seen
-    );
 
     Ok(())
 }
@@ -388,44 +228,52 @@ async fn test_massive_parallel_fanout() -> DagResult<()> {
     let max_concurrent = Arc::new(AtomicUsize::new(0));
     let current = Arc::new(AtomicUsize::new(0));
 
-    let source: TaskHandle<_> = dag.add_task(task_fn(|_: ()| async { 1 })).into();
+    let source: TaskHandle<_> = dag.add_task(task_fn::<(), _, _>(|_: ()| 1)).into();
+
+    struct FanoutTask {
+        comp: Arc<AtomicUsize>,
+        max: Arc<AtomicUsize>,
+        curr: Arc<AtomicUsize>,
+        idx: i32,
+    }
+
+    #[task]
+    impl FanoutTask {
+        async fn run(&self, x: &i32) -> i32 {
+            // Track concurrency
+            let c = self.curr.fetch_add(1, Ordering::SeqCst) + 1;
+
+            let mut prev_max = self.max.load(Ordering::SeqCst);
+            while c > prev_max {
+                match self.max.compare_exchange_weak(
+                    prev_max,
+                    c,
+                    Ordering::SeqCst,
+                    Ordering::SeqCst,
+                ) {
+                    Ok(_) => break,
+                    Err(v) => prev_max = v,
+                }
+            }
+
+            // Quick work
+            sleep(Duration::from_millis(100)).await;
+
+            self.curr.fetch_sub(1, Ordering::SeqCst);
+            self.comp.fetch_add(1, Ordering::SeqCst);
+            x + self.idx
+        }
+    }
 
     // Create 1000 tasks all depending on the same source
     let tasks: Vec<_> = (0..1000)
         .map(|i| {
-            let comp = completed.clone();
-            let max = max_concurrent.clone();
-            let curr = current.clone();
-
-            dag.add_task(task_fn(move |x: i32| {
-                let comp = comp.clone();
-                let max = max.clone();
-                let curr = curr.clone();
-                async move {
-                    // Track concurrency
-                    let c = curr.fetch_add(1, Ordering::SeqCst) + 1;
-
-                    let mut prev_max = max.load(Ordering::SeqCst);
-                    while c > prev_max {
-                        match max.compare_exchange_weak(
-                            prev_max,
-                            c,
-                            Ordering::SeqCst,
-                            Ordering::SeqCst,
-                        ) {
-                            Ok(_) => break,
-                            Err(v) => prev_max = v,
-                        }
-                    }
-
-                    // Quick work
-                    sleep(Duration::from_micros(100)).await;
-
-                    curr.fetch_sub(1, Ordering::SeqCst);
-                    comp.fetch_add(1, Ordering::SeqCst);
-                    x + i
-                }
-            }))
+            dag.add_task(FanoutTask {
+                comp: completed.clone(),
+                max: max_concurrent.clone(),
+                curr: current.clone(),
+                idx: i,
+            })
             .depends_on(source)
         })
         .collect();

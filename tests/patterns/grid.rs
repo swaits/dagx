@@ -14,10 +14,10 @@ async fn test_2d_grid_pattern() -> DagResult<()> {
     // Initialize first row and column
     #[allow(clippy::needless_range_loop)]
     for i in 0..4 {
-        let task = dag.add_task(task_fn(move |_: ()| async move { i as i32 }));
+        let task = dag.add_task(task_fn::<(), _, _>(move |_: ()| i as i32));
         grid[0][i] = Some(task.into());
         if i > 0 {
-            let task = dag.add_task(task_fn(move |_: ()| async move { i as i32 * 10 }));
+            let task = dag.add_task(task_fn::<(), _, _>(move |_: ()| i as i32 * 10));
             grid[i][0] = Some(task.into());
         }
     }
@@ -29,7 +29,9 @@ async fn test_2d_grid_pattern() -> DagResult<()> {
             let left = grid[i][j - 1].as_ref().unwrap();
 
             let task = dag
-                .add_task(task_fn(move |(a, l): (i32, i32)| async move { a + l }))
+                .add_task(task_fn::<(i32, i32), _, _>(move |(a, l): (&i32, &i32)| {
+                    a + l
+                }))
                 .depends_on((above, left));
             grid[i][j] = Some(task);
         }
@@ -54,7 +56,7 @@ async fn test_3d_grid_pattern() -> DagResult<()> {
         vec![vec![vec![None; size]; size]; size];
 
     // Initialize origin
-    let origin = dag.add_task(task_fn(|_: ()| async { 1 }));
+    let origin = dag.add_task(task_fn::<(), _, _>(|_: ()| 1));
     grid[0][0][0] = Some(origin.into());
 
     // Fill the 3D grid
@@ -76,18 +78,20 @@ async fn test_3d_grid_pattern() -> DagResult<()> {
 
                 let task_handle: dagx::TaskHandle<usize> = match deps.len() {
                     0 => {
-                        let t = dag.add_task(task_fn(move |_: ()| async move { x + y + z }));
+                        let t = dag.add_task(task_fn::<(), _, _>(move |_: ()| x + y + z));
                         t.into()
                     }
                     1 => dag
-                        .add_task(task_fn(move |prev: usize| async move { prev + 1 }))
+                        .add_task(task_fn::<usize, _, _>(move |prev: &usize| prev + 1))
                         .depends_on(deps[0]),
                     2 => dag
-                        .add_task(task_fn(move |(a, b): (usize, usize)| async move { a + b }))
+                        .add_task(task_fn::<(usize, usize), _, _>(
+                            move |(a, b): (&usize, &usize)| a + b,
+                        ))
                         .depends_on((&deps[0], &deps[1])),
                     3 => dag
-                        .add_task(task_fn(
-                            move |(a, b, c): (usize, usize, usize)| async move { a + b + c },
+                        .add_task(task_fn::<(usize, usize, usize), _, _>(
+                            move |(a, b, c): (&usize, &usize, &usize)| a + b + c,
                         ))
                         .depends_on((&deps[0], &deps[1], &deps[2])),
                     _ => unreachable!(),
@@ -120,7 +124,7 @@ async fn test_hexagonal_grid() -> DagResult<()> {
     let mut hex_grid = std::collections::HashMap::new();
 
     // Center hex
-    let center_builder = dag.add_task(task_fn(|_: ()| async { 100 }));
+    let center_builder = dag.add_task(task_fn::<(), _, _>(|_: ()| 100));
     let center: dagx::TaskHandle<i32> = center_builder.into();
     hex_grid.insert((0, 0), center);
 
@@ -129,9 +133,7 @@ async fn test_hexagonal_grid() -> DagResult<()> {
 
     for (i, &(dq, dr)) in directions.iter().enumerate() {
         let neighbor: dagx::TaskHandle<i32> = dag
-            .add_task(task_fn(
-                move |c: i32| async move { c + (i as i32 + 1) * 10 },
-            ))
+            .add_task(task_fn::<i32, _, _>(move |c: &i32| c + (i as i32 + 1) * 10))
             .depends_on(center);
         hex_grid.insert((dq, dr), neighbor);
     }
@@ -159,15 +161,15 @@ async fn test_hexagonal_grid() -> DagResult<()> {
             .collect();
 
         let task: dagx::TaskHandle<i32> = if neighbors.len() == 2 {
-            dag.add_task(task_fn(move |(a, b): (i32, i32)| async move {
+            dag.add_task(task_fn::<(i32, i32), _, _>(move |(a, b): (&i32, &i32)| {
                 (a + b) / 2 + q + r
             }))
             .depends_on((&neighbors[0], &neighbors[1]))
         } else if neighbors.len() == 1 {
-            dag.add_task(task_fn(move |n: i32| async move { n + q + r }))
+            dag.add_task(task_fn::<i32, _, _>(move |n: &i32| n + q + r))
                 .depends_on(neighbors[0])
         } else {
-            let t = dag.add_task(task_fn(move |_: ()| async move { q + r }));
+            let t = dag.add_task(task_fn::<(), _, _>(move |_: ()| q + r));
             t.into()
         };
 
@@ -193,7 +195,7 @@ async fn test_toroidal_grid() -> DagResult<()> {
     #[allow(clippy::needless_range_loop)]
     for i in 0..SIZE {
         for j in 0..SIZE {
-            let task = dag.add_task(task_fn(move |_: ()| async move { (i * SIZE + j) as i32 }));
+            let task = dag.add_task(task_fn::<(), _, _>(move |_: ()| (i * SIZE + j) as i32));
             grid[i][j] = Some(task.into());
         }
     }
@@ -211,8 +213,8 @@ async fn test_toroidal_grid() -> DagResult<()> {
             let right = grid[i][(j + 1) % SIZE].as_ref().unwrap();
 
             let task = dag
-                .add_task(task_fn(
-                    move |(c, u, d, l, r): (i32, i32, i32, i32, i32)| async move {
+                .add_task(task_fn::<(_, _, _, _, _), _, _>(
+                    move |(c, u, d, l, r): (&i32, &i32, &i32, &i32, &i32)| {
                         // Average of self and 4 neighbors
                         (c + u + d + l + r) / 5
                     },

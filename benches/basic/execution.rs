@@ -12,7 +12,7 @@ pub fn bench_dag_execution(c: &mut Criterion) {
             rt.block_on(async {
                 let dag = DagRunner::new();
                 for i in 0..10 {
-                    dag.add_task(task_fn(move |_: ()| async move { i }));
+                    dag.add_task(task_fn::<(), _, _>(move |_: ()| i));
                 }
                 dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
                     .await
@@ -26,7 +26,7 @@ pub fn bench_dag_execution(c: &mut Criterion) {
             rt.block_on(async {
                 let dag = DagRunner::new();
                 for i in 0..100 {
-                    dag.add_task(task_fn(move |_: ()| async move { i }));
+                    dag.add_task(task_fn::<(), _, _>(move |_: ()| i));
                 }
                 dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
                     .await
@@ -51,61 +51,61 @@ pub fn bench_dag_execution(c: &mut Criterion) {
 
                 let t0 = dag.add_task(Value(0));
                 let t1 = dag
-                    .add_task(task_fn(|x: i32| async move { x + 1 }))
+                    .add_task(task_fn::<i32, _, _>(|&x: &i32| x + 1))
                     .depends_on(t0);
                 let t2 = dag
-                    .add_task(task_fn(|x: i32| async move { x + 1 }))
+                    .add_task(task_fn::<i32, _, _>(|&x: &i32| x + 1))
                     .depends_on(t1);
                 let t3 = dag
-                    .add_task(task_fn(|x: i32| async move { x + 1 }))
+                    .add_task(task_fn::<i32, _, _>(|&x: &i32| x + 1))
                     .depends_on(t2);
                 let t4 = dag
-                    .add_task(task_fn(|x: i32| async move { x + 1 }))
+                    .add_task(task_fn::<i32, _, _>(|&x: &i32| x + 1))
                     .depends_on(t3);
                 let t5 = dag
-                    .add_task(task_fn(|x: i32| async move { x + 1 }))
+                    .add_task(task_fn::<i32, _, _>(|&x: &i32| x + 1))
                     .depends_on(t4);
                 let t6 = dag
-                    .add_task(task_fn(|x: i32| async move { x + 1 }))
+                    .add_task(task_fn::<i32, _, _>(|&x: &i32| x + 1))
                     .depends_on(t5);
                 let t7 = dag
-                    .add_task(task_fn(|x: i32| async move { x + 1 }))
+                    .add_task(task_fn::<i32, _, _>(|&x: &i32| x + 1))
                     .depends_on(t6);
                 let t8 = dag
-                    .add_task(task_fn(|x: i32| async move { x + 1 }))
+                    .add_task(task_fn::<i32, _, _>(|&x: &i32| x + 1))
                     .depends_on(t7);
                 let t9 = dag
-                    .add_task(task_fn(|x: i32| async move { x + 1 }))
+                    .add_task(task_fn::<i32, _, _>(|&x: &i32| x + 1))
                     .depends_on(t8);
                 let t10 = dag
-                    .add_task(task_fn(|x: i32| async move { x + 1 }))
+                    .add_task(task_fn::<i32, _, _>(|&x: &i32| x + 1))
                     .depends_on(t9);
                 let t11 = dag
-                    .add_task(task_fn(|x: i32| async move { x + 1 }))
+                    .add_task(task_fn::<i32, _, _>(|&x: &i32| x + 1))
                     .depends_on(t10);
                 let t12 = dag
-                    .add_task(task_fn(|x: i32| async move { x + 1 }))
+                    .add_task(task_fn::<i32, _, _>(|&x: &i32| x + 1))
                     .depends_on(t11);
                 let t13 = dag
-                    .add_task(task_fn(|x: i32| async move { x + 1 }))
+                    .add_task(task_fn::<i32, _, _>(|&x: &i32| x + 1))
                     .depends_on(t12);
                 let t14 = dag
-                    .add_task(task_fn(|x: i32| async move { x + 1 }))
+                    .add_task(task_fn::<i32, _, _>(|&x: &i32| x + 1))
                     .depends_on(t13);
                 let t15 = dag
-                    .add_task(task_fn(|x: i32| async move { x + 1 }))
+                    .add_task(task_fn::<i32, _, _>(|&x: &i32| x + 1))
                     .depends_on(t14);
                 let t16 = dag
-                    .add_task(task_fn(|x: i32| async move { x + 1 }))
+                    .add_task(task_fn::<i32, _, _>(|&x: &i32| x + 1))
                     .depends_on(t15);
                 let t17 = dag
-                    .add_task(task_fn(|x: i32| async move { x + 1 }))
+                    .add_task(task_fn::<i32, _, _>(|&x: &i32| x + 1))
                     .depends_on(t16);
                 let t18 = dag
-                    .add_task(task_fn(|x: i32| async move { x + 1 }))
+                    .add_task(task_fn::<i32, _, _>(|&x: &i32| x + 1))
                     .depends_on(t17);
                 let _t19 = dag
-                    .add_task(task_fn(|x: i32| async move { x + 1 }))
+                    .add_task(task_fn::<i32, _, _>(|&x: &i32| x + 1))
                     .depends_on(t18);
 
                 dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))

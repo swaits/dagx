@@ -10,7 +10,7 @@ async fn test_binary_tree_reduction() -> DagResult<()> {
 
     // Create 8 leaf nodes
     let leaves: Vec<_> = (0..8)
-        .map(|i| dag.add_task(task_fn(move |_: ()| async move { 1 << i })))
+        .map(|i| dag.add_task(task_fn::<(), _, _>(move |_: ()| 1 << i)))
         .collect();
 
     // Build binary tree reduction
@@ -23,7 +23,7 @@ async fn test_binary_tree_reduction() -> DagResult<()> {
         for chunk in current_level.chunks(2) {
             if chunk.len() == 2 {
                 let task = dag
-                    .add_task(task_fn(|(a, b): (i32, i32)| async move { a + b }))
+                    .add_task(task_fn::<(i32, i32), _, _>(|(a, b): (&i32, &i32)| a + b))
                     .depends_on((&chunk[0], &chunk[1]));
                 next_level.push(task);
             } else {
@@ -51,7 +51,7 @@ async fn test_n_ary_tree() -> DagResult<()> {
     // Build a 3-ary tree (each node has 3 children)
     fn build_tree(dag: &DagRunner, depth: usize, value: i32) -> dagx::TaskHandle<i32> {
         if depth == 0 {
-            let task = dag.add_task(task_fn(move |_: ()| async move { value }));
+            let task = dag.add_task(task_fn::<(), _, _>(move |_: ()| value));
             return task.into();
         }
 
@@ -59,9 +59,9 @@ async fn test_n_ary_tree() -> DagResult<()> {
             .map(|i| build_tree(dag, depth - 1, value * 3 + i))
             .collect();
 
-        dag.add_task(task_fn(move |(a, b, c): (i32, i32, i32)| async move {
-            value + a + b + c
-        }))
+        dag.add_task(task_fn::<(i32, i32, i32), _, _>(
+            move |(a, b, c): (&i32, &i32, &i32)| value + a + b + c,
+        ))
         .depends_on((&children[0], &children[1], &children[2]))
     }
 
@@ -88,30 +88,30 @@ async fn test_unbalanced_tree() -> DagResult<()> {
     //   /            \
     //  f              g
 
-    let f: TaskHandle<_> = dag.add_task(task_fn(|_: ()| async { 1 })).into();
-    let g = dag.add_task(task_fn(|_: ()| async { 2 }));
+    let f: TaskHandle<_> = dag.add_task(task_fn::<(), _, _>(|_: ()| 1)).into();
+    let g = dag.add_task(task_fn::<(), _, _>(|_: ()| 2));
 
     let c = dag
-        .add_task(task_fn(|x: i32| async move { x * 2 }))
+        .add_task(task_fn::<i32, _, _>(|&x: &i32| x * 2))
         .depends_on(f);
 
-    let d_builder = dag.add_task(task_fn(|_: ()| async { 3 }));
+    let d_builder = dag.add_task(task_fn::<(), _, _>(|_: ()| 3));
     let d: dagx::TaskHandle<i32> = d_builder.into();
 
     let e = dag
-        .add_task(task_fn(|x: i32| async move { x * 3 }))
+        .add_task(task_fn::<i32, _, _>(|&x: &i32| x * 3))
         .depends_on(g);
 
     let a = dag
-        .add_task(task_fn(|(c, d): (i32, i32)| async move { c + d }))
+        .add_task(task_fn::<(i32, i32), _, _>(|(c, d): (&i32, &i32)| c + d))
         .depends_on((&c, &d));
 
     let b = dag
-        .add_task(task_fn(|e: i32| async move { e + 10 }))
+        .add_task(task_fn::<i32, _, _>(|e: &i32| e + 10))
         .depends_on(e);
 
     let root = dag
-        .add_task(task_fn(|(a, b): (i32, i32)| async move { a * b }))
+        .add_task(task_fn::<(i32, i32), _, _>(|(a, b): (&i32, &i32)| a * b))
         .depends_on((&a, &b));
 
     dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
@@ -131,37 +131,39 @@ async fn test_trie_like_structure() -> DagResult<()> {
 
     // Build a trie-like structure for paths
     let root: TaskHandle<_> = dag
-        .add_task(task_fn(|_: ()| async { "root".to_string() }))
+        .add_task(task_fn::<(), _, _>(|_: ()| "root".to_string()))
         .into();
 
     // First level
     let usr = dag
-        .add_task(task_fn(|r: String| async move { format!("{}/usr", r) }))
+        .add_task(task_fn::<String, _, _>(|r: &String| format!("{}/usr", r)))
         .depends_on(root);
 
     let etc = dag
-        .add_task(task_fn(|r: String| async move { format!("{}/etc", r) }))
+        .add_task(task_fn::<String, _, _>(|r: &String| format!("{}/etc", r)))
         .depends_on(root);
 
     let var = dag
-        .add_task(task_fn(|r: String| async move { format!("{}/var", r) }))
+        .add_task(task_fn::<String, _, _>(|r: &String| format!("{}/var", r)))
         .depends_on(root);
 
     // Second level
     let usr_bin = dag
-        .add_task(task_fn(|u: String| async move { format!("{}/bin", u) }))
+        .add_task(task_fn::<String, _, _>(|u: &String| format!("{}/bin", u)))
         .depends_on(usr);
 
     let usr_lib = dag
-        .add_task(task_fn(|u: String| async move { format!("{}/lib", u) }))
+        .add_task(task_fn::<String, _, _>(|u: &String| format!("{}/lib", u)))
         .depends_on(usr);
 
     let etc_config = dag
-        .add_task(task_fn(|e: String| async move { format!("{}/config", e) }))
+        .add_task(task_fn::<String, _, _>(|e: &String| {
+            format!("{}/config", e)
+        }))
         .depends_on(etc);
 
     let var_log = dag
-        .add_task(task_fn(|v: String| async move { format!("{}/log", v) }))
+        .add_task(task_fn::<String, _, _>(|v: &String| format!("{}/log", v)))
         .depends_on(var);
 
     dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
@@ -189,7 +191,7 @@ async fn test_balanced_k_ary_tree() -> DagResult<()> {
         node_id: usize,
     ) -> dagx::TaskHandle<usize> {
         if depth == 0 {
-            let task = dag.add_task(task_fn(move |_: ()| async move { node_id }));
+            let task = dag.add_task(task_fn::<(), _, _>(move |_: ()| node_id));
             return task.into();
         }
 
@@ -199,20 +201,18 @@ async fn test_balanced_k_ary_tree() -> DagResult<()> {
 
         match k {
             2 => dag
-                .add_task(task_fn(move |(a, b): (usize, usize)| async move {
-                    node_id + a + b
-                }))
+                .add_task(task_fn::<(usize, usize), _, _>(
+                    move |(a, b): (&usize, &usize)| node_id + a + b,
+                ))
                 .depends_on((&children[0], &children[1])),
             3 => dag
-                .add_task(task_fn(
-                    move |(a, b, c): (usize, usize, usize)| async move { node_id + a + b + c },
+                .add_task(task_fn::<(usize, usize, usize), _, _>(
+                    move |(a, b, c): (&usize, &usize, &usize)| node_id + a + b + c,
                 ))
                 .depends_on((&children[0], &children[1], &children[2])),
             4 => dag
-                .add_task(task_fn(
-                    move |(a, b, c, d): (usize, usize, usize, usize)| async move {
-                        node_id + a + b + c + d
-                    },
+                .add_task(task_fn::<(usize, usize, usize, usize), _, _>(
+                    move |(a, b, c, d): (&usize, &usize, &usize, &usize)| node_id + a + b + c + d,
                 ))
                 .depends_on((&children[0], &children[1], &children[2], &children[3])),
             _ => panic!("Unsupported k value"),
@@ -236,7 +236,7 @@ async fn test_merkle_tree_pattern() -> DagResult<()> {
     // Simulate a Merkle tree for 8 data blocks
     let data_blocks: Vec<_> = (0..8)
         .map(|i| {
-            dag.add_task(task_fn(move |_: ()| async move {
+            dag.add_task(task_fn::<(), _, _>(move |_: ()| {
                 // Simulate hash of data block
                 format!("hash_{}", i)
             }))
@@ -253,9 +253,9 @@ async fn test_merkle_tree_pattern() -> DagResult<()> {
         for pair in current_level.chunks(2) {
             if pair.len() == 2 {
                 let hash_task = dag
-                    .add_task(task_fn(|(left, right): (String, String)| async move {
-                        format!("hash({}_{})", left, right)
-                    }))
+                    .add_task(task_fn::<(String, String), _, _>(
+                        |(left, right): (&String, &String)| format!("hash({}_{})", left, right),
+                    ))
                     .depends_on((&pair[0], &pair[1]));
                 next_level.push(hash_task);
             } else {

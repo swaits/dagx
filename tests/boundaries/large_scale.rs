@@ -16,12 +16,9 @@ async fn test_10000_independent_tasks() -> DagResult<()> {
     let mut tasks: Vec<_> = (0..10_000)
         .map(|i| {
             let counter = counter.clone();
-            dag.add_task(task_fn(move |_: ()| {
-                let counter = counter.clone();
-                async move {
-                    counter.fetch_add(1, Ordering::Relaxed);
-                    i
-                }
+            dag.add_task(task_fn::<(), _, _>(move |_: ()| {
+                counter.fetch_add(1, Ordering::Relaxed);
+                i
             }))
         })
         .collect();
@@ -48,13 +45,15 @@ async fn test_5000_node_pyramid() -> DagResult<()> {
     // Bottom layer: 2048 nodes - convert to TaskHandles
     let mut current_layer: Vec<dagx::TaskHandle<i32>> = (0..2048)
         .map(|i| {
-            let task = dag.add_task(task_fn(move |_: ()| async move {
-                if i < 1024 {
-                    1
-                } else {
-                    0
-                }
-            }));
+            let task = dag.add_task(task_fn::<(), _, _>(
+                move |_: ()| {
+                    if i < 1024 {
+                        1
+                    } else {
+                        0
+                    }
+                },
+            ));
             task.into()
         })
         .collect();
@@ -74,20 +73,20 @@ async fn test_5000_node_pyramid() -> DagResult<()> {
 
             let task = match deps.len() {
                 1 => dag
-                    .add_task(task_fn(|a: i32| async move { a }))
+                    .add_task(task_fn::<i32, _, _>(|&a: &i32| a))
                     .depends_on(deps[0]),
                 2 => dag
-                    .add_task(task_fn(|(a, b): (i32, i32)| async move { a + b }))
+                    .add_task(task_fn::<(i32, i32), _, _>(|(a, b): (&i32, &i32)| a + b))
                     .depends_on((deps[0], deps[1])),
                 3 => dag
-                    .add_task(task_fn(
-                        |(a, b, c): (i32, i32, i32)| async move { a + b + c },
+                    .add_task(task_fn::<(i32, i32, i32), _, _>(
+                        |(a, b, c): (&i32, &i32, &i32)| a + b + c,
                     ))
                     .depends_on((deps[0], deps[1], deps[2])),
                 4 => dag
-                    .add_task(task_fn(|(a, b, c, d): (i32, i32, i32, i32)| async move {
-                        a + b + c + d
-                    }))
+                    .add_task(task_fn::<(i32, i32, i32, i32), _, _>(
+                        |(a, b, c, d): (&i32, &i32, &i32, &i32)| a + b + c + d,
+                    ))
                     .depends_on((deps[0], deps[1], deps[2], deps[3])),
                 _ => unreachable!(),
             };
@@ -98,7 +97,7 @@ async fn test_5000_node_pyramid() -> DagResult<()> {
 
     // Final layer combines the last 2
     let root = dag
-        .add_task(task_fn(|(a, b): (i32, i32)| async move { a + b }))
+        .add_task(task_fn::<(i32, i32), _, _>(|(a, b): (&i32, &i32)| a + b))
         .depends_on((&current_layer[0], &current_layer[1]));
 
     dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
@@ -119,13 +118,15 @@ async fn test_5000_node_pyramid_single_threaded() -> DagResult<()> {
     // Bottom layer: 2048 nodes - convert to TaskHandles
     let mut current_layer: Vec<dagx::TaskHandle<i32>> = (0..2048)
         .map(|i| {
-            let task = dag.add_task(task_fn(move |_: ()| async move {
-                if i < 1024 {
-                    1
-                } else {
-                    0
-                }
-            }));
+            let task = dag.add_task(task_fn::<(), _, _>(
+                move |_: ()| {
+                    if i < 1024 {
+                        1
+                    } else {
+                        0
+                    }
+                },
+            ));
             task.into()
         })
         .collect();
@@ -145,20 +146,20 @@ async fn test_5000_node_pyramid_single_threaded() -> DagResult<()> {
 
             let task = match deps.len() {
                 1 => dag
-                    .add_task(task_fn(|a: i32| async move { a }))
+                    .add_task(task_fn::<i32, _, _>(|&a: &i32| a))
                     .depends_on(deps[0]),
                 2 => dag
-                    .add_task(task_fn(|(a, b): (i32, i32)| async move { a + b }))
+                    .add_task(task_fn::<(i32, i32), _, _>(|(a, b): (&i32, &i32)| a + b))
                     .depends_on((deps[0], deps[1])),
                 3 => dag
-                    .add_task(task_fn(
-                        |(a, b, c): (i32, i32, i32)| async move { a + b + c },
+                    .add_task(task_fn::<(i32, i32, i32), _, _>(
+                        |(a, b, c): (&i32, &i32, &i32)| a + b + c,
                     ))
                     .depends_on((deps[0], deps[1], deps[2])),
                 4 => dag
-                    .add_task(task_fn(|(a, b, c, d): (i32, i32, i32, i32)| async move {
-                        a + b + c + d
-                    }))
+                    .add_task(task_fn::<(i32, i32, i32, i32), _, _>(
+                        |(a, b, c, d): (&i32, &i32, &i32, &i32)| a + b + c + d,
+                    ))
                     .depends_on((deps[0], deps[1], deps[2], deps[3])),
                 _ => unreachable!(),
             };
@@ -169,7 +170,7 @@ async fn test_5000_node_pyramid_single_threaded() -> DagResult<()> {
 
     // Final layer combines the last 2
     let root = dag
-        .add_task(task_fn(|(a, b): (i32, i32)| async move { a + b }))
+        .add_task(task_fn::<(i32, i32), _, _>(|(a, b): (&i32, &i32)| a + b))
         .depends_on((&current_layer[0], &current_layer[1]));
 
     dag.run(|fut| fut).await?;
@@ -189,7 +190,7 @@ async fn test_wide_dag_1000_sources_1000_sinks() -> DagResult<()> {
     // Create 1000 source tasks
     let sources: Vec<_> = (0..1000)
         .map(|i| {
-            dag.add_task(task_fn(move |_: ()| async move { i % 10 }))
+            dag.add_task(task_fn::<(), _, _>(move |_: ()| i % 10))
                 .into()
         })
         .collect();
@@ -201,9 +202,9 @@ async fn test_wide_dag_1000_sources_1000_sinks() -> DagResult<()> {
             let idx2 = (i * 13) % 1000;
             let idx3 = (i * 17) % 1000;
 
-            dag.add_task(task_fn(move |(a, b, c): (i32, i32, i32)| async move {
-                a + b + c + i as i32
-            }))
+            dag.add_task(task_fn::<(i32, i32, i32), _, _>(
+                move |(a, b, c): (&i32, &i32, &i32)| a + b + c + i as i32,
+            ))
             .depends_on((&sources[idx1], &sources[idx2], &sources[idx3]))
         })
         .collect();
@@ -231,28 +232,24 @@ async fn test_10000_node_linear_chain_segments() -> DagResult<()> {
     let mut chain_ends = Vec::new();
 
     for chain_id in 0..100 {
-        let first = dag.add_task(task_fn({
+        let first = dag.add_task(task_fn::<(), _, _>({
             let counter = counter.clone();
             move |_: ()| {
                 let counter = counter.clone();
-                async move {
-                    counter.fetch_add(1, Ordering::Relaxed);
-                    chain_id * 100
-                }
+                counter.fetch_add(1, Ordering::Relaxed);
+                chain_id * 100
             }
         }));
         let mut current: dagx::TaskHandle<i32> = first.into();
 
         for _i in 1..100 {
             current = dag
-                .add_task(task_fn({
+                .add_task(task_fn::<i32, _, _>({
                     let counter = counter.clone();
-                    move |prev: i32| {
+                    move |&prev: &i32| {
                         let counter = counter.clone();
-                        async move {
-                            counter.fetch_add(1, Ordering::Relaxed);
-                            prev + 1
-                        }
+                        counter.fetch_add(1, Ordering::Relaxed);
+                        prev + 1
                     }
                 }))
                 .depends_on(current);
@@ -291,12 +288,10 @@ async fn test_100000_nodes_stress() -> DagResult<()> {
             .map(|i| {
                 let completed = completed.clone();
                 let task_id = batch * batch_size + i;
-                dag.add_task(task_fn(move |_: ()| {
+                dag.add_task(task_fn::<(), _, _>(move |_: ()| {
                     let completed = completed.clone();
-                    async move {
-                        completed.fetch_add(1, Ordering::Relaxed);
-                        task_id
-                    }
+                    completed.fetch_add(1, Ordering::Relaxed);
+                    task_id
                 }))
             })
             .collect();

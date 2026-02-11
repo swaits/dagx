@@ -20,7 +20,7 @@ pub fn bench_memory_efficiency(c: &mut Criterion) {
                         let dag = DagRunner::new();
 
                         let source: TaskHandle<_> = dag
-                            .add_task(task_fn(move |_: ()| async move {
+                            .add_task(task_fn::<(), _, _>(move |_: ()| {
                                 // Create MB of data - framework wraps in Arc automatically
                                 vec![0u8; mb * 1024 * 1024]
                             }))
@@ -28,7 +28,7 @@ pub fn bench_memory_efficiency(c: &mut Criterion) {
 
                         // 20 consumers share the data via automatic Arc wrapping
                         for i in 0..20 {
-                            dag.add_task(task_fn(move |data: Vec<u8>| async move {
+                            dag.add_task(task_fn::<Vec<_>, _, _>(move |data: &Vec<u8>| {
                                 // Process a small portion (data extracted from Arc)
                                 let sample_sum: u32 = data
                                     .iter()

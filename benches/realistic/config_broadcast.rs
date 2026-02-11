@@ -21,7 +21,7 @@ pub fn bench_config_broadcast(c: &mut Criterion) {
 
                         // Configuration source - framework wraps HashMap in Arc automatically
                         let config: TaskHandle<_> = dag
-                            .add_task(task_fn(|_: ()| async {
+                            .add_task(task_fn::<(), _, _>(|_: ()| {
                                 HashMap::from([
                                     ("max_connections".to_string(), "100".to_string()),
                                     ("timeout_ms".to_string(), "5000".to_string()),
@@ -37,20 +37,22 @@ pub fn bench_config_broadcast(c: &mut Criterion) {
 
                         // Workers receive and process based on shared config
                         for worker_id in 0..workers {
-                            dag.add_task(task_fn(move |cfg: HashMap<String, String>| async move {
-                                // Simulate work based on configuration
-                                let batch_size: usize = cfg
-                                    .get("batch_size")
-                                    .and_then(|s| s.parse().ok())
-                                    .unwrap_or(10);
-                                let timeout: usize = cfg
-                                    .get("timeout_ms")
-                                    .and_then(|s| s.parse().ok())
-                                    .unwrap_or(1000);
+                            dag.add_task(task_fn::<HashMap<_, _>, _, _>(
+                                move |cfg: &HashMap<String, String>| {
+                                    // Simulate work based on configuration
+                                    let batch_size: usize = cfg
+                                        .get("batch_size")
+                                        .and_then(|s| s.parse().ok())
+                                        .unwrap_or(10);
+                                    let timeout: usize = cfg
+                                        .get("timeout_ms")
+                                        .and_then(|s| s.parse().ok())
+                                        .unwrap_or(1000);
 
-                                // Simulate some computation
-                                black_box(worker_id * batch_size + timeout / 100)
-                            }))
+                                    // Simulate some computation
+                                    black_box(worker_id * batch_size + timeout / 100)
+                                },
+                            ))
                             .depends_on(config);
                         }
 

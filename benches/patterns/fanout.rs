@@ -12,10 +12,10 @@ pub fn bench_fanout(c: &mut Criterion) {
         b.iter(|| {
             rt.block_on(async {
                 let dag = DagRunner::new();
-                let source: TaskHandle<_> = dag.add_task(task_fn(|_: ()| async { 42 })).into();
+                let source: TaskHandle<_> = dag.add_task(task_fn::<(), _, _>(|_: ()| 42)).into();
 
                 for i in 0..100 {
-                    dag.add_task(task_fn(move |x: i32| async move { x + i }))
+                    dag.add_task(task_fn::<i32, _, _>(move |&x: &i32| x + i))
                         .depends_on(source);
                 }
 
@@ -32,14 +32,14 @@ pub fn bench_fanout(c: &mut Criterion) {
             rt.block_on(async {
                 let dag = DagRunner::new();
                 let source: TaskHandle<_> = dag
-                    .add_task(task_fn(|_: ()| async {
+                    .add_task(task_fn::<(), _, _>(|_: ()| {
                         // Create 1000 strings - framework wraps in Arc automatically
                         (0..1000).map(|i| format!("Item {}", i)).collect::<Vec<_>>()
                     }))
                     .into();
 
                 for i in 0..100 {
-                    dag.add_task(task_fn(move |data: Vec<String>| async move {
+                    dag.add_task(task_fn::<Vec<_>, _, _>(move |data: &Vec<String>| {
                         // Each consumer gets data extracted from Arc
                         data.iter().filter(|s| s.contains(&i.to_string())).count()
                     }))
@@ -63,11 +63,12 @@ pub fn bench_fanout(c: &mut Criterion) {
 
                 // Source produces a simple Copy type (usize)
                 // Framework wraps in Arc<usize> internally
-                let source: TaskHandle<_> = dag.add_task(task_fn(|_: ()| async { 42usize })).into();
+                let source: TaskHandle<_> =
+                    dag.add_task(task_fn::<(), _, _>(|_: ()| 42usize)).into();
 
                 // 100 dependents - Arc overhead visible on Copy types
                 for i in 0..100 {
-                    dag.add_task(task_fn(move |x: usize| async move { x + i }))
+                    dag.add_task(task_fn::<usize, _, _>(move |x: &usize| x + i))
                         .depends_on(source);
                 }
 

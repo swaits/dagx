@@ -8,10 +8,10 @@ use futures::FutureExt;
 async fn test_two_dependencies() -> DagResult<()> {
     let dag = DagRunner::new();
 
-    let a = dag.add_task(task_fn(|_: ()| async { 10 }));
-    let b = dag.add_task(task_fn(|_: ()| async { 20 }));
+    let a = dag.add_task(task_fn::<(), _, _>(|_: ()| 10));
+    let b = dag.add_task(task_fn::<(), _, _>(|_: ()| 20));
     let sum = dag
-        .add_task(task_fn(|(x, y): (i32, i32)| async move { x + y }))
+        .add_task(task_fn::<(i32, i32), _, _>(|(x, y): (&i32, &i32)| x + y))
         .depends_on((a, b));
 
     dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
@@ -24,12 +24,12 @@ async fn test_two_dependencies() -> DagResult<()> {
 async fn test_three_dependencies() -> DagResult<()> {
     let dag = DagRunner::new();
 
-    let a = dag.add_task(task_fn(|_: ()| async { 1 }));
-    let b = dag.add_task(task_fn(|_: ()| async { 2 }));
-    let c = dag.add_task(task_fn(|_: ()| async { 3 }));
+    let a = dag.add_task(task_fn::<(), _, _>(|_: ()| 1));
+    let b = dag.add_task(task_fn::<(), _, _>(|_: ()| 2));
+    let c = dag.add_task(task_fn::<(), _, _>(|_: ()| 3));
     let sum = dag
-        .add_task(task_fn(
-            |(x, y, z): (i32, i32, i32)| async move { x + y + z },
+        .add_task(task_fn::<(i32, i32, i32), _, _>(
+            |(x, y, z): (&i32, &i32, &i32)| x + y + z,
         ))
         .depends_on((a, b, c));
 
@@ -44,13 +44,13 @@ async fn test_four_dependencies() -> DagResult<()> {
     let dag = DagRunner::new();
 
     let deps: Vec<_> = (1..=4)
-        .map(|i| dag.add_task(task_fn(move |_: ()| async move { i })).into())
+        .map(|i| dag.add_task(task_fn::<(), _, _>(move |_: ()| i)).into())
         .collect();
 
     let sum = dag
-        .add_task(task_fn(|(a, b, c, d): (i32, i32, i32, i32)| async move {
-            a + b + c + d
-        }))
+        .add_task(task_fn::<(i32, i32, i32, i32), _, _>(
+            |(a, b, c, d): (&i32, &i32, &i32, &i32)| a + b + c + d,
+        ))
         .depends_on((&deps[0], &deps[1], &deps[2], &deps[3]));
 
     dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
@@ -64,12 +64,12 @@ async fn test_five_dependencies() -> DagResult<()> {
     let dag = DagRunner::new();
 
     let deps: Vec<_> = (1..=5)
-        .map(|i| dag.add_task(task_fn(move |_: ()| async move { i })).into())
+        .map(|i| dag.add_task(task_fn::<(), _, _>(move |_: ()| i)).into())
         .collect();
 
     let sum = dag
-        .add_task(task_fn(
-            |(a, b, c, d, e): (i32, i32, i32, i32, i32)| async move { a + b + c + d + e },
+        .add_task(task_fn::<(i32, i32, i32, i32, i32), _, _>(
+            |(a, b, c, d, e): (&i32, &i32, &i32, &i32, &i32)| a + b + c + d + e,
         ))
         .depends_on((&deps[0], &deps[1], &deps[2], &deps[3], &deps[4]));
 
@@ -84,16 +84,14 @@ async fn test_six_dependencies() -> DagResult<()> {
     let dag = DagRunner::new();
 
     let deps: Vec<_> = (1..=6)
-        .map(|i| dag.add_task(task_fn(move |_: ()| async move { i })).into())
+        .map(|i| dag.add_task(task_fn::<(), _, _>(move |_: ()| i)).into())
         .collect();
 
-    let sum = dag.add_task(task_fn(
-        |(a, b, c, d, e, f): (i32, i32, i32, i32, i32, i32)| async move {
-            a + b + c + d + e + f
-        }
-    )).depends_on((
-        &deps[0], &deps[1], &deps[2], &deps[3], &deps[4], &deps[5]
-    ));
+    let sum = dag
+        .add_task(task_fn::<(i32, i32, i32, i32, i32, i32), _, _>(
+            |(a, b, c, d, e, f): (&i32, &i32, &i32, &i32, &i32, &i32)| a + b + c + d + e + f,
+        ))
+        .depends_on((&deps[0], &deps[1], &deps[2], &deps[3], &deps[4], &deps[5]));
 
     dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
 
@@ -106,12 +104,12 @@ async fn test_seven_dependencies() -> DagResult<()> {
     let dag = DagRunner::new();
 
     let deps: Vec<_> = (1..=7)
-        .map(|i| dag.add_task(task_fn(move |_: ()| async move { i })).into())
+        .map(|i| dag.add_task(task_fn::<(), _, _>(move |_: ()| i)).into())
         .collect();
 
     let sum = dag
-        .add_task(task_fn(
-            |(a, b, c, d, e, f, g): (i32, i32, i32, i32, i32, i32, i32)| async move {
+        .add_task(task_fn::<(i32, i32, i32, i32, i32, i32, i32), _, _>(
+            |(a, b, c, d, e, f, g): (&i32, &i32, &i32, &i32, &i32, &i32, &i32)| {
                 a + b + c + d + e + f + g
             },
         ))
@@ -130,12 +128,12 @@ async fn test_eight_dependencies() -> DagResult<()> {
     let dag = DagRunner::new();
 
     let deps: Vec<_> = (1..=8)
-        .map(|i| dag.add_task(task_fn(move |_: ()| async move { i })).into())
+        .map(|i| dag.add_task(task_fn::<(), _, _>(move |_: ()| i)).into())
         .collect();
 
     let sum = dag
-        .add_task(task_fn(
-            |(a, b, c, d, e, f, g, h): (i32, i32, i32, i32, i32, i32, i32, i32)| async move {
+        .add_task(task_fn::<(i32, i32, i32, i32, i32, i32, i32, i32), _, _>(
+            |(a, b, c, d, e, f, g, h): (&i32, &i32, &i32, &i32, &i32, &i32, &i32, &i32)| {
                 a + b + c + d + e + f + g + h
             },
         ))

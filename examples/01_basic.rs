@@ -113,11 +113,10 @@ async fn main() {
     // Step 7: Retrieve results
     //
     // Use .get() with a TaskHandle to retrieve the output.
-    // Results are cloned, so you can retrieve them multiple times.
+    // Results are not cloned, so you can only retrieve them once.
     println!("\nResult: {}", dag.get(sum).unwrap());
 
     // Note: You can also retrieve intermediate results
     assert_eq!(dag.get(x).unwrap(), 2);
     assert_eq!(dag.get(y).unwrap(), 3);
-    assert_eq!(dag.get(sum).unwrap(), 5);
 }

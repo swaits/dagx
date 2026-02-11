@@ -9,8 +9,8 @@ use futures::FutureExt;
 async fn test_result_type() {
     let dag = DagRunner::new();
 
-    let success_task = dag.add_task(task_fn(|_: ()| async { Ok::<i32, String>(42) }));
-    let error_task = dag.add_task(task_fn(|_: ()| async {
+    let success_task = dag.add_task(task_fn::<(), _, _>(|_: ()| Ok::<i32, String>(42)));
+    let error_task = dag.add_task(task_fn::<(), _, _>(|_: ()| {
         Err::<i32, String>("error".to_string())
     }));
 
@@ -25,7 +25,7 @@ async fn test_result_type() {
 #[tokio::test]
 async fn test_dag_result_type_works() {
     let dag = DagRunner::new();
-    let task = dag.add_task(task_fn(|_: ()| async { 100 }));
+    let task = dag.add_task(task_fn::<(), _, _>(|_: ()| 100));
 
     // Test that DagResult<()> works with ? operator pattern
     async fn run_dag(dag: &DagRunner) -> DagResult<()> {
@@ -41,7 +41,7 @@ async fn test_dag_result_type_works() {
 #[tokio::test]
 async fn test_task_not_executed_error() {
     let dag = DagRunner::new();
-    let task = dag.add_task(task_fn(|_: ()| async { 42 }));
+    let task = dag.add_task(task_fn::<(), _, _>(|_: ()| 42));
 
     // Try to get result before running - should error
     let result = dag.get(task);
@@ -58,7 +58,7 @@ async fn test_task_not_executed_error() {
 async fn test_error_messages_are_helpful() {
     // Test ResultNotFound error message
     let dag = DagRunner::new();
-    let task = dag.add_task(task_fn(|_: ()| async { 42 }));
+    let task = dag.add_task(task_fn::<(), _, _>(|_: ()| 42));
     let result = dag.get(task);
     assert!(result.is_err());
     let err_msg = format!("{}", result.unwrap_err());
@@ -70,7 +70,7 @@ async fn test_error_messages_are_helpful() {
 #[tokio::test]
 async fn test_successful_execution_returns_ok() {
     let dag = DagRunner::new();
-    let task = dag.add_task(task_fn(|_: ()| async { 42 }));
+    let task = dag.add_task(task_fn::<(), _, _>(|_: ()| 42));
 
     // Should return Ok(())
     let result = dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await;
@@ -84,7 +84,7 @@ async fn test_successful_execution_returns_ok() {
 async fn test_stateful_tasks() {
     let dag = DagRunner::new();
 
-    let input = dag.add_task(task_fn(|_: ()| async { 5 }));
+    let input = dag.add_task(task_fn::<(), _, _>(|_: ()| 5));
     let counter = dag.add_task(Counter::new(10)).depends_on(input);
 
     dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
@@ -102,9 +102,9 @@ async fn test_task_fn_with_captured_state() {
     let dag = DagRunner::new();
 
     let multiplier = 7;
-    let base = dag.add_task(task_fn(|_: ()| async { 5 }));
+    let base = dag.add_task(task_fn::<(), _, _>(|_: ()| 5));
     let scaled = dag
-        .add_task(task_fn(move |x: i32| async move { x * multiplier }))
+        .add_task(task_fn::<i32, _, _>(move |&x: &i32| x * multiplier))
         .depends_on(base);
 
     dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))

@@ -18,34 +18,34 @@ pub fn bench_etl_pipeline(c: &mut Criterion) {
                 let dag = DagRunner::new();
 
                 // Extract from 3 sources
-                let source1 = dag.add_task(task_fn(|_: ()| async { vec![1, 2, 3, 4, 5] }));
-                let source2 = dag.add_task(task_fn(|_: ()| async { vec![6, 7, 8, 9, 10] }));
-                let source3 = dag.add_task(task_fn(|_: ()| async { vec![11, 12, 13, 14, 15] }));
+                let source1 = dag.add_task(task_fn::<(), _, _>(|_: ()| vec![1, 2, 3, 4, 5]));
+                let source2 = dag.add_task(task_fn::<(), _, _>(|_: ()| vec![6, 7, 8, 9, 10]));
+                let source3 = dag.add_task(task_fn::<(), _, _>(|_: ()| vec![11, 12, 13, 14, 15]));
 
                 // Transform each source
                 let transform1 = dag
-                    .add_task(task_fn(|data: Vec<i32>| async move {
-                        data.into_iter().map(|x| x * 2).collect::<Vec<_>>()
+                    .add_task(task_fn::<Vec<_>, _, _>(|data: &Vec<i32>| {
+                        data.iter().map(|x| x * 2).collect::<Vec<_>>()
                     }))
                     .depends_on(source1);
 
                 let transform2 = dag
-                    .add_task(task_fn(|data: Vec<i32>| async move {
-                        data.into_iter().map(|x| x * 2).collect::<Vec<_>>()
+                    .add_task(task_fn::<Vec<_>, _, _>(|data: &Vec<i32>| {
+                        data.iter().map(|x| x * 2).collect::<Vec<_>>()
                     }))
                     .depends_on(source2);
 
                 let transform3 = dag
-                    .add_task(task_fn(|data: Vec<i32>| async move {
-                        data.into_iter().map(|x| x * 2).collect::<Vec<_>>()
+                    .add_task(task_fn::<Vec<_>, _, _>(|data: &Vec<i32>| {
+                        data.iter().map(|x| x * 2).collect::<Vec<_>>()
                     }))
                     .depends_on(source3);
 
                 // Merge all transformed data
                 let merge = dag
-                    .add_task(task_fn(
-                        |(d1, d2, d3): (Vec<i32>, Vec<i32>, Vec<i32>)| async move {
-                            let mut result = d1;
+                    .add_task(task_fn::<(Vec<_>, Vec<_>, Vec<_>), _, _>(
+                        |(d1, d2, d3): (&Vec<i32>, &Vec<i32>, &Vec<i32>)| {
+                            let mut result = d1.clone();
                             result.extend(d2);
                             result.extend(d3);
                             result
@@ -55,15 +55,18 @@ pub fn bench_etl_pipeline(c: &mut Criterion) {
 
                 // Validate
                 let validate = dag
-                    .add_task(task_fn(|data: Vec<i32>| async move {
-                        data.into_iter().filter(|&x| x > 0).collect::<Vec<_>>()
+                    .add_task(task_fn::<Vec<_>, _, _>(|data: &Vec<i32>| {
+                        data.iter()
+                            .copied()
+                            .filter(|&x| x > 0)
+                            .collect::<Vec<i32>>()
                     }))
                     .depends_on(merge);
 
                 // Load (compute sum)
                 let load = dag
-                    .add_task(task_fn(|data: Vec<i32>| async move {
-                        data.into_iter().sum::<i32>()
+                    .add_task(task_fn::<Vec<_>, _, _>(|data: &Vec<i32>| {
+                        data.iter().sum::<i32>()
                     }))
                     .depends_on(validate);
 

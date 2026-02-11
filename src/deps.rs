@@ -50,7 +50,7 @@ impl DepsTuple<()> for () {
 }
 
 // Implementation for single dependency (all forms)
-impl<T> DepsTuple<T::Output> for T
+impl<T> DepsTuple<(T::Output,)> for T
 where
     T: IntoNodeRef,
 {

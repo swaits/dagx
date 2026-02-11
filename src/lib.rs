@@ -11,7 +11,7 @@
 //!   system. The public API is fully type-safe with no runtime type errors. Internal execution
 //!   uses type erasure for heterogeneous task storage, but this is never exposed to users.
 //! - **Works with ANY type**: Custom types work automatically with the `#[task]` macro—just
-//!   implement `Clone + Send + Sync`, no trait implementations needed! The macro generates
+//!   implement `Send + Sync`, no trait implementations needed! The macro generates
 //!   type-specific extraction logic for seamless integration.
 //! - **Runtime-agnostic**: Works with any async runtime (Tokio, async-std, smol, Embassy, etc.)
 //! - **Type-state pattern**: The API guides you with compile-time errors if you wire dependencies
@@ -442,15 +442,13 @@
 //!
 //! ## Custom Types
 //!
-//! **dagx works with ANY type automatically!** As long as your type implements `Clone + Send + Sync + 'static`,
+//! **dagx works with ANY type automatically!** As long as your type is `Send + Sync + 'static`,
 //! the `#[task]` macro generates the necessary extraction logic:
 //!
 //! ```no_run
 //! # use dagx::{task, DagRunner, Task};
 //! # use futures::FutureExt;
 //!
-//! // Just derive Clone - that's all you need!
-//! #[derive(Clone)]
 //! struct User {
 //!     name: String,
 //!     age: u32,
@@ -645,7 +643,7 @@
 //! }
 //!
 //! // Downstream tasks receive &Vec<String> as normal
-//! // Behind the scenes: Arc<Vec<String>> is cloned cheaply, then inner Vec extracted
+//! // Behind the scenes: Arc<Vec<String>> is cloned cheaply, then a reference to the inner Vec is extracted
 //! struct ProcessData;
 //! #[task]
 //! impl ProcessData {
@@ -791,7 +789,7 @@ mod types;
 pub use builder::TaskBuilder;
 pub use error::{DagError, DagResult};
 pub use runner::DagRunner;
-pub use task::Task;
+pub use task::{Task, TaskInput};
 pub use types::{Pending, TaskHandle};
 
 // Re-export the procedural macro

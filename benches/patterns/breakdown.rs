@@ -14,7 +14,7 @@ pub fn bench_10k_breakdown(c: &mut Criterion) {
         b.iter(|| {
             let dag = DagRunner::new();
             for i in 0..10_000 {
-                dag.add_task(task_fn(move |_: ()| async move { i }));
+                dag.add_task(task_fn::<(), _, _>(move |_: ()| i));
             }
         });
     });
@@ -25,7 +25,7 @@ pub fn bench_10k_breakdown(c: &mut Criterion) {
             rt.block_on(async {
                 let dag = DagRunner::new();
                 for i in 0..10_000 {
-                    dag.add_task(task_fn(move |_: ()| async move { i }));
+                    dag.add_task(task_fn::<(), _, _>(move |_: ()| i));
                 }
                 dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
                     .await
@@ -39,7 +39,7 @@ pub fn bench_10k_breakdown(c: &mut Criterion) {
         // Pre-build the DAG outside the measurement
         let dag = DagRunner::new();
         for i in 0..10_000 {
-            dag.add_task(task_fn(move |_: ()| async move { i }));
+            dag.add_task(task_fn::<(), _, _>(move |_: ()| i));
         }
 
         b.iter(|| {

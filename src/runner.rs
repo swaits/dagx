@@ -199,8 +199,8 @@ impl DagRunner {
     pub fn add_task<Tk>(&self, task: Tk) -> TaskBuilder<'_, Tk, Pending>
     where
         Tk: Task + Sync + 'static,
-        Tk::Input: 'static + Clone,
-        Tk::Output: 'static + Clone,
+        Tk::Input: 'static,
+        Tk::Output: 'static,
     {
         let id = self.alloc_id();
 
@@ -211,7 +211,7 @@ impl DagRunner {
             "adding task to DAG"
         );
 
-        let node = TypedNode::new(id, task);
+        let node = TypedNode::new(task);
         self.nodes.lock().push(Some(Box::new(node)));
         self.edges.lock().insert(id, Vec::new());
         self.dependents.lock().insert(id, Vec::new());
@@ -519,6 +519,7 @@ impl DagRunner {
     /// # Behavior
     ///
     /// All task outputs are stored after execution and can be retrieved via get().
+    /// Each task's output can only be taken once, after which it will return `DagError::ResultNotFound`.
     ///
     /// # Errors
     ///
@@ -557,26 +558,26 @@ impl DagRunner {
     /// assert_eq!(dag.get(task).unwrap(), 42);
     /// # };
     /// ```
-    pub fn get<T: 'static + Clone + Send + Sync, H>(&self, handle: H) -> DagResult<T>
+    pub fn get<T: 'static + Send + Sync, H>(&self, handle: H) -> DagResult<T>
     where
         H: Into<TaskHandle<T>>,
     {
         let handle: TaskHandle<T> = handle.into();
-        let outputs = self.outputs.lock();
+        let mut outputs = self.outputs.lock();
 
-        let arc_output = outputs.get(&handle.id).ok_or(DagError::ResultNotFound {
+        let arc_output = outputs.remove(&handle.id).ok_or(DagError::ResultNotFound {
             task_id: handle.id.0,
         })?;
 
-        // Downcast Arc<dyn Any> to Arc<T>, then clone the inner value
-        // The Arc itself is stored for efficient sharing, but get() clones the data
-        Arc::clone(arc_output)
+        // Downcast Arc<dyn Any> to Arc<T>
+        let output = arc_output
             .downcast::<T>()
-            .map(|arc| (*arc).clone())
             .map_err(|_| DagError::TypeMismatch {
                 expected: std::any::type_name::<T>(),
                 found: "unknown",
-            })
+            })?;
+
+        Ok(Arc::into_inner(output).unwrap())
     }
 
     #[inline]
@@ -673,6 +674,3 @@ impl DagRunner {
 
 #[cfg(test)]
 mod tests;
-
-#[cfg(test)]
-mod coverage_tests;

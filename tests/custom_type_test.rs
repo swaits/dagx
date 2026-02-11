@@ -80,7 +80,7 @@ async fn test_custom_type_passthrough() {
     let person_result = dag.get(process).unwrap();
     let company_result = dag.get(transform).unwrap();
 
-    assert_eq!(person_result, "Alice is 30 years old");
+    assert_eq!(person_result.as_str(), "Alice is 30 years old");
     assert_eq!(company_result.name, "Alice's Company");
     assert_eq!(company_result.employees.len(), 1);
 }
@@ -103,7 +103,7 @@ async fn test_custom_type_diamond_pattern() {
     let result_a = dag.get(path_a).unwrap();
     let result_b = dag.get(path_b).unwrap();
 
-    assert_eq!(result_a, "Alice is 30 years old");
+    assert_eq!(result_a.as_str(), "Alice is 30 years old");
     assert_eq!(result_b.name, "Alice's Company");
 }
 
