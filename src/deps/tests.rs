@@ -176,7 +176,7 @@ fn test_deps_tuple_large_tuples() {
     let node_ids = (&handles[0], &handles[1], &handles[2], &handles[3]).to_node_ids();
     assert_eq!(node_ids.len(), 4);
     for (i, node_id) in node_ids.iter().enumerate().take(4) {
-        assert_eq!(*node_id, NodeId(i));
+        assert_eq!(*node_id, NodeId(i as u32));
     }
 
     // Test 8-tuple
@@ -193,7 +193,7 @@ fn test_deps_tuple_large_tuples() {
         .to_node_ids();
     assert_eq!(node_ids.len(), 8);
     for (i, node_id) in node_ids.iter().enumerate().take(8) {
-        assert_eq!(*node_id, NodeId(i));
+        assert_eq!(*node_id, NodeId(i as u32));
     }
 }
 

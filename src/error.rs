@@ -6,19 +6,16 @@
 #[derive(Debug, Clone, PartialEq)]
 pub enum DagError {
     /// Invalid dependency: task does not exist
-    InvalidDependency { task_id: usize },
+    InvalidDependency { task_id: u32 },
     /// Type mismatch in task dependencies
     TypeMismatch {
         expected: &'static str,
         found: &'static str,
     },
     /// Task panicked during execution
-    TaskPanicked {
-        task_id: usize,
-        panic_message: String,
-    },
+    TaskPanicked { task_id: u32, panic_message: String },
     /// Result not found for task
-    ResultNotFound { task_id: usize },
+    ResultNotFound { task_id: u32 },
     /// Attempted to run the DAG while it's already running
     ConcurrentExecution,
 }
