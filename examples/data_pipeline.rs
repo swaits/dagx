@@ -77,7 +77,6 @@
 
 use dagx::{task, DagRunner};
 
-
 // Data source tasks
 struct LoadValue1;
 

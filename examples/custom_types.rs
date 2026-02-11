@@ -36,7 +36,6 @@
 
 use dagx::{task, DagRunner, TaskHandle};
 
-
 #[derive(Debug)]
 struct User {
     name: String,

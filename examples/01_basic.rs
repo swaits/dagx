@@ -32,7 +32,6 @@
 
 use dagx::{task, DagRunner};
 
-
 // Step 1: Define a source task (no dependencies)
 //
 // Source tasks produce initial data for the DAG.

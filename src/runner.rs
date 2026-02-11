@@ -8,6 +8,7 @@
 use std::any::Any;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::future::Future;
+use std::hash::{BuildHasher, Hasher};
 use std::panic::AssertUnwindSafe;
 use std::pin::Pin;
 use std::sync::{
@@ -39,6 +40,35 @@ impl<'a> Drop for RunGuard<'a> {
         self.lock.store(false, Ordering::SeqCst);
     }
 }
+
+#[derive(Default, Clone)]
+pub(crate) struct PassThroughHasher {
+    hash: u64,
+}
+
+impl Hasher for PassThroughHasher {
+    fn finish(&self) -> u64 {
+        self.hash
+    }
+
+    fn write_u32(&mut self, i: u32) {
+        self.hash = i as u64;
+    }
+
+    fn write(&mut self, _bytes: &[u8]) {
+        panic!("PassThroughHasher used on invalid type");
+    }
+}
+
+impl BuildHasher for PassThroughHasher {
+    type Hasher = PassThroughHasher;
+
+    fn build_hasher(&self) -> Self::Hasher {
+        PassThroughHasher::default()
+    }
+}
+
+pub(crate) type PassThroughHashMap<K, V> = HashMap<K, V, PassThroughHasher>;
 
 /// Build and execute a typed DAG of tasks.
 ///
@@ -100,10 +130,11 @@ impl<'a> Drop for RunGuard<'a> {
 /// Arc enables efficient sharing during fanout without cloning data.
 pub struct DagRunner {
     pub(crate) nodes: Mutex<Vec<Option<Box<dyn ExecutableNode + Sync>>>>,
-    pub(crate) outputs: Mutex<HashMap<NodeId, std::sync::Arc<dyn std::any::Any + Send + Sync>>>,
-    pub(crate) edges: Mutex<HashMap<NodeId, Vec<NodeId>>>, // node -> dependencies
-    pub(crate) dependents: Mutex<HashMap<NodeId, Vec<NodeId>>>, // node -> tasks that depend on it
-    pub(crate) next_id: Mutex<usize>,
+    pub(crate) outputs:
+        Mutex<PassThroughHashMap<NodeId, std::sync::Arc<dyn std::any::Any + Send + Sync>>>,
+    pub(crate) edges: Mutex<PassThroughHashMap<NodeId, Vec<NodeId>>>, // node -> dependencies
+    pub(crate) dependents: Mutex<PassThroughHashMap<NodeId, Vec<NodeId>>>, // node -> tasks that depend on it
+    pub(crate) next_id: Mutex<u32>,
     pub(crate) run_lock: AtomicBool, // Ensures only one run() at a time
 }
 
@@ -126,9 +157,9 @@ impl DagRunner {
     pub fn new() -> Self {
         Self {
             nodes: Mutex::new(Vec::new()),
-            outputs: Mutex::new(HashMap::new()),
-            edges: Mutex::new(HashMap::new()),
-            dependents: Mutex::new(HashMap::new()),
+            outputs: Mutex::new(HashMap::default()),
+            edges: Mutex::new(HashMap::default()),
+            dependents: Mutex::new(HashMap::default()),
             next_id: Mutex::new(0),
             run_lock: AtomicBool::new(false),
         }
@@ -314,16 +345,18 @@ impl DagRunner {
         // Build topological layers
         let layers = self.compute_layers()?;
 
+        let total_tasks = layers.iter().map(|l| l.len()).sum::<usize>();
+
         #[cfg(feature = "tracing")]
         debug!(
             layer_count = layers.len(),
-            total_tasks = layers.iter().map(|l| l.len()).sum::<usize>(),
-            "computed topological layers"
+            total_tasks, "computed topological layers"
         );
 
         let edges = self.edges.lock().clone();
 
-        let mut outputs: HashMap<NodeId, Arc<dyn Any + Send + Sync>> = HashMap::new();
+        let mut outputs: PassThroughHashMap<NodeId, Arc<dyn Any + Send + Sync>> =
+            HashMap::with_capacity_and_hasher(total_tasks, PassThroughHasher::default());
         let mut first_error = None;
 
         for layer in layers {
@@ -368,7 +401,7 @@ impl DagRunner {
                 // Take ownership of the node
                 let node = {
                     let mut nodes_lock = self.nodes.lock();
-                    nodes_lock[node_id.0].take()
+                    nodes_lock[node_id.0 as usize].take()
                 };
 
                 if let Some(node) = node {
@@ -432,7 +465,7 @@ impl DagRunner {
                         // Take ownership of the node
                         let node = {
                             let mut nodes_lock = self.nodes.lock();
-                            nodes_lock[node_id.0].take()
+                            nodes_lock[node_id.0 as usize].take()
                         };
                         if let Some(node) = node {
                             let dependencies: Vec<_> = edges[&node_id]
@@ -586,7 +619,7 @@ impl DagRunner {
         #[cfg(feature = "tracing")]
         debug!("computing topological layers");
 
-        let mut in_degree: HashMap<NodeId, usize> = HashMap::new();
+        let mut in_degree: PassThroughHashMap<NodeId, usize> = HashMap::default();
         let mut layers = Vec::new();
 
         // Calculate in-degrees: for each node, count how many dependencies it has

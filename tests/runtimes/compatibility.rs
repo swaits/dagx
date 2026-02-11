@@ -2,7 +2,6 @@
 
 use dagx::{DagResult, DagRunner};
 
-
 struct Value(i32);
 #[dagx::task]
 impl Value {
@@ -27,7 +26,8 @@ async fn runtime_integration_tokio() -> DagResult<()> {
     let b = dag.add_task(Value(20));
     let sum = dag.add_task(Add).depends_on((a, b));
 
-    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await?;
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+        .await?;
 
     assert_eq!(dag.get(sum)?, 30);
     Ok(())

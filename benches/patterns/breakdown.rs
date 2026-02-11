@@ -3,7 +3,6 @@
 use criterion::Criterion;
 use dagx::{task_fn, DagRunner};
 
-
 pub fn bench_10k_breakdown(c: &mut Criterion) {
     let rt = tokio::runtime::Runtime::new().unwrap();
     let mut group = c.benchmark_group("10k_tasks");

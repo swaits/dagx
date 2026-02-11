@@ -63,7 +63,6 @@
 
 use dagx::{task, DagRunner};
 
-
 struct FetchName;
 
 #[task]

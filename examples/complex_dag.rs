@@ -68,7 +68,6 @@
 
 use dagx::{task, DagResult, DagRunner};
 
-
 // Extract: Load data from different sources
 struct LoadData {
     source: &'static str,
@@ -202,7 +201,8 @@ async fn main() -> DagResult<()> {
 
     // Execute the entire ETL pipeline
     println!("Executing pipeline...\n");
-    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await?;
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+        .await?;
 
     // Display final report
     println!("\n{}", dag.get(report)?);

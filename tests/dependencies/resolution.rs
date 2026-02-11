@@ -79,7 +79,8 @@ async fn test_dependency_resolution_order() -> DagResult<()> {
         .depends_on(d)
     };
 
-    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await?;
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+        .await?;
 
     assert_eq!(dag.get(e)?, 5);
 
@@ -113,7 +114,8 @@ async fn test_transitive_dependencies() -> DagResult<()> {
         .add_task(task_fn::<i32, _, _>(|&x: &i32| x + 5))
         .depends_on(b);
 
-    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await?;
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+        .await?;
 
     assert_eq!(dag.get(a)?, 10);
     assert_eq!(dag.get(b)?, 20);
@@ -136,7 +138,8 @@ async fn test_deep_chain_50_levels() -> DagResult<()> {
         handles.push(next);
     }
 
-    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await?;
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+        .await?;
 
     assert_eq!(dag.get(handles.last().unwrap())?, 50);
     Ok(())
@@ -155,7 +158,8 @@ async fn test_deep_chain_200_levels() -> DagResult<()> {
             .depends_on(current);
     }
 
-    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await?;
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+        .await?;
 
     assert_eq!(dag.get(current)?, 201);
     Ok(())

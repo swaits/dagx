@@ -4,7 +4,6 @@
 
 use criterion::Criterion;
 
-
 pub fn bench_large_scale(c: &mut Criterion) {
     let rt = tokio::runtime::Runtime::new().unwrap();
     let mut group = c.benchmark_group("large_scale_10k_tasks");

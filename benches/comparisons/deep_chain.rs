@@ -5,7 +5,6 @@
 use criterion::Criterion;
 use dagx::TaskHandle;
 
-
 pub fn bench_deep_chain(c: &mut Criterion) {
     let rt = tokio::runtime::Runtime::new().unwrap();
     let mut group = c.benchmark_group("deep_chain_100_tasks");

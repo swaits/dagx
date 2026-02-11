@@ -4,7 +4,6 @@
 
 use criterion::Criterion;
 
-
 pub fn bench_linear_pipeline(c: &mut Criterion) {
     let rt = tokio::runtime::Runtime::new().unwrap();
     let mut group = c.benchmark_group("linear_pipeline_5_tasks");

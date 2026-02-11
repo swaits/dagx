@@ -3,7 +3,6 @@
 use criterion::{BenchmarkId, Criterion};
 use dagx::{task_fn, DagRunner};
 
-
 pub fn bench_dag_scaling(c: &mut Criterion) {
     let rt = tokio::runtime::Runtime::new().unwrap();
     let mut group = c.benchmark_group("scaling");

@@ -57,7 +57,6 @@
 
 use dagx::{task, DagResult, DagRunner};
 
-
 // Task that validates and processes input
 struct ValidateAndDouble {
     value: i32,
@@ -138,7 +137,8 @@ async fn main() -> DagResult<()> {
         .depends_on((&cat1, &cat2, &cat3));
 
     // Execute
-    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await?;
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+        .await?;
 
     // Display results
     println!("\nFinal summary: {}", dag.get(summary)?);

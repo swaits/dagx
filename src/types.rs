@@ -8,7 +8,7 @@ use crate::task::Task;
 
 /// Opaque node identifier
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct NodeId(pub usize);
+pub struct NodeId(pub u32);
 
 /// Opaque, typed token for a node's output.
 ///
