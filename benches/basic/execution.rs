@@ -3,7 +3,6 @@
 use criterion::Criterion;
 use dagx::{task_fn, DagRunner};
 
-
 pub fn bench_dag_execution(c: &mut Criterion) {
     let rt = tokio::runtime::Runtime::new().unwrap();
 

@@ -116,7 +116,6 @@
 
 use dagx::{task, DagRunner};
 
-
 // Source task that provides a string input
 struct StringSource(&'static str);
 

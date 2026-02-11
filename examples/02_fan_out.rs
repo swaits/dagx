@@ -57,7 +57,6 @@
 
 use dagx::{task, DagRunner, TaskHandle};
 
-
 // Source task with a value field
 struct Source {
     initial_value: i32,

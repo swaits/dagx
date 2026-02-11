@@ -20,7 +20,8 @@ async fn test_1000_level_deep_chain() -> DagResult<()> {
             .depends_on(current);
     }
 
-    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await?;
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+        .await?;
 
     assert_eq!(dag.get(current)?, 999);
     Ok(())
@@ -50,7 +51,8 @@ async fn test_deep_chain_with_branches() -> DagResult<()> {
         }
     }
 
-    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await?;
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+        .await?;
 
     assert_eq!(dag.get(main_chain)?, 499);
 
@@ -108,7 +110,8 @@ async fn test_multiple_parallel_deep_chains() -> DagResult<()> {
             &chain_ends[7],
         ));
 
-    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await?;
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+        .await?;
 
     // Each chain: start + 500
     // Chain 0: 0 + 500 = 500
@@ -149,7 +152,8 @@ async fn test_deep_chain_execution_order() -> DagResult<()> {
             .depends_on(current);
     }
 
-    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await?;
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+        .await?;
 
     assert_eq!(order.load(Ordering::SeqCst), 100);
     assert_eq!(dag.get(current)?, 99);
@@ -179,7 +183,8 @@ async fn test_deep_binary_tree() -> DagResult<()> {
 
     let root = build_tree(&dag, 10, 1);
 
-    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await?;
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+        .await?;
 
     // Sum of all values in a complete binary tree with values 1024..2047
     // This is sum from 2^10 to 2^11-1 = 1024 * 1023 / 2 + 1024 * 512 = 1047552
@@ -209,7 +214,8 @@ async fn test_fibonacci_chain() -> DagResult<()> {
         prev1 = next;
     }
 
-    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await?;
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+        .await?;
 
     // 50th Fibonacci number (0-indexed) = 7778742049
     assert_eq!(dag.get(prev1)?, 7778742049);
@@ -232,7 +238,8 @@ async fn test_deep_chain_with_accumulator() -> DagResult<()> {
             .depends_on(current);
     }
 
-    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await?;
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+        .await?;
 
     let result = dag.get(current)?;
     assert_eq!(result, 20100); // sum of 1..=200
@@ -270,7 +277,8 @@ async fn test_zigzag_dependencies() -> DagResult<()> {
         .add_task(task_fn::<(i32, i32), _, _>(|(a, b): (&i32, &i32)| a + b))
         .depends_on((&chain_a, &chain_b));
 
-    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await?;
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+        .await?;
 
     let result = dag.get(final_task)?;
     assert!(result > 100);
@@ -293,7 +301,8 @@ async fn test_10000_level_chain_stress() -> DagResult<()> {
             .depends_on(current);
     }
 
-    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await?;
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+        .await?;
 
     assert_eq!(dag.get(current)?, 9_999);
     Ok(())

@@ -4,7 +4,6 @@
 
 use criterion::Criterion;
 
-
 pub fn bench_etl_pipeline(c: &mut Criterion) {
     let rt = tokio::runtime::Runtime::new().unwrap();
     let mut group = c.benchmark_group("etl_pipeline");

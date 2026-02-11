@@ -5,7 +5,6 @@
 use criterion::Criterion;
 use dagx::TaskHandle;
 
-
 pub fn bench_wide_fanout(c: &mut Criterion) {
     let rt = tokio::runtime::Runtime::new().unwrap();
     let mut group = c.benchmark_group("wide_fanout_100_tasks");

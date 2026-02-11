@@ -31,7 +31,10 @@ async fn test_concurrent_run_calls() {
 
     for _ in 0..5 {
         let dag = Arc::clone(&dag);
-        handles.spawn(async move { dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await });
+        handles.spawn(async move {
+            dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+                .await
+        });
     }
 
     // Only one run should succeed, others should fail with concurrent execution error
