@@ -2,7 +2,7 @@
 
 use crate::common::task_fn;
 use dagx::{task, DagResult, DagRunner, TaskHandle};
-use futures::FutureExt;
+
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use tokio::sync::Barrier;
@@ -58,7 +58,8 @@ async fn test_forced_interleaving_with_barriers() -> DagResult<()> {
         ))
         .depends_on((t1, t2, t3));
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+        .await?;
 
     assert_eq!(dag.get(collector)?, 6);
 
@@ -186,7 +187,8 @@ async fn test_alternating_execution_pattern() -> DagResult<()> {
             .depends_on(chain_b);
     }
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+        .await?;
 
     // Check alternating pattern
     let event_list = events.lock().clone();
@@ -262,7 +264,8 @@ async fn test_layered_interleaving() -> DagResult<()> {
         })
         .depends_on((&layer2[0], &layer2[1]));
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+        .await?;
 
     // Sum of 0+1+2+3 = 6
     assert_eq!(dag.get(layer3)?, 6);
@@ -368,7 +371,8 @@ async fn test_cross_branch_synchronization() -> DagResult<()> {
         .add_task(task_fn::<(i32, i32), _, _>(|(a, b): (&i32, &i32)| a + b))
         .depends_on((&a2, &b2));
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+        .await?;
 
     assert_eq!(dag.get(merge)?, 13); // 2 + 11
 

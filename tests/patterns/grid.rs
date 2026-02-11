@@ -2,7 +2,6 @@
 
 use crate::common::task_fn;
 use dagx::{DagResult, DagRunner};
-use futures::FutureExt;
 
 #[tokio::test]
 async fn test_2d_grid_pattern() -> DagResult<()> {
@@ -37,7 +36,8 @@ async fn test_2d_grid_pattern() -> DagResult<()> {
         }
     }
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+        .await?;
 
     // Check corner values
     let bottom_right = dag.get(grid[3][3].as_ref().unwrap())?;
@@ -102,7 +102,8 @@ async fn test_3d_grid_pattern() -> DagResult<()> {
         }
     }
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+        .await?;
 
     // Check that all cells have values
     for row in &grid {
@@ -176,7 +177,8 @@ async fn test_hexagonal_grid() -> DagResult<()> {
         hex_grid.insert((q, r), task);
     }
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+        .await?;
 
     // Verify center and some ring values
     assert_eq!(dag.get(hex_grid.get(&(0, 0)).unwrap())?, 100);
@@ -225,7 +227,8 @@ async fn test_toroidal_grid() -> DagResult<()> {
         }
     }
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+        .await?;
 
     // Verify all torus tasks completed
     for task in torus_tasks {

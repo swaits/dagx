@@ -2,7 +2,7 @@
 
 use crate::common::task_fn;
 use dagx::{task, DagResult, DagRunner, TaskHandle};
-use futures::FutureExt;
+
 use std::collections::HashSet;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
@@ -52,7 +52,8 @@ async fn test_tasks_run_on_different_threads() -> DagResult<()> {
         })
         .collect();
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+        .await?;
 
     // Verify all tasks completed
     for task in tasks.into_iter() {
@@ -129,7 +130,8 @@ async fn test_concurrent_execution_with_atomic_counter() -> DagResult<()> {
         })
         .collect();
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+        .await?;
 
     // Verify all tasks completed
     for (i, task) in tasks.into_iter().enumerate() {
@@ -212,7 +214,8 @@ async fn test_diamond_parallel_execution() -> DagResult<()> {
         .add_task(task_fn::<(i32, i32), _, _>(|(a, b): (&i32, &i32)| a + b))
         .depends_on((&parallel1, &parallel2));
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+        .await?;
 
     assert_eq!(dag.get(sink)?, 500); // (100 * 2) + (100 * 3)
 
@@ -279,7 +282,8 @@ async fn test_massive_parallel_fanout() -> DagResult<()> {
         .collect();
 
     let start = Instant::now();
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+        .await?;
     let elapsed = start.elapsed();
 
     // All should complete

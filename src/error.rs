@@ -63,7 +63,7 @@ impl std::fmt::Display for DagError {
                     f,
                     "Result not found for task #{}.\n\
                      \n\
-                     Call dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).",
+                     Call dag.run(|fut| async move {{ tokio::spawn(fut).await.unwrap() }}).",
                     task_id
                 )
             }

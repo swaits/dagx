@@ -34,7 +34,7 @@
 //!
 
 use dagx::{task, DagRunner};
-use futures::FutureExt;
+
 use tracing_subscriber::{fmt, EnvFilter};
 
 // Simple source task
@@ -96,7 +96,7 @@ async fn main() {
         // Layer 2: Combine results
         let result = dag.add_task(Add).depends_on((&left, &right));
 
-        dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
             .await
             .unwrap();
 
@@ -117,7 +117,7 @@ async fn main() {
         let c = dag.add_task(Multiply).depends_on((&b, &b));
         let d = dag.add_task(Add).depends_on((&c, &c));
 
-        dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
             .await
             .unwrap();
 
@@ -146,7 +146,7 @@ async fn main() {
         let sum_all = dag.add_task(Add).depends_on((&sum12, &sum23));
         let final_result = dag.add_task(Add).depends_on((&sum_all, &sum34));
 
-        dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
             .await
             .unwrap();
 

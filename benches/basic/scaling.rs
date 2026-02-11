@@ -2,7 +2,7 @@
 
 use criterion::{BenchmarkId, Criterion};
 use dagx::{task_fn, DagRunner};
-use futures::FutureExt;
+
 
 pub fn bench_dag_scaling(c: &mut Criterion) {
     let rt = tokio::runtime::Runtime::new().unwrap();
@@ -19,7 +19,7 @@ pub fn bench_dag_scaling(c: &mut Criterion) {
                     for i in 0..size {
                         dag.add_task(task_fn::<(), _, _>(move |_: ()| i));
                     }
-                    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+                    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
                         .await
                         .unwrap();
                 })

@@ -3,7 +3,7 @@
 //! Simple chain of tasks: A → B → C → D → E
 
 use criterion::Criterion;
-use futures::FutureExt;
+
 
 pub fn bench_linear_pipeline(c: &mut Criterion) {
     let rt = tokio::runtime::Runtime::new().unwrap();
@@ -31,7 +31,7 @@ pub fn bench_linear_pipeline(c: &mut Criterion) {
                     .add_task(task_fn::<i32, _, _>(|&x: &i32| x * 3))
                     .depends_on(d);
 
-                dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+                dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
                     .await
                     .unwrap();
                 dag.get(e).unwrap()

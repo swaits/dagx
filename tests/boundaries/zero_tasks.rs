@@ -2,7 +2,7 @@
 
 use crate::common::task_fn;
 use dagx::{task, DagResult, DagRunner};
-use futures::FutureExt;
+
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use tokio::task::yield_now;
@@ -12,7 +12,7 @@ async fn test_empty_dag_execution() -> DagResult<()> {
     // Test that an empty DAG can be created and run without issues
     let dag = DagRunner::new();
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await?;
 
     // Should complete successfully with no tasks
     Ok(())
@@ -25,7 +25,7 @@ async fn test_single_task_no_deps() -> DagResult<()> {
 
     let task = dag.add_task(task_fn::<(), _, _>(|_: ()| 42));
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await?;
 
     assert_eq!(dag.get(task)?, 42);
     Ok(())
@@ -44,7 +44,7 @@ async fn test_single_task_unit_input_output() -> DagResult<()> {
         exec.fetch_add(1, Ordering::SeqCst);
     }));
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await?;
 
     dag.get(task)?; // Just verify it doesn't error
     assert_eq!(executed.load(Ordering::SeqCst), 1);
@@ -61,7 +61,7 @@ async fn test_zero_sized_type_task() -> DagResult<()> {
 
     let task = dag.add_task(task_fn::<(), _, _>(|_: ()| ZeroSized));
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await?;
 
     assert_eq!(dag.get(task)?, ZeroSized);
     Ok(())
@@ -73,7 +73,7 @@ async fn test_empty_dag_multiple_runs() -> DagResult<()> {
     let dag = DagRunner::new();
 
     for _ in 0..10 {
-        dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
+        dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await?;
     }
 
     Ok(())
@@ -88,7 +88,7 @@ async fn test_dag_with_only_source_tasks() -> DagResult<()> {
         .map(|i| dag.add_task(task_fn::<(), _, _>(move |_: ()| i)))
         .collect();
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await?;
 
     for (i, task) in tasks.into_iter().enumerate() {
         assert_eq!(dag.get(task)?, i);
@@ -114,7 +114,7 @@ async fn test_single_self_contained_stateful_task() -> DagResult<()> {
     let dag = DagRunner::new();
     let task = dag.add_task(Counter { value: 21 });
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await?;
 
     assert_eq!(dag.get(task)?, 42);
     Ok(())
@@ -128,11 +128,11 @@ async fn test_alternating_empty_and_filled_dag_runs() -> DagResult<()> {
 
         if i % 2 == 0 {
             // Empty DAG
-            dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
+            dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await?;
         } else {
             // DAG with a task
             let task = dag.add_task(task_fn::<(), _, _>(move |_: ()| i));
-            dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
+            dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await?;
             assert_eq!(dag.get(task)?, i);
         }
     }
@@ -152,7 +152,7 @@ async fn test_dag_with_never_type_simulation() -> DagResult<()> {
     // This task completes immediately but returns a Result containing "never" type
     let task = dag.add_task(task_fn::<(), _, _>(|_: ()| Result::<i32, Never>::Ok(42)));
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await?;
 
     assert_eq!(dag.get(task)?, Ok(42));
     Ok(())
@@ -175,7 +175,7 @@ async fn test_minimal_task_with_minimal_async_work() -> DagResult<()> {
 
     let task = dag.add_task(YieldTask);
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await?;
 
     assert_eq!(dag.get(task)?, 1337);
     Ok(())

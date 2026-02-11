@@ -3,7 +3,6 @@
 //! These tests ensure we hit line 71 in the From<TaskBuilder> implementation
 
 use crate::{task, DagRunner, TaskHandle};
-use futures::FutureExt;
 
 #[tokio::test]
 async fn test_unit_type_taskbuilder_to_handle_conversion() {
@@ -31,7 +30,7 @@ async fn test_unit_type_taskbuilder_to_handle_conversion() {
     // specifically covering line 71
     let handle: TaskHandle<_> = builder.into();
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await
         .unwrap();
 
@@ -79,7 +78,7 @@ async fn test_unit_type_conversion_with_multiple_tasks() {
     let second_handle: TaskHandle<_> = second_builder.into();
     let third_handle: TaskHandle<bool> = third_builder.into();
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await
         .unwrap();
 
@@ -118,7 +117,7 @@ async fn test_unit_struct_with_state() {
     // Explicit conversion - triggers line 71
     let handle: TaskHandle<_> = builder.into();
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await
         .unwrap();
 
@@ -144,7 +143,7 @@ async fn test_taskbuilder_conversion_assignment() {
     // This also uses From<TaskBuilder> implementation
     let handle: TaskHandle<Vec<i32>> = builder.into();
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await
         .unwrap();
 
@@ -181,7 +180,7 @@ async fn test_mixed_unit_and_dependent_tasks() {
     // Doubler needs dependencies, so we use it differently
     let doubler = dag.add_task(Doubler).depends_on(source_handle);
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await
         .unwrap();
 

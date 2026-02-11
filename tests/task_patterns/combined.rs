@@ -3,7 +3,7 @@ use crate::common::task_fn;
 // Comprehensive test showing all three patterns working together
 
 use dagx::*;
-use futures::FutureExt;
+
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
@@ -53,7 +53,7 @@ async fn test_all_three_task_patterns() {
     // Pattern 3: Mutable accumulation
     let accumulated = dag.add_task(MutableAccumulator(10)).depends_on(doubled); // 10 + 16 = 26
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await
         .unwrap();
 
@@ -90,7 +90,7 @@ async fn test_parallel_execution() {
         3
     }));
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await
         .unwrap();
 
@@ -111,7 +111,7 @@ async fn test_task_fn_with_captured_state() {
         .add_task(task_fn::<i32, _, _>(move |&x: &i32| x * multiplier))
         .depends_on(base);
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await
         .unwrap();
 

@@ -2,7 +2,6 @@
 
 use crate::common::task_fn;
 use dagx::{DagError, DagRunner, TaskHandle};
-use futures::FutureExt;
 
 #[tokio::test]
 async fn test_result_not_found_error() {
@@ -15,7 +14,7 @@ async fn test_result_not_found_error() {
     assert!(matches!(result, Err(DagError::ResultNotFound { .. })));
 
     // Run and verify it works after
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await
         .unwrap();
 
@@ -33,7 +32,7 @@ async fn test_nested_result_error_handling() {
 
     let task2 = dag.add_task(task_fn::<(), _, _>(|_: ()| Result::<i32, String>::Ok(42)));
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await
         .unwrap();
 
@@ -48,7 +47,7 @@ async fn test_option_none_not_error() {
 
     let task = dag.add_task(task_fn::<(), _, _>(|_: ()| None::<i32>));
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await
         .unwrap();
 
@@ -77,7 +76,7 @@ async fn test_custom_error_types() {
         })
     }));
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await
         .unwrap();
 
@@ -106,7 +105,9 @@ async fn test_error_in_tuple_dependency() {
         .add_task(task_fn::<(i32, i32), _, _>(|(a, b): (&i32, &i32)| a + b))
         .depends_on((ok_task, err_task));
 
-    let result = dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await;
+    let result = dag
+        .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+        .await;
 
     assert!(result.is_err());
     assert!(dag.get(dependent).is_err());
@@ -124,7 +125,9 @@ async fn test_string_panic_vs_structured_panic() {
         panic!("Formatted panic: value={}, code={}", 42, "ERROR");
     }));
 
-    let _ = dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await;
+    let _ = dag
+        .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+        .await;
 
     // Both should result in errors
     assert!(dag.get(string_panic).is_err());
@@ -144,7 +147,7 @@ async fn test_anyhow_like_error_chain() {
         outer
     }));
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await
         .unwrap();
 

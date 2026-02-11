@@ -23,7 +23,7 @@ pub struct NodeId(pub usize);
 ///
 /// ```no_run
 /// # use dagx::{task, DagRunner, Task};
-/// # use futures::FutureExt;
+/// #
 /// # struct LoadValue { value: i32 }
 /// # impl LoadValue { pub fn new(v: i32) -> Self { Self { value: v } } }
 /// # #[task]
@@ -34,7 +34,7 @@ pub struct NodeId(pub usize);
 /// let dag = DagRunner::new();
 /// let node = dag.add_task(LoadValue::new(42));
 ///
-/// dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await.unwrap();
+/// dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await.unwrap();
 ///
 /// assert_eq!(dag.get(node).unwrap(), 42);
 /// # };

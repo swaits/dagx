@@ -2,7 +2,7 @@
 
 use crate::common::task_fn;
 use dagx::{DagResult, DagRunner};
-use futures::FutureExt;
+
 
 #[tokio::test]
 async fn test_two_dependencies() -> DagResult<()> {
@@ -14,7 +14,7 @@ async fn test_two_dependencies() -> DagResult<()> {
         .add_task(task_fn::<(i32, i32), _, _>(|(x, y): (&i32, &i32)| x + y))
         .depends_on((a, b));
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await?;
 
     assert_eq!(dag.get(sum)?, 30);
     Ok(())
@@ -33,7 +33,7 @@ async fn test_three_dependencies() -> DagResult<()> {
         ))
         .depends_on((a, b, c));
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await?;
 
     assert_eq!(dag.get(sum)?, 6);
     Ok(())
@@ -53,7 +53,7 @@ async fn test_four_dependencies() -> DagResult<()> {
         ))
         .depends_on((&deps[0], &deps[1], &deps[2], &deps[3]));
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await?;
 
     assert_eq!(dag.get(sum)?, 10); // 1+2+3+4
     Ok(())
@@ -73,7 +73,7 @@ async fn test_five_dependencies() -> DagResult<()> {
         ))
         .depends_on((&deps[0], &deps[1], &deps[2], &deps[3], &deps[4]));
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await?;
 
     assert_eq!(dag.get(sum)?, 15); // 1+2+3+4+5
     Ok(())
@@ -93,7 +93,7 @@ async fn test_six_dependencies() -> DagResult<()> {
         ))
         .depends_on((&deps[0], &deps[1], &deps[2], &deps[3], &deps[4], &deps[5]));
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await?;
 
     assert_eq!(dag.get(sum)?, 21); // 1+2+3+4+5+6
     Ok(())
@@ -117,7 +117,7 @@ async fn test_seven_dependencies() -> DagResult<()> {
             &deps[0], &deps[1], &deps[2], &deps[3], &deps[4], &deps[5], &deps[6],
         ));
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await?;
 
     assert_eq!(dag.get(sum)?, 28); // 1+2+3+4+5+6+7
     Ok(())
@@ -141,7 +141,7 @@ async fn test_eight_dependencies() -> DagResult<()> {
             &deps[0], &deps[1], &deps[2], &deps[3], &deps[4], &deps[5], &deps[6], &deps[7],
         ));
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await?;
 
     assert_eq!(dag.get(sum)?, 36); // Sum of 1..=8
     Ok(())
