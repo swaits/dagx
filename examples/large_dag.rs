@@ -110,7 +110,7 @@
 //! ```
 
 use dagx::{task, DagRunner};
-use futures::FutureExt;
+
 use std::time::Instant;
 
 // Simple computation task
@@ -182,7 +182,7 @@ async fn main() {
         println!("  Build time: {:?}", build_time);
 
         let exec_start = Instant::now();
-        dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
             .await
             .unwrap();
         let exec_time = exec_start.elapsed();
@@ -222,7 +222,7 @@ async fn main() {
         println!("  Build time: {:?}", build_time);
 
         let exec_start = Instant::now();
-        dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
             .await
             .unwrap();
         let exec_time = exec_start.elapsed();
@@ -273,7 +273,7 @@ async fn main() {
         println!("  Tree depth: {}", level);
 
         let exec_start = Instant::now();
-        dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
             .await
             .unwrap();
         let exec_time = exec_start.elapsed();
@@ -331,7 +331,7 @@ async fn main() {
         println!("  Build time: {:?}", build_time);
 
         let exec_start = Instant::now();
-        dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
             .await
             .unwrap();
         let exec_time = exec_start.elapsed();
@@ -355,7 +355,7 @@ async fn main() {
             .map(|i| dag.add_task(FormatNumber { id: i }))
             .collect();
 
-        dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
             .await
             .unwrap();
 

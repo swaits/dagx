@@ -15,8 +15,8 @@
 
 use crate::common::task_fn;
 use dagx::{DagRunner, TaskHandle};
-use futures::task::SpawnExt;
 use futures_executor::ThreadPool;
+use futures_util::task::SpawnExt;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 

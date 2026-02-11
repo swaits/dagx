@@ -24,7 +24,7 @@
 //!
 //! **2. DAG-Level Timeout** - Entire workflow with timeout
 //! ```rust
-//! match timeout(dag_timeout, dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await {
+//! match timeout(dag_timeout, dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await {
 //!     Ok(result) => { /* DAG completed */ },
 //!     Err(_) => { /* DAG timed out */ },
 //! }
@@ -99,7 +99,7 @@
 //! ```
 
 use dagx::{task, DagRunner, TaskHandle};
-use futures::FutureExt;
+
 use tokio::time::{sleep, timeout, Duration};
 
 // Fast task that completes quickly
@@ -178,7 +178,7 @@ async fn main() {
             timeout_ms: 500,
         });
 
-        dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
             .await
             .unwrap();
 
@@ -198,7 +198,7 @@ async fn main() {
 
         let processed = dag.add_task(ProcessResult).depends_on(timed);
 
-        dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
             .await
             .unwrap();
 
@@ -225,7 +225,7 @@ async fn main() {
             timeout_ms: 200,
         });
 
-        dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
             .await
             .unwrap();
 
@@ -251,7 +251,7 @@ async fn main() {
         let processed1 = dag.add_task(ProcessResult).depends_on(source);
         let processed2 = dag.add_task(ProcessResult).depends_on(source);
 
-        dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
             .await
             .unwrap();
 
@@ -272,7 +272,7 @@ async fn main() {
         let dag_timeout = Duration::from_millis(500);
         match timeout(
             dag_timeout,
-            dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)),
+            dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }),
         )
         .await
         {

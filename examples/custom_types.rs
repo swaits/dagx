@@ -35,7 +35,7 @@
 //! ```
 
 use dagx::{task, DagRunner, TaskHandle};
-use futures::FutureExt;
+
 
 #[derive(Debug)]
 struct User {
@@ -107,7 +107,7 @@ async fn main() {
     let validation = dag.add_task(ValidateUser).depends_on(user_task);
 
     // Execute the DAG
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await
         .unwrap();
 

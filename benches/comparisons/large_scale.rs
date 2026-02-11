@@ -3,7 +3,7 @@
 //! 10,000 independent tasks to test scaling
 
 use criterion::Criterion;
-use futures::FutureExt;
+
 
 pub fn bench_large_scale(c: &mut Criterion) {
     let rt = tokio::runtime::Runtime::new().unwrap();
@@ -22,7 +22,7 @@ pub fn bench_large_scale(c: &mut Criterion) {
                     dag.add_task(task_fn::<(), _, _>(move |_: ()| i * 2));
                 }
 
-                dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+                dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
                     .await
                     .unwrap();
             })

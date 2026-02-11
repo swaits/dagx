@@ -153,7 +153,7 @@
 //! ```
 
 use dagx::{task, DagRunner};
-use futures::FutureExt;
+
 use tokio::time::{sleep, Duration};
 
 // Retry strategy configuration
@@ -356,7 +356,7 @@ async fn main() {
             ],
         ));
 
-        dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
             .await
             .unwrap();
 
@@ -378,7 +378,7 @@ async fn main() {
             ],
         ));
 
-        dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
             .await
             .unwrap();
 
@@ -404,7 +404,7 @@ async fn main() {
             ],
         ));
 
-        dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
             .await
             .unwrap();
 
@@ -423,7 +423,7 @@ async fn main() {
             vec![ApiError::AuthenticationFailed],
         ));
 
-        dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
             .await
             .unwrap();
 
@@ -450,7 +450,7 @@ async fn main() {
             ],
         ));
 
-        dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
             .await
             .unwrap();
 

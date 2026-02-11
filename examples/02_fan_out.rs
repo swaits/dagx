@@ -56,7 +56,7 @@
 //! ```
 
 use dagx::{task, DagRunner, TaskHandle};
-use futures::FutureExt;
+
 
 // Source task with a value field
 struct Source {
@@ -141,7 +141,7 @@ async fn main() {
 
     // Run the DAG
     println!("Running fan-out DAG...\n");
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await
         .unwrap();
 

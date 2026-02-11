@@ -1,6 +1,5 @@
 // Test that custom types work without any trait implementations
 use dagx::{task, DagRunner, TaskHandle};
-use futures::FutureExt;
 
 #[derive(Clone, Debug, PartialEq)]
 struct Person {
@@ -57,7 +56,7 @@ async fn test_custom_type_single_dependency() {
     let fetch = dag.add_task(FetchPerson);
     let process = dag.add_task(ProcessPerson).depends_on(fetch);
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await
         .unwrap();
 
@@ -73,7 +72,7 @@ async fn test_custom_type_passthrough() {
     let transform = dag.add_task(PersonToCompany).depends_on(fetch);
     let process = dag.add_task(ProcessPerson).depends_on(fetch);
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await
         .unwrap();
 
@@ -96,7 +95,7 @@ async fn test_custom_type_diamond_pattern() {
     let path_a = dag.add_task(ProcessPerson).depends_on(fetch);
     let path_b = dag.add_task(PersonToCompany).depends_on(fetch);
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await
         .unwrap();
 
@@ -116,7 +115,7 @@ async fn test_custom_type_fan_out() {
     let process2 = dag.add_task(ProcessPerson).depends_on(fetch);
     let process3 = dag.add_task(ProcessPerson).depends_on(fetch);
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await
         .unwrap();
 

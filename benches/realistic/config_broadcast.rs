@@ -2,7 +2,7 @@
 
 use criterion::{BenchmarkId, Criterion};
 use dagx::{task_fn, DagRunner, TaskHandle};
-use futures::FutureExt;
+
 use std::collections::HashMap;
 use std::hint::black_box;
 
@@ -56,7 +56,7 @@ pub fn bench_config_broadcast(c: &mut Criterion) {
                             .depends_on(config);
                         }
 
-                        dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+                        dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
                             .await
                             .unwrap();
                     })

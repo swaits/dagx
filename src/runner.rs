@@ -9,14 +9,13 @@ use std::any::Any;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::future::Future;
 use std::panic::AssertUnwindSafe;
+use std::pin::Pin;
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc,
 };
 
-use futures::future::BoxFuture;
-use futures::stream::FuturesUnordered;
-use futures::{FutureExt, StreamExt, TryFutureExt};
+use futures_util::{stream::FuturesUnordered, FutureExt, StreamExt, TryFutureExt};
 use parking_lot::Mutex;
 
 #[cfg(feature = "tracing")]
@@ -27,6 +26,8 @@ use crate::error::{DagError, DagResult};
 use crate::node::{ExecutableNode, TypedNode};
 use crate::task::Task;
 use crate::types::{NodeId, Pending, TaskHandle};
+
+type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 
 // Guard to ensure run_lock is released even on early return or panic
 struct RunGuard<'a> {
@@ -56,7 +57,7 @@ impl<'a> Drop for RunGuard<'a> {
 ///
 /// ```no_run
 /// # use dagx::{task, DagRunner, Task};
-/// # use futures::FutureExt;
+/// #
 /// // Task with state constructed via ::new()
 /// struct LoadValue { value: i32 }
 ///
@@ -85,7 +86,7 @@ impl<'a> Drop for RunGuard<'a> {
 /// let y = dag.add_task(LoadValue::new(3));
 /// let sum = dag.add_task(Add).depends_on((x, y));
 ///
-/// dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await.unwrap();
+/// dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await.unwrap();
 ///
 /// assert_eq!(dag.get(sum).unwrap(), 5);
 /// # };
@@ -150,7 +151,7 @@ impl DagRunner {
     ///
     /// ```no_run
     /// # use dagx::{task, DagRunner, Task};
-    /// # use futures::FutureExt;
+    /// #
     /// // Task with state - shows you construct with specific value
     /// struct LoadValue {
     ///     initial: i32,
@@ -192,7 +193,7 @@ impl DagRunner {
     /// // Construct task with offset of 1
     /// let inc = dag.add_task(AddOffset::new(1)).depends_on(base);
     ///
-    /// dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await.unwrap();
+    /// dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await.unwrap();
     /// assert_eq!(dag.get(inc).unwrap(), 11);
     /// # };
     /// ```
@@ -236,7 +237,7 @@ impl DagRunner {
     ///
     /// - `spawner`: A function that spawns futures on the async runtime
     ///   and returns a handle to the task. This is the only way to run tasks on separate threads. Examples:
-    ///   - Tokio: `|fut| { tokio::spawn(fut).map(Result::unwrap) }`
+    ///   - Tokio: `|fut| { tokio::spawn(fut).await.unwrap() }`
     ///   - Smol: `|fut| { smol::spawn(fut) }`
     ///   - Async-std: `|fut| { async_std::task::spawn(fut) }`
     ///   - Single-threaded: `|fut| fut`
@@ -256,7 +257,7 @@ impl DagRunner {
     ///
     /// ```
     /// # use dagx::{task, DagRunner, Task};
-    /// # use futures::FutureExt;
+    /// #
     /// // Tuple struct
     /// struct Value(i32);
     ///
@@ -280,7 +281,7 @@ impl DagRunner {
     /// let b = dag.add_task(Value(2));
     /// let sum = dag.add_task(Add).depends_on((a, b));
     ///
-    /// dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await.unwrap(); // Executes all tasks
+    /// dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await.unwrap(); // Executes all tasks
     /// # };
     /// ```
     #[inline]
@@ -531,7 +532,7 @@ impl DagRunner {
     ///
     /// ```no_run
     /// # use dagx::{task, DagRunner, Task};
-    /// # use futures::FutureExt;
+    /// #
     /// struct Configuration {
     ///     setting: i32,
     /// }
@@ -553,7 +554,7 @@ impl DagRunner {
     /// // Construct task with specific setting value
     /// let task = dag.add_task(Configuration::new(42));
     ///
-    /// dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await.unwrap();
+    /// dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await.unwrap();
     ///
     /// assert_eq!(dag.get(task).unwrap(), 42);
     /// # };

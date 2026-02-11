@@ -10,7 +10,7 @@
 //! These tests serve as both validation and documentation for proper Arc usage.
 
 use dagx::{task, DagRunner, TaskHandle};
-use futures::FutureExt;
+
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -44,7 +44,7 @@ async fn test_arc_basic_pipeline() {
     let producer = dag.add_task(Producer);
     let consumer = dag.add_task(Consumer).depends_on(producer);
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await
         .unwrap();
 
@@ -100,7 +100,7 @@ async fn test_arc_with_primitives() {
         .add_task(AllConsumer)
         .depends_on((i32_prod, f64_prod, bool_prod));
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await
         .unwrap();
 
@@ -174,7 +174,7 @@ async fn test_arc_with_collections() {
         .add_task(CollectionConsumer)
         .depends_on((vec_prod, map_prod, set_prod));
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await
         .unwrap();
 
@@ -245,7 +245,7 @@ async fn test_arc_with_custom_structs() {
     let age_ext = dag.add_task(AgeExtractor).depends_on(person_prod);
     let email_ext = dag.add_task(EmailCountExtractor).depends_on(person_prod);
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await
         .unwrap();
 
@@ -311,7 +311,7 @@ async fn test_arc_fan_out_three_consumers() {
     let c2 = dag.add_task(FirstConsumer).depends_on(producer);
     let c3 = dag.add_task(JoinConsumer).depends_on(producer);
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await
         .unwrap();
 
@@ -385,7 +385,7 @@ async fn test_arc_fan_out_five_consumers_large_data() {
     let c4 = dag.add_task(PatternCounter).depends_on(producer);
     let c5 = dag.add_task(TotalBytesComputer).depends_on(producer);
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await
         .unwrap();
 
@@ -475,7 +475,7 @@ async fn test_arc_nested_fan_out_tree() {
     let l2_negate = dag.add_task(Level2Negate).depends_on(l1_prod);
     let l2_mod = dag.add_task(Level2Mod10).depends_on(l1_prod);
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await
         .unwrap();
 
@@ -543,7 +543,7 @@ async fn test_arc_performance_vs_clone() {
 
     let start = Instant::now();
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await
         .unwrap();
 
@@ -643,7 +643,7 @@ async fn test_arc_with_result() {
 
     let consumer3 = dag.add_task(ArcResultConsumer2).depends_on(arc_result_err);
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await
         .unwrap();
 
@@ -750,7 +750,7 @@ async fn test_arc_with_option() {
     let c3 = dag.add_task(OptionArcConsumer1).depends_on(opt_arc_some);
     let c4 = dag.add_task(OptionArcConsumer2).depends_on(opt_arc_none);
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await
         .unwrap();
 
@@ -805,7 +805,7 @@ async fn test_arc_diamond_dependency() {
     let right = dag.add_task(RightBranch).depends_on(top);
     let bottom = dag.add_task(Bottom).depends_on((&left, &right));
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await
         .unwrap();
 
@@ -873,7 +873,7 @@ async fn test_arc_empty_collections() {
         .add_task(EmptyConsumer)
         .depends_on((vec_task, string_task, map_task));
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await
         .unwrap();
 
@@ -944,7 +944,7 @@ async fn test_arc_very_large_data() {
     let last = dag.add_task(LastSampler).depends_on(producer);
     let middle = dag.add_task(MiddleSampler).depends_on(producer);
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await
         .unwrap();
 
@@ -981,7 +981,7 @@ async fn test_arc_of_arc() {
     let producer = dag.add_task(NestedProducer);
     let consumer = dag.add_task(NestedConsumer).depends_on(producer);
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await
         .unwrap();
 
@@ -1045,7 +1045,7 @@ async fn test_arc_mixed_with_non_arc() {
     let unwrap = dag.add_task(Unwrapper).depends_on(arc_prod);
     let wrap = dag.add_task(Wrapper).depends_on(non_arc_prod);
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await
         .unwrap();
 
@@ -1113,7 +1113,7 @@ async fn test_arc_parallel_execution() {
 
     let start = Instant::now();
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await
         .unwrap();
 
@@ -1162,7 +1162,7 @@ async fn test_arc_reference_counting() {
     let producer = dag.add_task(RefCountProducer);
     let checker = dag.add_task(RefCountChecker).depends_on(producer);
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await
         .unwrap();
 
@@ -1240,7 +1240,7 @@ async fn test_arc_massive_fanout_performance_comparison() {
 
     let start_without_arc = Instant::now();
     dag_without_arc
-        .run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await
         .unwrap();
     let duration_without_arc = start_without_arc.elapsed();
@@ -1294,7 +1294,7 @@ async fn test_arc_massive_fanout_performance_comparison() {
 
     let start_with_arc = Instant::now();
     dag_with_arc
-        .run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await
         .unwrap();
     let duration_with_arc = start_with_arc.elapsed();

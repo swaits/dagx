@@ -2,7 +2,7 @@
 
 use crate::common::task_fn;
 use dagx::{task, DagRunner};
-use futures::FutureExt;
+
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
@@ -31,7 +31,7 @@ async fn test_concurrent_run_calls() {
 
     for _ in 0..5 {
         let dag = Arc::clone(&dag);
-        handles.spawn(async move { dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await });
+        handles.spawn(async move { dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await });
     }
 
     // Only one run should succeed, others should fail with concurrent execution error
@@ -66,7 +66,7 @@ async fn test_concurrent_execution_and_building() {
         .collect();
 
     // Execute the initial DAG
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await
         .unwrap();
 
@@ -95,7 +95,7 @@ async fn test_concurrent_execution_and_building() {
     }
 
     // Execute again with the new tasks
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await
         .unwrap();
 }
@@ -139,7 +139,7 @@ async fn test_dag_builder_thread_safety() {
     assert_eq!(counter.load(Ordering::SeqCst), 10);
 
     // Execute the combined DAG
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await
         .unwrap();
 
@@ -161,7 +161,7 @@ async fn test_concurrent_get_operations() {
         .map(|i| dag.add_task(task_fn::<(), _, _>(move |_: ()| i)))
         .collect();
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await
         .unwrap();
 
@@ -213,7 +213,7 @@ async fn test_no_race_in_dependency_tracking() {
     }
 
     // Execute
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await
         .unwrap();
 
@@ -273,7 +273,7 @@ async fn test_high_concurrency_stress() {
     assert_eq!(completed.load(Ordering::SeqCst), 1000);
 
     // The DAG should still be executable
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await
         .unwrap();
 }
@@ -363,7 +363,7 @@ async fn test_atomic_dag_operations() {
     assert_eq!(deps.len(), 50);
 
     // Execute and verify
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await
         .unwrap();
 
@@ -416,7 +416,7 @@ async fn test_no_deadlock_on_circular_waiting() {
     assert!(result.is_ok(), "Deadlock detected - operation timed out");
 
     // Should be able to execute the DAG
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await
         .unwrap();
 }

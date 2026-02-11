@@ -4,7 +4,7 @@
 
 use criterion::Criterion;
 use dagx::TaskHandle;
-use futures::FutureExt;
+
 
 pub fn bench_deep_chain(c: &mut Criterion) {
     let rt = tokio::runtime::Runtime::new().unwrap();
@@ -29,7 +29,7 @@ pub fn bench_deep_chain(c: &mut Criterion) {
                         .depends_on(prev);
                 }
 
-                dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+                dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
                     .await
                     .unwrap();
                 dag.get(prev).unwrap()

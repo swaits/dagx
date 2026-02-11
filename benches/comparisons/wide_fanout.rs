@@ -4,7 +4,7 @@
 
 use criterion::Criterion;
 use dagx::TaskHandle;
-use futures::FutureExt;
+
 
 pub fn bench_wide_fanout(c: &mut Criterion) {
     let rt = tokio::runtime::Runtime::new().unwrap();
@@ -25,7 +25,7 @@ pub fn bench_wide_fanout(c: &mut Criterion) {
                         .depends_on(source);
                 }
 
-                dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+                dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
                     .await
                     .unwrap();
             })

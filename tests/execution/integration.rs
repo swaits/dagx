@@ -2,7 +2,7 @@
 
 use crate::common::task_fn;
 use dagx::{DagResult, DagRunner, Task};
-use futures::FutureExt;
+
 use std::time::Instant;
 use tokio::time::{sleep, Duration};
 
@@ -68,7 +68,8 @@ async fn integration_test_etl_pipeline() -> DagResult<()> {
     let final_result = dag.add_task(Add).depends_on((&combine12, &transform3));
 
     // Execute pipeline
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+        .await?;
 
     // Verify
     let result = dag.get(final_result)?;
@@ -98,7 +99,8 @@ async fn integration_test_multi_layer_dag() -> DagResult<()> {
     // Layer 4: Final result
     let final_result = dag.add_task(Add).depends_on((&double_ab, &double_bc));
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+        .await?;
 
     let result = dag.get(final_result)?;
     // (1+2)*2 + (2+3)*2 = 6 + 10 = 16
@@ -119,7 +121,8 @@ async fn integration_test_multiple_sinks() -> DagResult<()> {
     let branch2 = dag.add_task(Multiply::new(3)).depends_on(source);
     let branch3 = dag.add_task(Multiply::new(4)).depends_on(source);
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+        .await?;
 
     // All branches should complete
     assert_eq!(dag.get(branch1)?, 20);
@@ -145,7 +148,8 @@ async fn integration_test_diamond_cascade() -> DagResult<()> {
     let right2 = dag.add_task(Multiply::new(3)).depends_on(sink1);
     let sink2 = dag.add_task(Add).depends_on((&left2, &right2));
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+        .await?;
 
     let result = dag.get(sink2)?;
     // Diamond 1: (10*2) + (10*3) = 50
@@ -176,7 +180,8 @@ async fn integration_test_wide_and_deep() -> DagResult<()> {
         final_nodes.push(step3);
     }
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+        .await?;
 
     // Verify each chain
     for (i, node) in final_nodes.iter().enumerate() {
@@ -195,7 +200,8 @@ async fn integration_test_error_recovery() -> DagResult<()> {
     let source = dag.add_task(LoadValue::new(42));
     let transform = dag.add_task(Multiply::new(2)).depends_on(source);
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+        .await?;
 
     // Should be able to access results
     assert_eq!(dag.get(transform)?, 84);
@@ -231,7 +237,8 @@ async fn integration_test_large_scale() -> DagResult<()> {
         })
         .collect();
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+        .await?;
 
     // Verify some results
     assert_eq!(dag.get(aggregations[0])?, 1); // First two
@@ -255,7 +262,8 @@ async fn integration_test_reused_values() -> DagResult<()> {
     // Combine some of the results
     let combined = dag.add_task(Add).depends_on((&double, &triple));
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+        .await?;
 
     assert_eq!(dag.get(double)?, 200);
     assert_eq!(dag.get(triple)?, 300);
@@ -284,7 +292,8 @@ async fn integration_test_parallel_execution_timing() -> DagResult<()> {
         .collect();
 
     let start = Instant::now();
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+        .await?;
     let elapsed = start.elapsed();
 
     // Verify all tasks completed
@@ -345,7 +354,8 @@ async fn integration_test_parallel_vs_sequential_timing() -> DagResult<()> {
         .depends_on(seq2);
 
     let start = Instant::now();
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+        .await?;
     let elapsed = start.elapsed();
 
     // Verify results

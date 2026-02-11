@@ -2,7 +2,7 @@
 
 use crate::common::task_fn;
 use dagx::DagRunner;
-use futures::FutureExt;
+
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -27,7 +27,7 @@ async fn test_deep_chain_100_levels() {
 
     // Execute
     let start = Instant::now();
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await
         .unwrap();
     let exec_time = start.elapsed();
@@ -88,7 +88,7 @@ async fn test_stress_mixed_patterns() {
 
     // Execute
     let start = Instant::now();
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await
         .unwrap();
     let exec_time = start.elapsed();

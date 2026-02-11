@@ -115,7 +115,7 @@
 //! ```
 
 use dagx::{task, DagRunner};
-use futures::FutureExt;
+
 use std::time::Instant;
 use tokio::time::{sleep, Duration};
 
@@ -401,7 +401,7 @@ async fn main() {
             .depends_on((inventory, payment, shipping));
 
         // Run the DAG
-        dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
             .await
             .unwrap();
 
@@ -441,7 +441,7 @@ async fn main() {
             true, // will fail
         ));
 
-        dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
             .await
             .unwrap();
 

@@ -24,7 +24,6 @@
 //!
 //! ```no_run
 //! use dagx::{task, DagRunner, Task, TaskHandle};
-//! use futures::FutureExt; // for FutureExt::map
 //!
 //! // Source task with read-only state (tuple struct)
 //! struct Value(i32);
@@ -53,7 +52,7 @@
 //! let sum = dag.add_task(Add).depends_on((x, &y));
 //!
 //! // Execute and retrieve results
-//! dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await.unwrap();
+//! dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await.unwrap();
 //! assert_eq!(dag.get(sum).unwrap(), 5);
 //! # };
 //! ```
@@ -291,7 +290,7 @@
 //!
 //! ```no_run
 //! use dagx::{task, DagRunner, Task};
-//! use futures::FutureExt;
+//!
 //!
 //! // Source task (tuple struct)
 //! struct Value(i32);
@@ -324,7 +323,7 @@
 //! let plus1 = dag.add_task(Add(1)).depends_on(&base);
 //! let times2 = dag.add_task(Scale(2)).depends_on(&base);
 //!
-//! dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await.unwrap();
+//! dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await.unwrap();
 //!
 //! assert_eq!(dag.get(plus1).unwrap(), 11);
 //! assert_eq!(dag.get(times2).unwrap(), 20);
@@ -337,7 +336,7 @@
 //!
 //! ```no_run
 //! use dagx::{task, DagRunner, Task};
-//! use futures::FutureExt;
+//!
 //!
 //! // Source task for String (tuple struct)
 //! struct Name(String);
@@ -381,7 +380,7 @@
 //! let active = dag.add_task(Active(true));
 //! let result = dag.add_task(FormatUser).depends_on((name, age, active));
 //!
-//! dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await.unwrap();
+//! dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await.unwrap();
 //!
 //! assert_eq!(dag.get(result).unwrap(), "User: Alice, Age: 30, Active: true");
 //! # };
@@ -393,7 +392,7 @@
 //!
 //! ```no_run
 //! use dagx::{task, DagRunner, Task};
-//! use futures::FutureExt;
+//!
 //!
 //! // Source task (tuple struct)
 //! struct Value(i32);
@@ -434,7 +433,7 @@
 //! // Layer 3: Final result
 //! let total = dag.add_task(Add).depends_on((&sum_xy, &prod_yz)); // 5 + 15 = 20
 //!
-//! dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await.unwrap();
+//! dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await.unwrap();
 //!
 //! assert_eq!(dag.get(total).unwrap(), 20);
 //! # };
@@ -447,7 +446,7 @@
 //!
 //! ```no_run
 //! # use dagx::{task, DagRunner, Task};
-//! # use futures::FutureExt;
+//! #
 //!
 //! struct User {
 //!     name: String,
@@ -476,7 +475,7 @@
 //! let user = dag.add_task(CreateUser);
 //! let formatted = dag.add_task(FormatUser).depends_on(user);
 //!
-//! dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await.unwrap();
+//! dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await.unwrap();
 //!
 //! assert_eq!(dag.get(formatted).unwrap(), "Alice is 30 years old");
 //! # };
@@ -533,7 +532,7 @@
 //!
 //! ```no_run
 //! # use dagx::{task, DagRunner, Task};
-//! # use futures::FutureExt;
+//! #
 //! # struct Value(i32);
 //! # #[task]
 //! # impl Value {
@@ -543,11 +542,11 @@
 //! # let dag = DagRunner::new();
 //! # let node = dag.add_task(Value(42));
 //! // Simple approach with .unwrap()
-//! dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await.unwrap();
+//! dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await.unwrap();
 //! let result = dag.get(node).unwrap();
 //!
 //! // Or handle errors explicitly
-//! match dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await {
+//! match dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await {
 //!     Ok(_) => println!("DAG executed successfully"),
 //!     Err(e) => eprintln!("DAG execution failed: {}", e),
 //! }
@@ -631,7 +630,7 @@
 //!
 //! ```
 //! # use dagx::{task, DagRunner, Task};
-//! # use futures::FutureExt;
+//! #
 //!
 //! // ✅ CORRECT: Just output Vec<String>, framework wraps in Arc internally
 //! struct FetchData;
@@ -661,7 +660,7 @@
 //! let task2 = dag.add_task(ProcessData).depends_on(&data);
 //! let task3 = dag.add_task(ProcessData).depends_on(&data);
 //!
-//! dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await.unwrap();
+//! dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await.unwrap();
 //! # };
 //! ```
 //!

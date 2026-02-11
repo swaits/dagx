@@ -115,7 +115,7 @@
 //! ```
 
 use dagx::{task, DagRunner};
-use futures::FutureExt;
+
 
 // Source task that provides a string input
 struct StringSource(&'static str);
@@ -223,7 +223,7 @@ async fn main() {
         let processed = dag.add_task(ProcessData).depends_on(validated);
         let logged = dag.add_task(LogError).depends_on(processed);
 
-        dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
             .await
             .unwrap();
 
@@ -249,7 +249,7 @@ async fn main() {
         let processed = dag.add_task(ProcessData).depends_on(validated);
         let logged = dag.add_task(LogError).depends_on(processed);
 
-        dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
             .await
             .unwrap();
 
@@ -275,7 +275,7 @@ async fn main() {
         let processed = dag.add_task(ProcessData).depends_on(validated);
         let logged = dag.add_task(LogError).depends_on(processed);
 
-        dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
             .await
             .unwrap();
 
@@ -298,7 +298,7 @@ async fn main() {
             .add_task(WithFallback { fallback: 0 })
             .depends_on(parsed);
 
-        dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+        dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
             .await
             .unwrap();
 

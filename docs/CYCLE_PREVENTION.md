@@ -13,7 +13,7 @@ let a = dag.add_task(TaskA);
 let b = dag.add_task(TaskB);
 a.depends_on(b);
 b.depends_on(a);  // Compiles fine...
-dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
 ```
 
 **dagx prevents this at compile time:**

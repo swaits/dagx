@@ -22,7 +22,7 @@ use tracing::debug;
 ///
 /// ```no_run
 /// # use dagx::{task, DagRunner, Task};
-/// # use futures::FutureExt;
+/// #
 /// // Using tuple struct for simple constants
 /// struct Constant(i32);
 ///
@@ -57,7 +57,7 @@ use tracing::debug;
 /// let b = b.depends_on(a);
 /// // Now b is a TaskHandle<i32>
 ///
-/// dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await.unwrap();
+/// dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await.unwrap();
 /// assert_eq!(dag.get(b).unwrap(), 20);
 /// # };
 /// ```
@@ -81,7 +81,7 @@ impl<'a, Tk: Task, Deps> TaskBuilder<'a, Tk, Deps> {
     ///
     /// ```no_run
     /// # use dagx::{task, DagRunner, Task};
-    /// # use futures::FutureExt;
+    /// #
     /// // Tuple struct
     /// struct Value(i32);
     ///
@@ -118,7 +118,7 @@ impl<'a, Tk: Task, Deps> TaskBuilder<'a, Tk, Deps> {
     /// // Multiple dependencies: tuple form
     /// let sum = dag.add_task(Add).depends_on((&x, y));
     ///
-    /// dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await.unwrap();
+    /// dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await.unwrap();
     /// # };
     /// ```
     pub fn depends_on<D>(self, deps: D) -> TaskHandle<Tk::Output>

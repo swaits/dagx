@@ -62,7 +62,7 @@
 //! ```
 
 use dagx::{task, DagRunner};
-use futures::FutureExt;
+
 
 struct FetchName;
 
@@ -134,7 +134,7 @@ async fn main() {
 
     // Run the DAG
     println!("Running fan-in DAG...\n");
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await
         .unwrap();
 

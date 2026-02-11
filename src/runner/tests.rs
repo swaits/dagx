@@ -4,8 +4,6 @@ use crate::error::DagError;
 use crate::runner::DagRunner;
 use crate::types::TaskHandle;
 
-use futures::FutureExt;
-
 // Initialize tracing subscriber for tests (idempotent)
 #[cfg(feature = "tracing")]
 fn init_tracing() {
@@ -69,7 +67,7 @@ async fn test_get_wrong_type() {
     let dag = DagRunner::new();
     let handle = dag.add_task(TestTask { value: 42 });
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await
         .unwrap();
 
@@ -144,12 +142,14 @@ async fn test_concurrent_run_protection() {
     // Start two runs concurrently
     let handle1 = tokio::spawn(async move {
         barrier1.wait().await;
-        dag1.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await
+        dag1.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+            .await
     });
 
     let handle2 = tokio::spawn(async move {
         barrier2.wait().await;
-        dag2.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await
+        dag2.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+            .await
     });
 
     // One should succeed, one should fail (concurrent execution not supported)
@@ -197,7 +197,7 @@ async fn test_invalid_node_id_in_get() {
         _phantom: std::marker::PhantomData,
     };
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await
         .unwrap();
 
@@ -250,7 +250,9 @@ async fn test_task_panic_in_multi_task_layer() {
     let _good_task = dag.add_task(GoodTask).depends_on(source);
 
     // Run the DAG - the panic should be caught
-    let result = dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await;
+    let result = dag
+        .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+        .await;
 
     // The run should fail due to the panic
     // Note: Tokio catches panics in spawned tasks, so the behavior depends on the runtime

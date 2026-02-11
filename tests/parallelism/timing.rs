@@ -1,7 +1,7 @@
 //! Tests for timing and speedup verification
 
 use dagx::{task, DagResult, DagRunner};
-use futures::FutureExt;
+
 use std::time::{Duration, Instant};
 use tokio::time::sleep;
 
@@ -29,7 +29,8 @@ async fn test_parallel_execution_speedup() -> DagResult<()> {
         .collect();
 
     let start = Instant::now();
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+        .await?;
     let elapsed = start.elapsed();
 
     // Verify all tasks completed

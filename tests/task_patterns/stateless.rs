@@ -1,6 +1,5 @@
 // Stateless task pattern tests
 use crate::common::task_fn;
-use futures::FutureExt;
 
 use dagx::*;
 
@@ -86,7 +85,7 @@ async fn test_stateless_basic() {
     let y = dag.add_task(task_fn::<(), _, _>(|_: ()| 20));
     let sum = dag.add_task(StatelessAdd).depends_on((x, y));
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await
         .unwrap();
     assert_eq!(dag.get(sum).unwrap(), 30);
@@ -100,7 +99,7 @@ async fn test_stateless_single_input() {
     let input = dag.add_task(task_fn::<(), _, _>(|_: ()| 21));
     let doubled = dag.add_task(StatelessDouble).depends_on(input);
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await
         .unwrap();
     assert_eq!(dag.get(doubled).unwrap(), 42);
@@ -113,7 +112,7 @@ async fn test_stateless_no_input() {
 
     let source = dag.add_task(StatelessSource);
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await
         .unwrap();
     assert_eq!(dag.get(source).unwrap(), 42);
@@ -130,7 +129,7 @@ async fn test_stateless_multiple_inputs() {
 
     let result = dag.add_task(StatelessFormat).depends_on((num, text, flag));
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await
         .unwrap();
     assert_eq!(dag.get(result).unwrap(), "test: 42 (true)");
@@ -169,7 +168,7 @@ async fn test_stateless_mixed_with_stateful() {
     // Stateful counter
     let counted = dag.add_task(Counter::new(10)).depends_on(product);
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await
         .unwrap();
 
@@ -187,7 +186,7 @@ async fn test_stateless_chain() {
     let step2 = dag.add_task(StatelessInc).depends_on(step1);
     let step3 = dag.add_task(StatelessInc).depends_on(step2);
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await
         .unwrap();
 
@@ -208,7 +207,7 @@ async fn test_stateless_parallel() {
         })
         .collect();
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await
         .unwrap();
 
@@ -229,7 +228,7 @@ async fn test_stateless_with_string_types() {
 
     let greeting = dag.add_task(StatelessConcat).depends_on((hello, world));
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await
         .unwrap();
 

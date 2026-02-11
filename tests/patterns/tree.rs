@@ -2,7 +2,6 @@
 
 use crate::common::task_fn;
 use dagx::{DagResult, DagRunner, TaskHandle};
-use futures::FutureExt;
 
 #[tokio::test]
 async fn test_binary_tree_reduction() -> DagResult<()> {
@@ -36,7 +35,8 @@ async fn test_binary_tree_reduction() -> DagResult<()> {
 
     let root = current_level[0];
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+        .await?;
 
     // Sum of powers of 2 from 0 to 7: 1+2+4+8+16+32+64+128 = 255
     assert_eq!(dag.get(root)?, 255);
@@ -67,7 +67,8 @@ async fn test_n_ary_tree() -> DagResult<()> {
 
     let root = build_tree(&dag, 3, 1);
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+        .await?;
 
     let result = dag.get(root)?;
     assert!(result > 0);
@@ -114,7 +115,8 @@ async fn test_unbalanced_tree() -> DagResult<()> {
         .add_task(task_fn::<(i32, i32), _, _>(|(a, b): (&i32, &i32)| a * b))
         .depends_on((&a, &b));
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+        .await?;
 
     assert_eq!(dag.get(f)?, 1);
     assert_eq!(dag.get(c)?, 2);
@@ -166,7 +168,8 @@ async fn test_trie_like_structure() -> DagResult<()> {
         .add_task(task_fn::<String, _, _>(|v: &String| format!("{}/log", v)))
         .depends_on(var);
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+        .await?;
 
     assert_eq!(dag.get(usr_bin)?, "root/usr/bin");
     assert_eq!(dag.get(usr_lib)?, "root/usr/lib");
@@ -221,7 +224,8 @@ async fn test_balanced_k_ary_tree() -> DagResult<()> {
 
     let root = create_balanced_tree(&dag, DEPTH, K, 0);
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+        .await?;
 
     let result = dag.get(root)?;
     assert!(result > 0);
@@ -268,7 +272,8 @@ async fn test_merkle_tree_pattern() -> DagResult<()> {
 
     let root_hash = current_level[0];
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap)).await?;
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+        .await?;
 
     let result = dag.get(root_hash)?;
     assert!(result.starts_with("hash"));

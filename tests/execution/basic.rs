@@ -1,13 +1,12 @@
 // Basic execution tests for DagRunner
 use crate::common::task_fn;
-use futures::FutureExt;
 
 use dagx::*;
 
 #[tokio::test]
 async fn test_empty_dag() {
     let dag = DagRunner::new();
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await
         .unwrap(); // Should complete without error
 }
@@ -16,7 +15,7 @@ async fn test_empty_dag() {
 async fn test_single_task() {
     let dag = DagRunner::new();
     let task = dag.add_task(task_fn::<(), _, _>(|_: ()| 42));
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await
         .unwrap();
     assert_eq!(dag.get(task).unwrap(), 42);
@@ -40,7 +39,7 @@ async fn test_deep_chain() {
         .add_task(task_fn::<i32, _, _>(|&x: &i32| x + 1))
         .depends_on(d);
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await
         .unwrap();
 
@@ -57,7 +56,7 @@ async fn test_wide_parallel() {
         .map(|i| dag.add_task(task_fn::<(), _, _>(move |_: ()| i * 2)))
         .collect();
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await
         .unwrap();
 
@@ -81,7 +80,7 @@ async fn test_diamond_dependency() {
         .add_task(task_fn::<(i32, i32), _, _>(|(x, y): (&i32, &i32)| x + y))
         .depends_on((&b, &c));
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await
         .unwrap();
 
@@ -107,7 +106,7 @@ async fn test_different_output_types() {
         age: 30,
     }));
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await
         .unwrap();
 
@@ -140,7 +139,7 @@ async fn test_multiple_sinks() {
         .add_task(task_fn::<i32, _, _>(|&x: &i32| x * 3))
         .depends_on(branch2);
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await
         .unwrap(); // Should wait for both sinks
 
@@ -162,7 +161,7 @@ async fn test_single_task_inline_path() {
         .add_task(task_fn::<i32, _, _>(|&x: &i32| x + 5))
         .depends_on(t2);
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await
         .unwrap();
 
@@ -187,7 +186,7 @@ async fn test_multi_task_spawn_path() {
         .add_task(task_fn::<i32, _, _>(|&x: &i32| x + 3))
         .depends_on(source);
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await
         .unwrap();
 
@@ -213,7 +212,7 @@ async fn test_producer_consumer_channels() {
         }))
         .depends_on(producer);
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await
         .unwrap();
 
@@ -238,7 +237,7 @@ async fn test_multi_consumer_fanout() {
         .add_task(task_fn::<i32, _, _>(|&x: &i32| x - 5))
         .depends_on(producer);
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await
         .unwrap();
 
@@ -266,7 +265,7 @@ async fn test_compute_layers_with_dependents_tracking() {
         .add_task(task_fn::<(i32, i32), _, _>(|(l, r): (&i32, &i32)| l + r))
         .depends_on((&left, &right));
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await
         .unwrap();
 
@@ -308,7 +307,7 @@ async fn test_layer_execution_order() {
         }))
         .depends_on(t2);
 
-    dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await
         .unwrap();
 

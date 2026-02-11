@@ -4,7 +4,7 @@
 
 use criterion::Criterion;
 use dagx::TaskHandle;
-use futures::FutureExt;
+
 
 pub fn bench_diamond_pattern(c: &mut Criterion) {
     let rt = tokio::runtime::Runtime::new().unwrap();
@@ -29,7 +29,7 @@ pub fn bench_diamond_pattern(c: &mut Criterion) {
                     .add_task(task_fn::<(i32, i32), _, _>(|(x, y): (&i32, &i32)| x + y))
                     .depends_on((&b, &c));
 
-                dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))
+                dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
                     .await
                     .unwrap();
                 dag.get(d).unwrap()
