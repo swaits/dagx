@@ -40,11 +40,28 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Extract MSRV from Cargo.toml
+        id: msrv
+        run: |
+          MSRV=$(yq '.package.rust-version' Cargo.toml --unwrapScalar)
+
+          if [ -z "$MSRV" ]; then
+            echo "No MSRV specified in Cargo.toml, using stable"
+            MSRV="stable"
+          else
+            echo "msrv=$MSRV" >> $GITHUB_OUTPUT
+            echo "Using MSRV: $MSRV"
+          fi
+
       - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ steps.msrv.outputs.msrv }}
 
       - name: Install cargo-msrv
-        run: cargo install cargo-msrv
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-msrv
 
       - name: Verify MSRV
         run: cargo msrv verify ${{ matrix.features }}
@@ -119,7 +136,7 @@ jobs:
   #       uses: dtolnay/rust-toolchain@stable
 
   #     - name: Install cargo-tarpaulin
-  #       run: cargo install cargo-tarpaulin
+  #     - uses: taiki-e/install-action@cargo-tarpaulin
 
   #     - name: Generate code coverage
   #       run: cargo tarpaulin --lib --all-features --out Xml --out Lcov --output-dir coverage --fail-under 80
@@ -134,7 +151,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Install cargo-audit
-        run: cargo install cargo-audit
+        uses: taiki-e/install-action@cargo-audit
 
       - name: Run cargo audit
         run: cargo audit
