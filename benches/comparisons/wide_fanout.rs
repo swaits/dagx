@@ -17,11 +17,11 @@ pub fn bench_wide_fanout(c: &mut Criterion) {
                 use dagx::{task_fn, DagRunner};
 
                 let dag = DagRunner::new();
-                let source: TaskHandle<_> = dag.add_task(task_fn::<(), _, _>(|_: ()| { 42 })).into();
+                let source: TaskHandle<_> = dag.add_task(task_fn::<(), _, _>(|_: ()| 42)).into();
 
                 // Create 100 tasks that all depend on source
                 for i in 0..100 {
-                    dag.add_task(task_fn::<i32, _, _>(move |&x: &i32| { x + i }))
+                    dag.add_task(task_fn::<i32, _, _>(move |&x: &i32| x + i))
                         .depends_on(source);
                 }
 

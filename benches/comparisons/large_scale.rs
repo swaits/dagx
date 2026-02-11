@@ -19,7 +19,7 @@ pub fn bench_large_scale(c: &mut Criterion) {
 
                 let dag = DagRunner::new();
                 for i in 0..10_000 {
-                    dag.add_task(task_fn::<(), _, _>(move |_: ()| { i * 2 }));
+                    dag.add_task(task_fn::<(), _, _>(move |_: ()| i * 2));
                 }
 
                 dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))

@@ -17,7 +17,7 @@ async fn test_task_fn_creation_and_execution() {
     // Test the Task trait implementation
     let result = task
         .run(TaskInput::new(
-            vec![Arc::new(42) as Arc<dyn Any + Send + Sync + 'static>].iter(),
+            [Arc::new(42) as Arc<dyn Any + Send + Sync + 'static>].iter(),
         ))
         .await;
     assert_eq!(result, 84);
@@ -30,7 +30,7 @@ async fn test_task_fn_with_unit_input() {
 
     let result = task
         .run(TaskInput::new(
-            vec![Arc::new(()) as Arc<dyn Any + Send + Sync + 'static>].iter(),
+            [Arc::new(()) as Arc<dyn Any + Send + Sync + 'static>].iter(),
         ))
         .await;
     assert_eq!(result, 100);
@@ -43,7 +43,7 @@ async fn test_task_fn_with_tuple_input() {
 
     let result = task
         .run(TaskInput::new(
-            vec![
+            [
                 Arc::new(10) as Arc<dyn Any + Send + Sync + 'static>,
                 Arc::new(20) as Arc<dyn Any + Send + Sync + 'static>,
             ]
@@ -56,15 +56,12 @@ async fn test_task_fn_with_tuple_input() {
 #[tokio::test]
 async fn test_task_fn_with_string_input() {
     // Test task_fn with String input
-    let task = task_fn::<String, _, _>(|input: &String| {
-        let len = input.len();
-        len
-    });
+    let task = task_fn::<String, _, _>(|input: &String| input.len());
 
     let test_string = String::from("hello");
     let result = task
         .run(TaskInput::new(
-            vec![Arc::new(test_string) as Arc<dyn Any + Send + Sync + 'static>].iter(),
+            [Arc::new(test_string) as Arc<dyn Any + Send + Sync + 'static>].iter(),
         ))
         .await;
     assert_eq!(result, 5);
@@ -77,7 +74,7 @@ async fn test_task_fn_with_complex_output() {
 
     let result = task
         .run(TaskInput::new(
-            vec![Arc::new(5) as Arc<dyn Any + Send + Sync + 'static>].iter(),
+            [Arc::new(5) as Arc<dyn Any + Send + Sync + 'static>].iter(),
         ))
         .await;
     assert_eq!(result, vec![5, 10, 15]);
@@ -91,7 +88,7 @@ async fn test_task_fn_stateful_closure() {
 
     let result = task
         .run(TaskInput::new(
-            vec![Arc::new(7) as Arc<dyn Any + Send + Sync + 'static>].iter(),
+            [Arc::new(7) as Arc<dyn Any + Send + Sync + 'static>].iter(),
         ))
         .await;
     assert_eq!(result, 21);
@@ -124,7 +121,7 @@ async fn test_custom_task_implementation() {
 
     let result1 = task
         .run(TaskInput::new(
-            vec![Arc::new(5) as Arc<dyn Any + Send + Sync + 'static>].iter(),
+            [Arc::new(5) as Arc<dyn Any + Send + Sync + 'static>].iter(),
         ))
         .await;
     assert_eq!(result1, 15);
@@ -160,7 +157,7 @@ async fn test_task_fn_single_call() {
 
     assert_eq!(
         task.run(TaskInput::new(
-            vec![Arc::new(1) as Arc<dyn Any + Send + Sync + 'static>].iter()
+            [Arc::new(1) as Arc<dyn Any + Send + Sync + 'static>].iter()
         ))
         .await,
         2
@@ -180,7 +177,7 @@ async fn test_task_fn_with_result_type() {
 
     assert_eq!(
         task.run(TaskInput::new(
-            vec![Arc::new(5) as Arc<dyn Any + Send + Sync + 'static>].iter()
+            [Arc::new(5) as Arc<dyn Any + Send + Sync + 'static>].iter()
         ))
         .await,
         Ok(10)
@@ -194,7 +191,7 @@ async fn test_task_fn_with_option_type() {
 
     assert_eq!(
         task.run(TaskInput::new(
-            vec![Arc::new(5) as Arc<dyn Any + Send + Sync + 'static>].iter()
+            [Arc::new(5) as Arc<dyn Any + Send + Sync + 'static>].iter()
         ))
         .await,
         Some(10)
@@ -210,7 +207,7 @@ async fn test_task_fn_explicit_trait_call() {
     // Explicitly call the Task trait's run method
     let result = Task::run(
         task,
-        TaskInput::new(vec![Arc::new(10) as Arc<dyn Any + Send + Sync + 'static>].iter()),
+        TaskInput::new([Arc::new(10) as Arc<dyn Any + Send + Sync + 'static>].iter()),
     )
     .await;
     assert_eq!(result, 30);

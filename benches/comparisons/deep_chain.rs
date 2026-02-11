@@ -18,14 +18,14 @@ pub fn bench_deep_chain(c: &mut Criterion) {
 
                 let dag = DagRunner::new();
 
-                let first: TaskHandle<_> = dag.add_task(task_fn::<(), _, _>(|_: ()| { 0 })).into();
+                let first: TaskHandle<_> = dag.add_task(task_fn::<(), _, _>(|_: ()| 0)).into();
                 let mut prev = dag
-                    .add_task(task_fn::<i32, _, _>(|&x: &i32| { x + 1 }))
+                    .add_task(task_fn::<i32, _, _>(|&x: &i32| x + 1))
                     .depends_on(first);
 
                 for i in 2..100 {
                     prev = dag
-                        .add_task(task_fn::<i32, _, _>(move |&x: &i32| { x + i }))
+                        .add_task(task_fn::<i32, _, _>(move |&x: &i32| x + i))
                         .depends_on(prev);
                 }
 

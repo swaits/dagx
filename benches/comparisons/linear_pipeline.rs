@@ -17,18 +17,18 @@ pub fn bench_linear_pipeline(c: &mut Criterion) {
 
                 let dag = DagRunner::new();
 
-                let a = dag.add_task(task_fn::<(), _, _>(|_: ()| { 1 }));
+                let a = dag.add_task(task_fn::<(), _, _>(|_: ()| 1));
                 let b = dag
-                    .add_task(task_fn::<i32, _, _>(|&x: &i32| { x + 1 }))
+                    .add_task(task_fn::<i32, _, _>(|&x: &i32| x + 1))
                     .depends_on(a);
                 let c = dag
-                    .add_task(task_fn::<i32, _, _>(|&x: &i32| { x * 2 }))
+                    .add_task(task_fn::<i32, _, _>(|&x: &i32| x * 2))
                     .depends_on(b);
                 let d = dag
-                    .add_task(task_fn::<i32, _, _>(|&x: &i32| { x - 1 }))
+                    .add_task(task_fn::<i32, _, _>(|&x: &i32| x - 1))
                     .depends_on(c);
                 let e = dag
-                    .add_task(task_fn::<i32, _, _>(|&x: &i32| { x * 3 }))
+                    .add_task(task_fn::<i32, _, _>(|&x: &i32| x * 3))
                     .depends_on(d);
 
                 dag.run(|fut| tokio::spawn(fut).map(Result::unwrap))

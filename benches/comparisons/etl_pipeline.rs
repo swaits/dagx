@@ -25,19 +25,19 @@ pub fn bench_etl_pipeline(c: &mut Criterion) {
                 // Transform each source
                 let transform1 = dag
                     .add_task(task_fn::<Vec<_>, _, _>(|data: &Vec<i32>| {
-                        data.into_iter().map(|x| x * 2).collect::<Vec<_>>()
+                        data.iter().map(|x| x * 2).collect::<Vec<_>>()
                     }))
                     .depends_on(source1);
 
                 let transform2 = dag
                     .add_task(task_fn::<Vec<_>, _, _>(|data: &Vec<i32>| {
-                        data.into_iter().map(|x| x * 2).collect::<Vec<_>>()
+                        data.iter().map(|x| x * 2).collect::<Vec<_>>()
                     }))
                     .depends_on(source2);
 
                 let transform3 = dag
                     .add_task(task_fn::<Vec<_>, _, _>(|data: &Vec<i32>| {
-                        data.into_iter().map(|x| x * 2).collect::<Vec<_>>()
+                        data.iter().map(|x| x * 2).collect::<Vec<_>>()
                     }))
                     .depends_on(source3);
 
@@ -66,7 +66,7 @@ pub fn bench_etl_pipeline(c: &mut Criterion) {
                 // Load (compute sum)
                 let load = dag
                     .add_task(task_fn::<Vec<_>, _, _>(|data: &Vec<i32>| {
-                        data.into_iter().sum::<i32>()
+                        data.iter().sum::<i32>()
                     }))
                     .depends_on(validate);
 
