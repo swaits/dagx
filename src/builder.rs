@@ -121,6 +121,7 @@ impl<'a, Tk: Task, Deps> TaskBuilder<'a, Tk, Deps> {
     /// dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await.unwrap();
     /// # };
     /// ```
+    #[allow(private_bounds)]
     pub fn depends_on<D>(self, deps: D) -> TaskHandle<Tk::Output>
     where
         D: DepsTuple<Tk::Input>,

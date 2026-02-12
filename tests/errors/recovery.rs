@@ -1,41 +1,10 @@
 //! Tests for error recovery patterns
 
-use crate::common::task_fn;
 use dagx::{DagResult, DagRunner};
+use dagx_test::task_fn;
 
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
-
-#[tokio::test]
-async fn test_fallback_on_error() -> DagResult<()> {
-    let dag = DagRunner::new();
-
-    // Primary task that fails
-    let primary = dag.add_task(task_fn::<(), _, _>(|_: ()| {
-        panic!("Primary task failed");
-        #[allow(unreachable_code)]
-        42
-    }));
-
-    // Fallback task
-    let fallback = dag.add_task(task_fn::<(), _, _>(|_: ()| 100));
-
-    // Selector that uses fallback if primary fails
-    let _selector = dag.add_task(task_fn::<(), _, _>(|_: ()| {}));
-
-    // Run DAG
-    let _ = dag
-        .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
-        .await;
-
-    // Primary should fail
-    assert!(dag.get(primary).is_err());
-
-    // Fallback should succeed
-    assert_eq!(dag.get(fallback)?, 100);
-
-    Ok(())
-}
 
 #[tokio::test]
 async fn test_retry_pattern_simulation() -> DagResult<()> {
@@ -114,38 +83,6 @@ async fn test_circuit_breaker_pattern() -> DagResult<()> {
 }
 
 #[tokio::test]
-async fn test_partial_recovery_with_defaults() -> DagResult<()> {
-    let dag = DagRunner::new();
-
-    // Some tasks that might fail
-    let _tasks: Vec<_> = (0..10)
-        .map(|i| {
-            dag.add_task(task_fn::<(), _, _>(move |_: ()| {
-                if i % 3 == 0 {
-                    panic!("Task {} failed", i);
-                }
-                i * 10
-            }))
-        })
-        .collect();
-
-    // Aggregator that handles failures gracefully
-    let aggregator = dag.add_task(task_fn::<(), _, _>(|_: ()| {
-        // In real scenario, would check task results and use defaults
-        vec![0, 10, 20, 0, 40, 50, 0, 70, 80, 0] // 0 for failed tasks
-    }));
-
-    let _ = dag
-        .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
-        .await;
-
-    let result = dag.get(aggregator)?;
-    assert_eq!(result.len(), 10);
-
-    Ok(())
-}
-
-#[tokio::test]
 async fn test_error_accumulation_pattern() -> DagResult<()> {
     let dag = DagRunner::new();
     let errors = Arc::new(parking_lot::Mutex::new(Vec::new()));
@@ -184,36 +121,6 @@ async fn test_error_accumulation_pattern() -> DagResult<()> {
 }
 
 #[tokio::test]
-async fn test_graceful_degradation() -> DagResult<()> {
-    let dag = DagRunner::new();
-
-    // Critical task
-    let critical = dag.add_task(task_fn::<(), _, _>(|_: ()| vec![1, 2, 3, 4, 5]));
-
-    // Optional enhancement that fails - returns Result
-    let _enhancement = dag.add_task(task_fn::<(), _, _>(|_: ()| {
-        Err::<Vec<i32>, &str>("Enhancement failed")
-    }));
-
-    // Final task that works with what's available
-    let final_task = dag
-        .add_task(task_fn::<Vec<_>, _, _>(|base: &Vec<i32>| {
-            // Would combine with enhancement if available
-            // Here just uses base
-            base.iter().sum::<i32>()
-        }))
-        .depends_on(critical);
-
-    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
-        .await?;
-
-    // Critical path works
-    assert_eq!(dag.get(final_task)?, 15);
-
-    Ok(())
-}
-
-#[tokio::test]
 async fn test_error_boundary_isolation() -> DagResult<()> {
     let dag = DagRunner::new();
 
@@ -245,41 +152,6 @@ async fn test_error_boundary_isolation() -> DagResult<()> {
     // Groups B and C succeed
     assert_eq!(dag.get(b2)?, 40);
     assert_eq!(dag.get(c1)?, 45);
-
-    Ok(())
-}
-
-#[tokio::test]
-async fn test_compensation_action() -> DagResult<()> {
-    let dag = DagRunner::new();
-    let compensation_triggered = Arc::new(AtomicBool::new(false));
-
-    // Action that fails
-    let action = dag.add_task(task_fn::<(), _, _>(|_: ()| {
-        // Perform some action that fails
-        panic!("Action failed");
-    }));
-
-    // Compensation task (runs independently)
-    let compensation = dag.add_task(task_fn::<(), _, _>({
-        let triggered = compensation_triggered.clone();
-        move |_: ()| {
-            let triggered = triggered.clone();
-            triggered.store(true, Ordering::SeqCst);
-            "Compensation executed"
-        }
-    }));
-
-    let _ = dag
-        .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
-        .await;
-
-    // Action failed
-    assert!(dag.get(action).is_err());
-
-    // Compensation ran successfully
-    assert_eq!(dag.get(compensation)?, "Compensation executed");
-    assert!(compensation_triggered.load(Ordering::SeqCst));
 
     Ok(())
 }

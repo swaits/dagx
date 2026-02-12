@@ -22,23 +22,23 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 check_pass() {
-  echo -e "${GREEN}✓${NC} $1"
+	echo -e "${GREEN}✓${NC} $1"
 }
 
 check_fail() {
-  echo -e "${RED}✗${NC} $1"
-  exit 1
+	echo -e "${RED}✗${NC} $1"
+	exit 1
 }
 
 check_warn() {
-  echo -e "${YELLOW}⚠${NC} $1"
+	echo -e "${YELLOW}⚠${NC} $1"
 }
 
 section() {
-  echo ""
-  echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-  echo -e "${BLUE}$1${NC}"
-  echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+	echo ""
+	echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+	echo -e "${BLUE}$1${NC}"
+	echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 }
 
 # =============================================================================
@@ -57,18 +57,18 @@ check_pass "Rust version compatible"
 echo ""
 echo "→ Checking for uncommitted changes..."
 if jj status 2>&1 | grep -q "Working copy changes:"; then
-  check_warn "Uncommitted changes found - you'll need to commit before publishing"
+	check_warn "Uncommitted changes found - you'll need to commit before publishing"
 else
-  check_pass "No uncommitted changes"
+	check_pass "No uncommitted changes"
 fi
 
 echo ""
 echo "→ Checking for old 'dagrunner' references..."
 OLD_REFS=$(grep -ri "dagrunner" --exclude-dir=target --exclude-dir=.git --exclude-dir=.jj --exclude="*.lock" --exclude="release_check.sh" . 2>/dev/null | grep -v "DagRunner" | grep -v "dag-runner" | wc -l)
 if [ "$OLD_REFS" -gt 0 ]; then
-  check_fail "Found $OLD_REFS old 'dagrunner' references (excluding DagRunner struct)"
+	check_fail "Found $OLD_REFS old 'dagrunner' references (excluding DagRunner struct)"
 else
-  check_pass "No old 'dagrunner' references found"
+	check_pass "No old 'dagrunner' references found"
 fi
 
 # =============================================================================
@@ -90,9 +90,9 @@ echo ""
 echo "→ Checking for TODO/FIXME/XXX/HACK in source..."
 TODO_COUNT=$(grep -r "TODO\|FIXME\|XXX\|HACK" src/ dagx-macros/src/ 2>/dev/null | wc -l)
 if [ "$TODO_COUNT" -gt 0 ]; then
-  check_warn "Found $TODO_COUNT TODO/FIXME/HACK comments in source"
+	check_warn "Found $TODO_COUNT TODO/FIXME/HACK comments in source"
 else
-  check_pass "No TODO/FIXME/HACK comments in source"
+	check_pass "No TODO/FIXME/HACK comments in source"
 fi
 
 # =============================================================================
@@ -218,16 +218,16 @@ check_pass "LICENSE files present in both crates"
 section "COVERAGE CHECK"
 
 echo "→ Running coverage analysis..."
-COVERAGE=$(cargo tarpaulin --lib --all-features --out Stdout 2>&1 | grep -oP '^\d+\.\d+%' | head -1 | sed 's/%//')
+COVERAGE=$(cargo tarpaulin --out Stdout 2>&1 | grep -oP '^\d+\.\d+%' | head -1 | sed 's/%//')
 if [ -z "$COVERAGE" ]; then
-  check_warn "Could not determine coverage percentage"
+	check_warn "Could not determine coverage percentage"
 else
-  echo "  Current coverage: ${COVERAGE}%"
-  if (( $(echo "$COVERAGE < 80" | bc -l) )); then
-    check_warn "Coverage is ${COVERAGE}% (below 80% target)"
-  else
-    check_pass "Coverage is ${COVERAGE}% (meets 80% target)"
-  fi
+	echo "  Current coverage: ${COVERAGE}%"
+	if (($(echo "$COVERAGE < 80" | bc -l))); then
+		check_warn "Coverage is ${COVERAGE}% (below 80% target)"
+	else
+		check_pass "Coverage is ${COVERAGE}% (meets 80% target)"
+	fi
 fi
 
 # =============================================================================
@@ -248,10 +248,10 @@ check_pass "All examples build successfully"
 echo ""
 echo "→ Checking examples run without panics..."
 if [ -f ./scripts/run_examples.sh ]; then
-  ./scripts/run_examples.sh || check_fail "Some examples failed to run"
-  check_pass "All examples run successfully"
+	./scripts/run_examples.sh || check_fail "Some examples failed to run"
+	check_pass "All examples run successfully"
 else
-  check_warn "run_examples.sh not found, skipping runtime check"
+	check_warn "run_examples.sh not found, skipping runtime check"
 fi
 
 echo ""
@@ -297,9 +297,9 @@ echo "→ Verifying version consistency..."
 DAGX_VERSION=$(grep '^version = ' Cargo.toml | head -1 | cut -d'"' -f2)
 MACROS_VERSION=$(grep '^version = ' dagx-macros/Cargo.toml | head -1 | cut -d'"' -f2)
 if [ "$DAGX_VERSION" != "$MACROS_VERSION" ]; then
-  check_fail "Version mismatch: dagx=$DAGX_VERSION, dagx-macros=$MACROS_VERSION"
+	check_fail "Version mismatch: dagx=$DAGX_VERSION, dagx-macros=$MACROS_VERSION"
 else
-  check_pass "Versions match: both are $DAGX_VERSION"
+	check_pass "Versions match: both are $DAGX_VERSION"
 fi
 
 # =============================================================================
@@ -316,10 +316,10 @@ echo ""
 echo "→ Testing dagx package (dry-run with --allow-dirty)..."
 echo "  Note: This will fail until dagx-macros is published to crates.io"
 if cargo publish --dry-run --allow-dirty 2>&1 | grep -q "failed to select a version for the requirement.*dagx-macros"; then
-  check_warn "dagx package check shows dependency on unpublished dagx-macros v$VERSION (expected)"
+	check_warn "dagx package check shows dependency on unpublished dagx-macros v$VERSION (expected)"
 else
-  cargo publish --dry-run --allow-dirty || check_fail "dagx package check failed unexpectedly"
-  check_pass "dagx package is ready (dagx-macros must be published first)"
+	cargo publish --dry-run --allow-dirty || check_fail "dagx package check failed unexpectedly"
+	check_pass "dagx package is ready (dagx-macros must be published first)"
 fi
 
 echo ""
@@ -332,9 +332,9 @@ echo "→ Checking package size..."
 PACKAGE_SIZE=$(cargo package --list --allow-dirty 2>/dev/null | wc -l)
 echo "  Files to be packaged: $PACKAGE_SIZE"
 if [ "$PACKAGE_SIZE" -lt 5 ]; then
-  check_fail "Suspiciously few files to package ($PACKAGE_SIZE)"
+	check_fail "Suspiciously few files to package ($PACKAGE_SIZE)"
 else
-  check_pass "Package contains $PACKAGE_SIZE files"
+	check_pass "Package contains $PACKAGE_SIZE files"
 fi
 
 # =============================================================================
@@ -345,16 +345,16 @@ section "SECURITY CHECKS"
 
 echo "→ Checking for sensitive data..."
 if grep -r "api[_-]key\|secret\|password\|token" src/ dagx-macros/src/ 2>/dev/null | grep -v "^Binary" | grep -v "token for a node" | grep -q .; then
-  check_fail "Potential sensitive data found in source"
+	check_fail "Potential sensitive data found in source"
 else
-  check_pass "No sensitive data found"
+	check_pass "No sensitive data found"
 fi
 
 echo ""
 echo "→ Verifying .gitignore..."
 [ -f .gitignore ] || check_fail ".gitignore missing"
 if ! grep -qE "^/?target(/)?$" .gitignore; then
-  check_fail ".gitignore doesn't exclude target/"
+	check_fail ".gitignore doesn't exclude target/"
 fi
 check_pass ".gitignore looks good"
 

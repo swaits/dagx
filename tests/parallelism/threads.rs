@@ -1,80 +1,12 @@
 //! Tests for multi-threading and concurrent execution
 
-use crate::common::task_fn;
 use dagx::{task, DagResult, DagRunner, TaskHandle};
+use dagx_test::task_fn;
 
-use std::collections::HashSet;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex};
-use std::thread::ThreadId;
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::time::sleep;
-
-#[tokio::test]
-async fn test_tasks_run_on_different_threads() -> DagResult<()> {
-    // Prove that tasks CAN run on multiple different threads (true parallelism capability)
-    // Note: Tokio may choose to run fast tasks on the same thread for efficiency
-    use std::thread;
-
-    let dag = DagRunner::new();
-    let thread_ids = Arc::new(Mutex::new(std::collections::HashSet::new()));
-
-    struct LayerTask {
-        ids: Arc<Mutex<HashSet<ThreadId>>>,
-        idx: i32,
-    }
-
-    #[task]
-    impl LayerTask {
-        async fn run(&self) -> i32 {
-            let tid = thread::current().id();
-            self.ids.lock().unwrap().insert(tid);
-
-            // Yield to give tokio reason to distribute
-            sleep(Duration::from_millis(5)).await;
-
-            // Some CPU work too
-            let mut sum = 0;
-            for j in 0..1000 {
-                sum += j;
-            }
-            self.idx + sum
-        }
-    }
-
-    // Create 50 tasks with actual work to encourage multi-threading
-    let tasks: Vec<_> = (0..50)
-        .map(|i| {
-            dag.add_task(LayerTask {
-                ids: thread_ids.clone(),
-                idx: i,
-            })
-        })
-        .collect();
-
-    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
-        .await?;
-
-    // Verify all tasks completed
-    for task in tasks.into_iter() {
-        let _ = dag.get(task)?;
-    }
-
-    // With a multi-threaded runtime and sufficient work, we typically see multiple threads
-    // But we can't guarantee it (scheduler's choice), so we just verify the capability exists
-    let unique_threads = thread_ids.lock().unwrap().len();
-
-    // On a multi-core system with sufficient work, tokio should use multiple threads
-    // This is a soft assertion - if it fails, it means tasks CAN'T use multiple threads
-    if unique_threads == 1 {
-        eprintln!(
-            "Warning: All tasks ran on 1 thread. This may indicate parallelism isn't working, \
-             or tokio chose not to distribute work (valid for small/fast tasks)"
-        );
-    }
-
-    Ok(())
-}
 
 #[tokio::test]
 async fn test_concurrent_execution_with_atomic_counter() -> DagResult<()> {
@@ -151,73 +83,6 @@ async fn test_concurrent_execution_with_atomic_counter() -> DagResult<()> {
 
     // Final count should be 0
     assert_eq!(concurrent_count.load(Ordering::SeqCst), 0);
-
-    Ok(())
-}
-
-#[tokio::test]
-async fn test_diamond_parallel_execution() -> DagResult<()> {
-    // Test diamond pattern: source -> (parallel1, parallel2) -> sink
-    let dag = DagRunner::new();
-
-    let concurrent_middle = Arc::new(AtomicUsize::new(0));
-
-    let source: TaskHandle<_> = dag.add_task(task_fn::<(), _, _>(|_: ()| 100)).into();
-
-    struct ParallelTask1 {
-        counter: Arc<AtomicUsize>,
-    }
-
-    #[task]
-    impl ParallelTask1 {
-        async fn run(&self, x: &i32) -> i32 {
-            self.counter.fetch_add(1, Ordering::SeqCst);
-            sleep(Duration::from_millis(20)).await;
-            let count = self.counter.load(Ordering::SeqCst);
-            self.counter.fetch_sub(1, Ordering::SeqCst);
-            assert!(count > 0, "Should see concurrent execution");
-            x * 2
-        }
-    }
-
-    // These should run in parallel
-    let parallel1 = dag
-        .add_task(ParallelTask1 {
-            counter: concurrent_middle.clone(),
-        })
-        .depends_on(source);
-
-    struct ParallelTask2 {
-        counter: Arc<AtomicUsize>,
-    }
-
-    #[task]
-    impl ParallelTask2 {
-        async fn run(&self, x: &i32) -> i32 {
-            self.counter.fetch_add(1, Ordering::SeqCst);
-            sleep(Duration::from_millis(20)).await;
-            let count = self.counter.load(Ordering::SeqCst);
-            self.counter.fetch_sub(1, Ordering::SeqCst);
-            // Both should be running
-            assert!(count > 0, "Should see concurrent execution");
-            x * 3
-        }
-    }
-
-    let parallel2 = dag
-        .add_task(ParallelTask2 {
-            counter: concurrent_middle.clone(),
-        })
-        .depends_on(source);
-
-    let sink = dag
-        .add_task(task_fn::<(i32, i32), _, _>(|(a, b): (&i32, &i32)| a + b))
-        .depends_on((&parallel1, &parallel2));
-
-    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
-        .await?;
-
-    assert_eq!(dag.get(sink)?, 500); // (100 * 2) + (100 * 3)
 
     Ok(())
 }

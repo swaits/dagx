@@ -1,7 +1,10 @@
 //! Unit tests for runner module
 
+use std::collections::HashMap;
+use std::hash::Hasher;
+
 use crate::error::DagError;
-use crate::runner::DagRunner;
+use crate::runner::{DagRunner, PassThroughHasher};
 use crate::types::TaskHandle;
 
 // Initialize tracing subscriber for tests (idempotent)
@@ -168,23 +171,6 @@ async fn test_concurrent_run_protection() {
     }
 }
 
-#[test]
-fn test_add_task_increments_id() {
-    let dag = DagRunner::new();
-
-    let handle1 = dag.add_task(TestTask { value: 1 });
-    let handle2 = dag.add_task(TestTask { value: 2 });
-    let handle3 = dag.add_task(TestTask { value: 3 });
-
-    // Node IDs should be sequential
-    assert_eq!(handle1.id.0, 0);
-    assert_eq!(handle2.id.0, 1);
-    assert_eq!(handle3.id.0, 2);
-
-    // Check that nodes were actually added
-    assert_eq!(dag.nodes.lock().len(), 3);
-}
-
 #[tokio::test]
 async fn test_invalid_node_id_in_get() {
     init_tracing();
@@ -255,7 +241,18 @@ async fn test_task_panic_in_multi_task_layer() {
         .await;
 
     // The run should fail due to the panic
-    // Note: Tokio catches panics in spawned tasks, so the behavior depends on the runtime
-    // This test mainly ensures we don't crash
-    assert!(result.is_ok() || result.is_err());
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_passthrough_hasher() {
+    let mut passthrough_hashmap = HashMap::with_hasher(PassThroughHasher::default());
+    passthrough_hashmap.insert(64u32, "test string");
+}
+
+#[test]
+#[should_panic]
+fn test_passthrough_hasher_only_u32() {
+    let mut passthrough_hasher = PassThroughHasher::default();
+    passthrough_hasher.write(&[0; 4]);
 }

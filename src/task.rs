@@ -5,8 +5,6 @@
 
 use std::{any::Any, future::Future, marker::PhantomData, slice::Iter, sync::Arc};
 
-use crate::extract::ExtractInput;
-
 /// A unit of async work with typed inputs and outputs.
 ///
 /// Use the [`task`](crate::task) macro to implement this trait. The macro automatically
@@ -146,51 +144,6 @@ impl TaskInput<'static, ()> {
             inputs: [].iter(),
             phantom: PhantomData,
         }
-    }
-}
-
-/// **INTERNAL USE ONLY**: This struct is for testing purposes only and should
-/// not be used in production code. Use the `#[task]` macro instead.
-#[doc(hidden)]
-pub struct TaskFn<I, O, F>
-where
-    for<'input> F: FnMut(I::Retv<'input>) -> O + Send,
-    I: ExtractInput + Send + Sync + 'static,
-    O: Send,
-{
-    f: F,
-    _phantom: std::marker::PhantomData<fn(I) -> O>,
-}
-
-impl<I, O, F> Task for TaskFn<I, O, F>
-where
-    for<'input> F: FnMut(I::Retv<'input>) -> O + Send,
-    I: ExtractInput + Send + Sync + 'static,
-    O: Send + Sync,
-{
-    type Input = I::Input;
-    type Output = O;
-
-    async fn run(mut self, input: TaskInput<'_, I::Input>) -> O {
-        (self.f)(I::extract_from_task_input(input).unwrap())
-    }
-}
-
-/// Convenience function to create a task from a closure.
-///
-/// **INTERNAL USE ONLY**: This function is for testing purposes only and should
-/// not be used in production code. Use the `#[task]` macro instead.
-#[doc(hidden)]
-pub fn task_fn<I, O, F>(f: F) -> TaskFn<I, O, F>
-where
-    for<'input> F: FnMut(I::Retv<'input>) -> O + Send,
-    I: ExtractInput + Send + Sync + 'static,
-    I::Input: Send + Sync + 'static,
-    O: Send + Sync + 'static,
-{
-    TaskFn {
-        f,
-        _phantom: std::marker::PhantomData,
     }
 }
 

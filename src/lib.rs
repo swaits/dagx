@@ -6,7 +6,7 @@
 //! # Features
 //!
 //! - **Compile-time cycle prevention**: The type system makes cycles **impossible**—no runtime
-//!   cycle detection needed! See [`cycle_prevention`] module for detailed explanation and proof.
+//!   cycle detection needed! See [the repository documentation](https://github.com/swaits/dagx/blob/main/docs/CYCLE_PREVENTION.md) for a detailed explanation.
 //! - **Compile-time type safety**: Dependencies are validated at compile time through the type
 //!   system. The public API is fully type-safe with no runtime type errors. Internal execution
 //!   uses type erasure for heterogeneous task storage, but this is never exposed to users.
@@ -482,8 +482,7 @@
 //! ```
 //!
 //! **No trait implementations needed!** Works with nested structs, collections, enums, and any
-//! other custom type. See [`examples/custom_types.rs`](https://github.com/swaits/dagx/blob/main/examples/custom_types.rs)
-//! for a complete example with complex nested types.
+//! other custom type.
 //!
 //! # Runtime Agnostic
 //!
@@ -764,21 +763,13 @@
 //!
 //! This follows the same zero-cost pattern used by Tokio, Hyper, and other performance-critical
 //! Rust async libraries.
-//!
-//! See [`examples/tracing_example.rs`](https://github.com/swaits/dagx/blob/main/examples/tracing_example.rs)
-//! for a complete working example.
-//!
-
-#![allow(private_bounds, private_interfaces)]
 
 extern crate self as dagx;
 
 // Module declarations
 mod builder;
-pub mod cycle_prevention;
 mod deps;
 mod error;
-mod extract;
 mod node;
 mod runner;
 mod task;
@@ -793,7 +784,3 @@ pub use types::{Pending, TaskHandle};
 
 // Re-export the procedural macro
 pub use dagx_macros::task;
-
-// Internal testing support - not part of the public API
-#[doc(hidden)]
-pub use task::task_fn;

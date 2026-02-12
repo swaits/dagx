@@ -1,7 +1,7 @@
 //! Tests for spawner functionality
 
-use crate::common::task_fn;
 use dagx::{DagResult, DagRunner};
+use dagx_test::task_fn;
 
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;

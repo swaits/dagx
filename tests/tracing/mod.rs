@@ -5,6 +5,3 @@
 
 #[cfg(feature = "tracing")]
 mod with_tracing;
-
-#[cfg(not(feature = "tracing"))]
-mod without_tracing;

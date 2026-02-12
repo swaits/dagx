@@ -1,8 +1,8 @@
 //! Mixed realistic patterns - fan-out, fan-in, and processing
 
 use criterion::Criterion;
-use dagx::{task_fn, DagRunner, TaskHandle};
-
+use dagx::{DagRunner, TaskHandle};
+use dagx_test::task_fn;
 pub fn bench_mixed_patterns(c: &mut Criterion) {
     let rt = tokio::runtime::Runtime::new().unwrap();
 

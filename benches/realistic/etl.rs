@@ -1,8 +1,8 @@
 //! ETL (Extract, Transform, Load) pipeline benchmark
 
 use criterion::{BenchmarkId, Criterion};
-use dagx::{task_fn, DagRunner, TaskHandle};
-
+use dagx::{DagRunner, TaskHandle};
+use dagx_test::task_fn;
 pub fn bench_etl_pipeline(c: &mut Criterion) {
     let rt = tokio::runtime::Runtime::new().unwrap();
     let mut group = c.benchmark_group("etl_scaling");

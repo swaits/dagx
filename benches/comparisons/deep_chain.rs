@@ -13,7 +13,8 @@ pub fn bench_deep_chain(c: &mut Criterion) {
     group.bench_function("dagx", |b| {
         b.iter(|| {
             rt.block_on(async {
-                use dagx::{task_fn, DagRunner};
+                use dagx::DagRunner;
+                use dagx_test::task_fn;
 
                 let dag = DagRunner::new();
 

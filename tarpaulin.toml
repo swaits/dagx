@@ -1,0 +1,13 @@
+
+[test_config]
+manifest-path = "./Cargo.toml"
+skip-clean = true
+engine = "Llvm"
+# cargo-tarpaulin already reports tracing lines incorrectly when the feature is turned off,
+# and this is exacerbated when building with all-features.
+all-features = false
+run-types = ["Tests"]
+command = "Test"
+locked = true
+frozen = true
+fail-under = 80.0

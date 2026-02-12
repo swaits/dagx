@@ -214,8 +214,6 @@ impl ProcessUser {
 
 **No trait implementations needed!** The `#[task]` macro generates type-specific extraction logic automatically. This includes nested structs, collections, enums, and any other type you define.
 
-See [`custom_types.rs`](examples/custom_types.rs) for a complete example with nested custom types.
-
 ### Runtime Agnostic
 
 dagx works with any async runtime. Provide a spawner function to `run()`:
@@ -261,17 +259,8 @@ cargo run --example 04_parallel_computation
 Real-world patterns:
 
 - [`circuit_breaker.rs`](examples/circuit_breaker.rs) - Circuit breaker pattern for resilient systems
-- [`complex_dag.rs`](examples/complex_dag.rs) - Multi-layer workflows with complex dependencies
-- [`conditional_workflow.rs`](examples/conditional_workflow.rs) - Conditional execution with Result types
-- [`custom_types.rs`](examples/custom_types.rs) - Using your own custom types (no trait implementations needed!)
 - [`data_pipeline.rs`](examples/data_pipeline.rs) - ETL data processing pipeline
-- [`debug_tracing.rs`](examples/debug_tracing.rs) - Debug metadata and task naming
 - [`error_handling.rs`](examples/error_handling.rs) - Error propagation and recovery
-- [`large_dag.rs`](examples/large_dag.rs) - Performance at 10,000+ nodes
-- [`parallelism_proof.rs`](examples/parallelism_proof.rs) - Proof of true parallel execution
-- [`retry_strategies.rs`](examples/retry_strategies.rs) - Retry patterns for transient failures
-- [`timeout.rs`](examples/timeout.rs) - Managing task timeouts
-- [`tracing_example.rs`](examples/tracing_example.rs) - Observability with tracing support
 
 Run any example: `cargo run --example custom_types`
 

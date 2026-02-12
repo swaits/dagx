@@ -4,6 +4,7 @@
 
 /// Errors that can occur during DAG construction and execution
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub enum DagError {
     /// Invalid dependency: task does not exist
     InvalidDependency { task_id: u32 },

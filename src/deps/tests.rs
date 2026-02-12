@@ -17,17 +17,6 @@ impl TestTask {
     }
 }
 
-struct TestTaskWithInput;
-
-#[crate::task]
-impl TestTaskWithInput {
-    #[allow(dead_code)]
-    #[cfg(not(tarpaulin_include))]
-    async fn run(input: &i32) -> i32 {
-        input * 2
-    }
-}
-
 #[test]
 fn test_deps_tuple_unit() {
     // Test lines 20-22 in deps.rs - unit type implementation

@@ -1,7 +1,7 @@
 //! Tests for tuple dependencies (2-8 dependencies)
 
-use crate::common::task_fn;
 use dagx::{DagResult, DagRunner};
+use dagx_test::task_fn;
 
 #[tokio::test]
 async fn test_two_dependencies() -> DagResult<()> {
