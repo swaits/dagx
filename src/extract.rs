@@ -40,7 +40,6 @@ use crate::TaskInput;
 ///
 /// Type erasure occurs only at the ExecutableNode trait boundary - by the time
 /// we're in ExtractInput, we know the concrete type and can safely downcast.
-#[allow(dead_code)]
 pub trait ExtractInput: Sized + Clone {
     type Input: Send;
     type Retv<'input>;

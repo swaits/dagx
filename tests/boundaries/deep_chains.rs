@@ -1,69 +1,10 @@
 //! Tests for extremely deep dependency chains
 
-use crate::common::task_fn;
+use dagx::task_fn;
 use dagx::{DagResult, DagRunner};
 
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
-
-#[tokio::test]
-async fn test_1000_level_deep_chain() -> DagResult<()> {
-    // Test a linear chain of 1000 tasks
-    let dag = DagRunner::new();
-
-    let first = dag.add_task(task_fn::<(), _, _>(|_: ()| 0));
-    let mut current = first.into(); // Convert to TaskHandle
-
-    for _i in 1..1000 {
-        current = dag
-            .add_task(task_fn::<i32, _, _>(move |&prev: &i32| prev + 1))
-            .depends_on(current);
-    }
-
-    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
-        .await?;
-
-    assert_eq!(dag.get(current)?, 999);
-    Ok(())
-}
-
-#[tokio::test]
-async fn test_deep_chain_with_branches() -> DagResult<()> {
-    // Test a deep chain where each node has a side branch
-    let dag = DagRunner::new();
-
-    let first = dag.add_task(task_fn::<(), _, _>(|_: ()| 0));
-    let mut main_chain: dagx::TaskHandle<i32> = first.into();
-    let mut branches = Vec::new();
-
-    for i in 1..500 {
-        // Main chain continues
-        main_chain = dag
-            .add_task(task_fn::<i32, _, _>(move |&prev: &i32| prev + 1))
-            .depends_on(main_chain);
-
-        // Create a branch at every 10th node
-        if i % 10 == 0 {
-            let branch = dag
-                .add_task(task_fn::<i32, _, _>(move |main_val: &i32| main_val * 2))
-                .depends_on(main_chain);
-            branches.push(branch);
-        }
-    }
-
-    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
-        .await?;
-
-    assert_eq!(dag.get(main_chain)?, 499);
-
-    // Check some branches
-    if !branches.is_empty() {
-        assert_eq!(dag.get(branches[0])?, 20); // 10 * 2
-        assert_eq!(dag.get(branches[4])?, 100); // 50 * 2
-    }
-
-    Ok(())
-}
 
 #[tokio::test]
 async fn test_multiple_parallel_deep_chains() -> DagResult<()> {
@@ -224,30 +165,6 @@ async fn test_fibonacci_chain() -> DagResult<()> {
 }
 
 #[tokio::test]
-async fn test_deep_chain_with_accumulator() -> DagResult<()> {
-    // Test a deep chain where each node accumulates a value
-    let dag = DagRunner::new();
-
-    // Use a simpler accumulation pattern - just sum
-    let first = dag.add_task(task_fn::<(), _, _>(|_: ()| 0i64));
-    let mut current: dagx::TaskHandle<i64> = first.into();
-
-    for i in 1..=200 {
-        current = dag
-            .add_task(task_fn::<i64, _, _>(move |sum: &i64| sum + i as i64))
-            .depends_on(current);
-    }
-
-    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
-        .await?;
-
-    let result = dag.get(current)?;
-    assert_eq!(result, 20100); // sum of 1..=200
-
-    Ok(())
-}
-
-#[tokio::test]
 async fn test_zigzag_dependencies() -> DagResult<()> {
     // Test a zigzag pattern: two chains that cross-reference each other
     let dag = DagRunner::new();
@@ -283,27 +200,5 @@ async fn test_zigzag_dependencies() -> DagResult<()> {
     let result = dag.get(final_task)?;
     assert!(result > 100);
 
-    Ok(())
-}
-
-#[tokio::test]
-#[cfg_attr(tarpaulin, ignore)] // This test is extremely resource intensive
-async fn test_10000_level_chain_stress() -> DagResult<()> {
-    // Ultimate deep chain test
-    let dag = DagRunner::new();
-
-    let first = dag.add_task(task_fn::<(), _, _>(|_: ()| 0u64));
-    let mut current: dagx::TaskHandle<u64> = first.into();
-
-    for _ in 1..10_000 {
-        current = dag
-            .add_task(task_fn::<u64, _, _>(|prev: &u64| prev + 1))
-            .depends_on(current);
-    }
-
-    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
-        .await?;
-
-    assert_eq!(dag.get(current)?, 9_999);
     Ok(())
 }

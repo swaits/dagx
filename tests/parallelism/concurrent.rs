@@ -1,6 +1,6 @@
 //! Concurrent access tests
 
-use crate::common::task_fn;
+use dagx::task_fn;
 use dagx::{task, DagRunner};
 
 use std::sync::atomic::{AtomicUsize, Ordering};

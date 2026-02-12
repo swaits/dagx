@@ -41,8 +41,6 @@ RUST_LOG=dagx=debug cargo run    # Task and layer details
 RUST_LOG=dagx=trace cargo run    # All execution details
 ```
 
-See [`examples/tracing_example.rs`](../examples/tracing_example.rs) for a complete working example.
-
 ## Zero-Cost Guarantee
 
 When the `tracing` feature is disabled (the default), there is **literally 0ns overhead**:

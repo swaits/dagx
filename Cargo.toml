@@ -40,7 +40,6 @@ tokio = { version = "1", features = [
     "time",
     "sync",
 ] }
-async-std = { version = "1", features = ["attributes"] }
 smol = "2"
 criterion = "0.7"
 # Quirky async runtimes for edge-case testing
@@ -52,6 +51,7 @@ dagrs = { version = "0.5", default-features = false }
 async-trait = "0.1"
 # Tracing support for tests and examples
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+test-case = "3.3.1"
 
 [[bench]]
 name = "dagx_bench"

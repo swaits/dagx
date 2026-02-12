@@ -277,11 +277,6 @@ impl DagRunner {
     /// - Returns `DagError::ConcurrentExecution` if the DAG is already executing
     /// - Returns `DagError::TaskPanicked` if any task panics during execution
     ///
-    /// # Note on Cycles
-    ///
-    /// Cycles are impossible via the public API due to compile-time prevention.
-    /// See the [`crate::cycle_prevention`] module for details.
-    ///
     /// # Examples
     ///
     /// ```
@@ -674,13 +669,11 @@ impl DagRunner {
             }
 
             if !current_layer.is_empty() {
-                current_layer.sort(); // Deterministic ordering
                 layers.push(current_layer);
             }
         }
 
         // Cycle detection removed: cycles are impossible via the public API.
-        // See src/cycle_prevention.rs for proof that the type system prevents cycles.
         //
         // The type-state pattern enforces acyclic structure at compile time through:
         // 1. TaskBuilder::depends_on() consumes the builder (move semantics)

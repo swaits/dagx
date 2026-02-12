@@ -98,7 +98,7 @@ use syn::{parse_macro_input, FnArg, Ident, ImplItem, ItemImpl, Pat, PatType, Ret
 ///         self.value
 ///     }
 /// }
-/// ```ignore
+/// ```
 ///
 /// ## Single Input
 ///
@@ -113,7 +113,7 @@ use syn::{parse_macro_input, FnArg, Ident, ImplItem, ItemImpl, Pat, PatType, Ret
 ///         input * 2
 ///     }
 /// }
-/// ```ignore
+/// ```
 ///
 /// ## Multiple Inputs (up to 8)
 ///
@@ -128,7 +128,7 @@ use syn::{parse_macro_input, FnArg, Ident, ImplItem, ItemImpl, Pat, PatType, Ret
 ///         format!("{}: {} ({})", b, a, c)
 ///     }
 /// }
-/// ```ignore
+/// ```
 ///
 /// # Requirements
 ///
@@ -168,7 +168,7 @@ use syn::{parse_macro_input, FnArg, Ident, ImplItem, ItemImpl, Pat, PatType, Ret
 ///         a + b
 ///     }
 /// }
-/// ```ignore
+/// ```
 ///
 /// For stateful tasks (with &mut self):
 ///
@@ -199,7 +199,7 @@ use syn::{parse_macro_input, FnArg, Ident, ImplItem, ItemImpl, Pat, PatType, Ret
 ///         self.count
 ///     }
 /// }
-/// ```ignore
+/// ```
 #[proc_macro_attribute]
 pub fn task(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let impl_block = parse_macro_input!(item as ItemImpl);

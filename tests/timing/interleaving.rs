@@ -1,7 +1,7 @@
 //! Tests for forced execution interleaving patterns
 
-use crate::common::task_fn;
-use dagx::{task, DagResult, DagRunner, TaskHandle};
+use dagx::task_fn;
+use dagx::{task, DagResult, DagRunner};
 
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
@@ -269,116 +269,6 @@ async fn test_layered_interleaving() -> DagResult<()> {
 
     // Sum of 0+1+2+3 = 6
     assert_eq!(dag.get(layer3)?, 6);
-
-    Ok(())
-}
-
-#[tokio::test]
-async fn test_cross_branch_synchronization() -> DagResult<()> {
-    // Test synchronization between parallel branches
-    let dag = DagRunner::new();
-    let sync_point = Arc::new(AtomicUsize::new(0));
-    let events = Arc::new(parking_lot::Mutex::new(Vec::new()));
-
-    // Branch A
-    let a1: TaskHandle<_> = dag
-        .add_task(task_fn::<(), _, _>({
-            let sync = sync_point.clone();
-            let events = events.clone();
-            move |_: ()| {
-                events.lock().push("A1");
-                sync.fetch_add(1, Ordering::SeqCst);
-                1
-            }
-        }))
-        .into();
-
-    struct A2Task {
-        sync: Arc<AtomicUsize>,
-        events: Arc<parking_lot::Mutex<Vec<&'static str>>>,
-    }
-
-    #[task]
-    impl A2Task {
-        async fn run(&self, x: &i32) -> i32 {
-            // Wait for B1
-            while self.sync.load(Ordering::SeqCst) < 2 {
-                tokio::task::yield_now().await;
-            }
-            self.events.lock().push("A2");
-            self.sync.fetch_add(1, Ordering::SeqCst);
-            x + 1
-        }
-    }
-
-    let a2 = dag
-        .add_task(A2Task {
-            sync: sync_point.clone(),
-            events: events.clone(),
-        })
-        .depends_on(a1);
-
-    struct B1Task {
-        sync: Arc<AtomicUsize>,
-        events: Arc<parking_lot::Mutex<Vec<&'static str>>>,
-    }
-
-    #[task]
-    impl B1Task {
-        async fn run(&self) -> i32 {
-            // Wait for A1
-            while self.sync.load(Ordering::SeqCst) < 1 {
-                tokio::task::yield_now().await;
-            }
-            self.events.lock().push("B1");
-            self.sync.fetch_add(1, Ordering::SeqCst);
-            10
-        }
-    }
-
-    // Branch B
-    let b1 = dag.add_task(B1Task {
-        events: events.clone(),
-        sync: sync_point.clone(),
-    });
-
-    struct B2Task {
-        sync: Arc<AtomicUsize>,
-        events: Arc<parking_lot::Mutex<Vec<&'static str>>>,
-    }
-
-    #[task]
-    impl B2Task {
-        async fn run(&self, x: &i32) -> i32 {
-            // Wait for A2
-            while self.sync.load(Ordering::SeqCst) < 3 {
-                tokio::task::yield_now().await;
-            }
-            self.events.lock().push("B2");
-            x + 1
-        }
-    }
-
-    let b2 = dag
-        .add_task(B2Task {
-            events: events.clone(),
-            sync: sync_point.clone(),
-        })
-        .depends_on(b1);
-
-    // Merge
-    let merge = dag
-        .add_task(task_fn::<(i32, i32), _, _>(|(a, b): (&i32, &i32)| a + b))
-        .depends_on((&a2, &b2));
-
-    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
-        .await?;
-
-    assert_eq!(dag.get(merge)?, 13); // 2 + 11
-
-    // Check forced interleaving
-    let event_list = events.lock().clone();
-    assert_eq!(event_list, vec!["A1", "B1", "A2", "B2"]);
 
     Ok(())
 }

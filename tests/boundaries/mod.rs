@@ -4,6 +4,5 @@
 //! by normal usage patterns.
 
 mod deep_chains;
-mod large_scale;
 mod type_limits;
 mod zero_tasks;

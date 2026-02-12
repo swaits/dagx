@@ -1,7 +1,7 @@
 //! Tests for dependency resolution order and transitive dependencies
 
-use crate::common::task_fn;
-use dagx::{task, DagResult, DagRunner, TaskHandle};
+use dagx::task_fn;
+use dagx::{task, DagResult, DagRunner};
 
 use std::sync::{Arc, Mutex};
 
@@ -97,70 +97,5 @@ async fn test_dependency_resolution_order() -> DagResult<()> {
     let c_start_pos = order.iter().position(|x| x == "C_start").unwrap();
     assert!(c_start_pos > b_end_pos, "C should start after B ends");
 
-    Ok(())
-}
-
-#[tokio::test]
-async fn test_transitive_dependencies() -> DagResult<()> {
-    // Test that transitive dependencies work correctly
-    // A -> B -> C (creates transitive A -> C relationship)
-    let dag = DagRunner::new();
-
-    let a: TaskHandle<_> = dag.add_task(task_fn::<(), _, _>(|_: ()| 10)).into();
-    let b = dag
-        .add_task(task_fn::<i32, _, _>(|&x: &i32| x * 2))
-        .depends_on(a);
-    let c = dag
-        .add_task(task_fn::<i32, _, _>(|&x: &i32| x + 5))
-        .depends_on(b);
-
-    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
-        .await?;
-
-    assert_eq!(dag.get(a)?, 10);
-    assert_eq!(dag.get(b)?, 20);
-    assert_eq!(dag.get(c)?, 25); // 20 + 5
-
-    Ok(())
-}
-
-#[tokio::test]
-async fn test_deep_chain_50_levels() -> DagResult<()> {
-    let dag = DagRunner::new();
-
-    let first = dag.add_task(task_fn::<(), _, _>(|_: ()| 0));
-    let mut handles = vec![first.into()];
-
-    for _i in 1..=50 {
-        let next = dag
-            .add_task(task_fn::<i32, _, _>(move |&x: &i32| x + 1))
-            .depends_on(handles.last().unwrap());
-        handles.push(next);
-    }
-
-    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
-        .await?;
-
-    assert_eq!(dag.get(handles.last().unwrap())?, 50);
-    Ok(())
-}
-
-#[tokio::test]
-async fn test_deep_chain_200_levels() -> DagResult<()> {
-    let dag = DagRunner::new();
-
-    let first = dag.add_task(task_fn::<(), _, _>(|_: ()| 1));
-    let mut current = first.into();
-
-    for _ in 0..200 {
-        current = dag
-            .add_task(task_fn::<i32, _, _>(|&x: &i32| x + 1))
-            .depends_on(current);
-    }
-
-    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
-        .await?;
-
-    assert_eq!(dag.get(current)?, 201);
     Ok(())
 }

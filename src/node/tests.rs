@@ -68,7 +68,7 @@ async fn test_execute_with_deps_sink_node() {
 
 #[tokio::test]
 async fn test_execute_with_deps_non_sink_node() {
-    // Test that non-sink nodes send output via channels
+    // Test that non-sink nodes return their output
     let node = TypedNode::new(TestTask { value: 42 });
 
     // Execute with senders (non-sink node)

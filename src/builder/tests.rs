@@ -58,18 +58,6 @@ fn test_task_builder_from_conversion() {
 }
 
 #[test]
-fn test_task_builder_depends_on_returns_handle() {
-    init_tracing();
-    let dag = DagRunner::new();
-
-    let source = dag.add_task(TestTask { value: 10 });
-    let dependent = dag.add_task(TestTaskWithInput).depends_on(source);
-
-    // depends_on should return a TaskHandle
-    let _handle: TaskHandle<_> = dependent;
-}
-
-#[test]
 fn test_task_builder_chain() {
     let dag = DagRunner::new();
 

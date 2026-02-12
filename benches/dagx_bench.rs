@@ -29,12 +29,6 @@ criterion_group! {
 }
 
 criterion_group! {
-    name = execution_benches;
-    config = configure_criterion();
-    targets = basic::execution::bench_dag_execution
-}
-
-criterion_group! {
     name = scaling_benches;
     config = configure_criterion();
     targets = basic::scaling::bench_dag_scaling
@@ -54,7 +48,6 @@ criterion_group! {
     config = configure_criterion();
     targets =
         realistic::etl::bench_etl_pipeline,
-        realistic::config_broadcast::bench_config_broadcast,
         realistic::memory_efficiency::bench_memory_efficiency,
         realistic::mixed::bench_mixed_patterns
 }
@@ -73,7 +66,6 @@ criterion_group! {
 
 criterion_main!(
     creation_benches,
-    execution_benches,
     scaling_benches,
     pattern_benches,
     realistic_benches,

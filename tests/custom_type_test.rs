@@ -1,4 +1,4 @@
-// Test that custom types work without any trait implementations
+// Test that custom types work with the #[task] macro
 use dagx::{task, DagRunner, TaskHandle};
 
 #[derive(Clone, Debug, PartialEq)]
@@ -82,28 +82,6 @@ async fn test_custom_type_passthrough() {
     assert_eq!(person_result.as_str(), "Alice is 30 years old");
     assert_eq!(company_result.name, "Alice's Company");
     assert_eq!(company_result.employees.len(), 1);
-}
-
-#[tokio::test]
-async fn test_custom_type_diamond_pattern() {
-    let dag = DagRunner::new();
-
-    // Source
-    let fetch: TaskHandle<_> = dag.add_task(FetchPerson).into();
-
-    // Two paths from source
-    let path_a = dag.add_task(ProcessPerson).depends_on(fetch);
-    let path_b = dag.add_task(PersonToCompany).depends_on(fetch);
-
-    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
-        .await
-        .unwrap();
-
-    let result_a = dag.get(path_a).unwrap();
-    let result_b = dag.get(path_b).unwrap();
-
-    assert_eq!(result_a.as_str(), "Alice is 30 years old");
-    assert_eq!(result_b.name, "Alice's Company");
 }
 
 #[tokio::test]

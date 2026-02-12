@@ -1,6 +1,6 @@
 //! 10,000 task breakdown benchmarks - construction vs execution
 
-use criterion::Criterion;
+use criterion::{BatchSize, Criterion};
 use dagx::{task_fn, DagRunner};
 
 pub fn bench_10k_breakdown(c: &mut Criterion) {
@@ -35,19 +35,23 @@ pub fn bench_10k_breakdown(c: &mut Criterion) {
 
     // c) Execution only (pre-built DAG, just run)
     group.bench_function("execution_only", |b| {
-        // Pre-build the DAG outside the measurement
-        let dag = DagRunner::new();
-        for i in 0..10_000 {
-            dag.add_task(task_fn::<(), _, _>(move |_: ()| i));
-        }
-
-        b.iter(|| {
-            rt.block_on(async {
-                dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
-                    .await
-                    .unwrap();
-            })
-        });
+        b.iter_batched(
+            || {
+                let dag = DagRunner::new();
+                for i in 0..10_000 {
+                    dag.add_task(task_fn::<(), _, _>(move |_: ()| i));
+                }
+                dag
+            },
+            |dag| {
+                rt.block_on(async {
+                    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+                        .await
+                        .unwrap();
+                })
+            },
+            BatchSize::LargeInput,
+        );
     });
 
     group.finish();

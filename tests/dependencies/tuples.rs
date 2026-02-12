@@ -1,6 +1,6 @@
 //! Tests for tuple dependencies (2-8 dependencies)
 
-use crate::common::task_fn;
+use dagx::task_fn;
 use dagx::{DagResult, DagRunner};
 
 #[tokio::test]
