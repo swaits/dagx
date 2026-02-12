@@ -2,7 +2,8 @@
 
 use std::{any::Any, sync::Arc};
 
-use dagx::{task_fn, DagResult, DagRunner};
+use dagx::{DagResult, DagRunner};
+use dagx_test::task_fn;
 use futures_util::{future::BoxFuture, task::SpawnExt, Future};
 use test_case::test_case;
 

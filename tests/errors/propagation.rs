@@ -1,7 +1,7 @@
 //! Tests for error propagation through the DAG
 
-use dagx::task_fn;
 use dagx::{task, DagRunner, TaskHandle};
+use dagx_test::task_fn;
 
 use std::sync::Arc;
 use std::time::Duration;

@@ -1,8 +1,8 @@
 //! Fan-out pattern benchmarks (1 → N dependencies)
 
 use criterion::Criterion;
-use dagx::{task_fn, DagRunner, TaskHandle};
-
+use dagx::{DagRunner, TaskHandle};
+use dagx_test::task_fn;
 pub fn bench_fanout(c: &mut Criterion) {
     let rt = tokio::runtime::Runtime::new().unwrap();
 

@@ -1,7 +1,7 @@
 //! Tests for error recovery patterns
 
-use dagx::task_fn;
 use dagx::{DagResult, DagRunner};
+use dagx_test::task_fn;
 
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;

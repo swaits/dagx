@@ -1,45 +1,10 @@
-//! Input extraction for task dependencies via a list of dependencies.
-//!
-//! # Legacy Trait for Internal Use Only
-//!
-//! **NOTE**: This module is now primarily for internal use. The `ExtractInput` trait is only
-//! used by the internal `task_fn` test helper function.
-//!
-//! **For regular tasks**: The `#[task]` macro generates inline `run()` methods with
-//! type-specific extraction logic. This means **ANY type** implementing `Send + Sync`
-//! works automatically without needing `ExtractInput` implementations!
-//!
-//! # How it works
-//!
-//! When a task executes, it needs to extract its inputs from type-erased oneshot dependencies.
-//! Outputs are wrapped in Arc for efficient fanout (cheap Arc clones instead of data clones).
-//!
-//! **Modern approach (via `#[task]` macro)**:
-//! - The macro generates custom extraction logic inline in `run()`
-//! - Works with ANY type (just needs `Send + Sync + 'static`)
-//! - No trait implementations needed!
-//!
-//! **Legacy approach (via `ExtractInput` trait)**:
-//! - Used only by the internal `task_fn` test helper
-//! - Provides implementations for primitives, standard types, and tuples
-//! - Requires explicit trait implementations for custom types (not recommended)
-//!
-//! # Why macros?
-//!
-//! Rust lacks variadic generics, so we use macros to generate implementations for:
-//! - Common primitive/standard types (one impl per type)
-//! - Tuples of different sizes (one impl per size, up to 8 elements)
-//!
-//! This is standard practice in Rust for working with tuples of different arities.
+//! Input extraction for tasks from a list of dependencies.
 
 use std::{collections::HashMap, hash::Hash, sync::Arc};
 
 use crate::TaskInput;
 
 /// Helper trait for input extraction from list of dependencies.
-///
-/// Type erasure occurs only at the ExecutableNode trait boundary - by the time
-/// we're in ExtractInput, we know the concrete type and can safely downcast.
 pub trait ExtractInput: Sized + Clone {
     type Input: Send;
     type Retv<'input>;
@@ -157,18 +122,6 @@ where
     }
 }
 
-/// Macro to implement ExtractInput for tuple types.
-///
-/// We need separate implementations for each tuple size (2-8) because Rust doesn't support
-/// variadic generics. This is standard practice when working with tuples in Rust.
-///
-/// # Compile-time Safety
-///
-/// The number of dependencies is guaranteed to match the tuple size at compile time through:
-/// 1. The `DepsTuple<Tk::Input>` trait bound on `depends_on()` ensures type/arity matching
-/// 2. The `IsUnitType` constraint on `From<TaskBuilder>` prevents using tasks without calling `depends_on()`
-///
-/// Therefore, no runtime validation is needed - if it compiles, the dependency count is correct.
 macro_rules! impl_extract_tuple {
     ($($T:ident),+) => {
         impl<$($T: 'static + Clone + Send + Sync),+> ExtractInput for ($($T,)+) {

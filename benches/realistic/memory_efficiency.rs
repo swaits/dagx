@@ -1,8 +1,8 @@
 //! Memory efficiency benchmark with large data structures
 
 use criterion::{BenchmarkId, Criterion};
-use dagx::{task_fn, DagRunner, TaskHandle};
-
+use dagx::{DagRunner, TaskHandle};
+use dagx_test::task_fn;
 use std::hint::black_box;
 
 pub fn bench_memory_efficiency(c: &mut Criterion) {

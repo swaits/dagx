@@ -1,7 +1,7 @@
 //! Tests for empty DAGs and minimal task configurations
 
-use dagx::task_fn;
 use dagx::{task, DagResult, DagRunner};
+use dagx_test::task_fn;
 
 use tokio::task::yield_now;
 

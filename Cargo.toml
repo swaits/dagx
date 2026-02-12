@@ -1,5 +1,5 @@
 [workspace]
-members = ["dagx-macros"]
+members = ["dagx-macros", "dagx-test"]
 
 [package]
 name = "dagx"
@@ -21,11 +21,14 @@ exclude = [".claude/", ".jj/", "dagx-spec.md"]
 default = []
 tracing = ["dep:tracing"]
 
-[lints.rust]
+[workspace.lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = [
     'cfg(tarpaulin)',
     'cfg(tarpaulin_include)',
 ] }
+
+[lints]
+workspace = true
 
 [dependencies]
 futures-util = { version = "0.3", default-features = false, features = ["std"] }
@@ -34,6 +37,7 @@ dagx-macros = { version = "0.3.1", path = "./dagx-macros" }
 tracing = { version = "0.1", optional = true }
 
 [dev-dependencies]
+dagx-test = { path = "./dagx-test" }
 tokio = { version = "1", features = [
     "macros",
     "rt-multi-thread",

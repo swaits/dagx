@@ -1,8 +1,8 @@
 //! Diamond pattern benchmarks (fan-out then fan-in)
 
 use criterion::Criterion;
-use dagx::{task_fn, DagRunner, TaskHandle};
-
+use dagx::{DagRunner, TaskHandle};
+use dagx_test::task_fn;
 pub fn bench_diamond(c: &mut Criterion) {
     let rt = tokio::runtime::Runtime::new().unwrap();
 

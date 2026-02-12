@@ -1,7 +1,8 @@
 //! DAG scaling benchmarks - how performance scales with task count
 
 use criterion::{BenchmarkId, Criterion};
-use dagx::{task_fn, DagRunner};
+use dagx::DagRunner;
+use dagx_test::task_fn;
 
 pub fn bench_dag_scaling(c: &mut Criterion) {
     let rt = tokio::runtime::Runtime::new().unwrap();

@@ -1,6 +1,7 @@
 //! Tests for timing and speedup verification
 
-use dagx::{task, task_fn, DagResult, DagRunner};
+use dagx::{task, DagResult, DagRunner};
+use dagx_test::task_fn;
 
 use std::{
     sync::{Arc, Mutex},

@@ -1,7 +1,7 @@
 //! Tests for type system edge cases and limits
 
-use dagx::task_fn;
 use dagx::{DagResult, DagRunner, TaskHandle};
+use dagx_test::task_fn;
 
 use std::marker::PhantomData;
 

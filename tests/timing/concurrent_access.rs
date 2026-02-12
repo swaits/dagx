@@ -1,7 +1,7 @@
 //! Tests for concurrent access patterns and race conditions
 
-use dagx::task_fn;
 use dagx::{task, DagResult, DagRunner, TaskHandle};
+use dagx_test::task_fn;
 
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;

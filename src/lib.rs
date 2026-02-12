@@ -770,7 +770,6 @@ extern crate self as dagx;
 mod builder;
 mod deps;
 mod error;
-mod extract;
 mod node;
 mod runner;
 mod task;
@@ -785,7 +784,3 @@ pub use types::{Pending, TaskHandle};
 
 // Re-export the procedural macro
 pub use dagx_macros::task;
-
-// Internal testing support - not part of the public API
-#[doc(hidden)]
-pub use task::task_fn;

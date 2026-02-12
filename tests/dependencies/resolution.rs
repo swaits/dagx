@@ -1,7 +1,7 @@
 //! Tests for dependency resolution order and transitive dependencies
 
-use dagx::task_fn;
 use dagx::{task, DagResult, DagRunner};
+use dagx_test::task_fn;
 
 use std::sync::{Arc, Mutex};
 

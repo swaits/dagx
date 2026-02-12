@@ -1,7 +1,8 @@
 //! 10,000 task breakdown benchmarks - construction vs execution
 
 use criterion::{BatchSize, Criterion};
-use dagx::{task_fn, DagRunner};
+use dagx::DagRunner;
+use dagx_test::task_fn;
 
 pub fn bench_10k_breakdown(c: &mut Criterion) {
     let rt = tokio::runtime::Runtime::new().unwrap();

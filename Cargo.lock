@@ -378,6 +378,7 @@ dependencies = [
  "criterion",
  "dagrs",
  "dagx-macros",
+ "dagx-test",
  "futures-executor",
  "futures-util",
  "parking_lot",
@@ -396,6 +397,13 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "dagx-test"
+version = "0.3.1"
+dependencies = [
+ "dagx",
 ]
 
 [[package]]

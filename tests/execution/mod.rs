@@ -1,5 +1,5 @@
 // Basic execution tests for DagRunner
-use dagx::task_fn;
+use dagx_test::task_fn;
 
 use dagx::*;
 

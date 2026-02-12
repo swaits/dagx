@@ -1,7 +1,7 @@
 //! Tests for forced execution interleaving patterns
 
-use dagx::task_fn;
 use dagx::{task, DagResult, DagRunner};
+use dagx_test::task_fn;
 
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
