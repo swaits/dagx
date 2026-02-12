@@ -10,12 +10,12 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::future::Future;
 use std::hash::{BuildHasher, Hasher};
 use std::panic::AssertUnwindSafe;
-use std::pin::Pin;
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc,
 };
 
+use futures_util::future::BoxFuture;
 use futures_util::{stream::FuturesUnordered, FutureExt, StreamExt, TryFutureExt};
 use parking_lot::Mutex;
 
@@ -27,8 +27,6 @@ use crate::error::{DagError, DagResult};
 use crate::node::{ExecutableNode, TypedNode};
 use crate::task::Task;
 use crate::types::{NodeId, Pending, TaskHandle};
-
-type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 
 // Guard to ensure run_lock is released even on early return or panic
 struct RunGuard<'a> {
@@ -319,8 +317,8 @@ impl DagRunner {
     #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, spawner)))]
     pub async fn run<S, F>(&self, spawner: S) -> DagResult<()>
     where
-        S: Fn(BoxFuture<'static, DagResult<(NodeId, Arc<dyn Any + Send + Sync>)>>) -> F,
-        F: Future<Output = DagResult<(NodeId, Arc<dyn Any + Send + Sync>)>>,
+        S: Fn(BoxFuture<'static, DagResult<Arc<dyn Any + Send + Sync>>>) -> F,
+        F: Future<Output = DagResult<Arc<dyn Any + Send + Sync>>>,
     {
         #[cfg(feature = "tracing")]
         info!("starting DAG execution");
@@ -474,14 +472,15 @@ impl DagRunner {
                                 .cloned()
                                 .collect();
 
+                            let inner_future = spawner(node.execute_with_deps(dependencies));
                             // Spawn the task using the provided spawner
                             let inner_future = async move {
-                                let result = node.execute_with_deps(dependencies).await?;
+                                let result = inner_future.await?;
                                 Ok((node_id, result))
                             };
 
                             Some(
-                                AssertUnwindSafe(spawner(Box::pin(inner_future)))
+                                AssertUnwindSafe(inner_future)
                                     .catch_unwind()
                                     .unwrap_or_else(move |panic_payload| {
                                         // Convert panic to error
