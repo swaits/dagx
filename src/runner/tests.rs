@@ -1,7 +1,10 @@
 //! Unit tests for runner module
 
+use std::collections::HashMap;
+use std::hash::Hasher;
+
 use crate::error::DagError;
-use crate::runner::DagRunner;
+use crate::runner::{DagRunner, PassThroughHasher};
 use crate::types::TaskHandle;
 
 // Initialize tracing subscriber for tests (idempotent)
@@ -239,4 +242,17 @@ async fn test_task_panic_in_multi_task_layer() {
 
     // The run should fail due to the panic
     assert!(result.is_err());
+}
+
+#[test]
+fn test_passthrough_hasher() {
+    let mut passthrough_hashmap = HashMap::with_hasher(PassThroughHasher::default());
+    passthrough_hashmap.insert(64u32, "test string");
+}
+
+#[test]
+#[should_panic]
+fn test_passthrough_hasher_only_u32() {
+    let mut passthrough_hasher = PassThroughHasher::default();
+    passthrough_hasher.write(&[0; 4]);
 }

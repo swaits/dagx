@@ -33,3 +33,9 @@ async fn test_custom_task_implementation() {
     // Can't call run again since task was consumed
     // This demonstrates the ownership model
 }
+
+#[test]
+fn test_empty_task_input() {
+    let empty = TaskInput::empty();
+    assert_eq!(empty.inputs.len(), 0);
+}
