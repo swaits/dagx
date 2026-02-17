@@ -1,7 +1,6 @@
 //! Unit tests for builder module
 
 use crate::runner::DagRunner;
-use crate::types::TaskHandle;
 
 // Initialize tracing subscriber for tests (idempotent)
 #[cfg(feature = "tracing")]
@@ -47,11 +46,11 @@ impl TestTaskWithInput {
 #[test]
 fn test_task_builder_from_conversion() {
     // Test line 165 in builder.rs - the From implementation
-    let dag = DagRunner::new();
+    let mut dag = DagRunner::new();
     let builder = dag.add_task(TestTask { value: 42 });
 
     // Convert builder to TaskHandle
-    let handle: TaskHandle<_> = builder.into();
+    let handle = builder;
 
     // Check that the ID is preserved
     assert_eq!(handle.id.0, 0); // First task should have ID 0
@@ -59,17 +58,17 @@ fn test_task_builder_from_conversion() {
 
 #[test]
 fn test_task_builder_chain() {
-    let dag = DagRunner::new();
+    let mut dag = DagRunner::new();
 
     // Test chaining multiple tasks
-    let t1 = dag.add_task(TestTask { value: 1 }).into();
+    let t1 = dag.add_task(TestTask { value: 1 });
     let t2 = dag.add_task(TestTaskWithInput).depends_on(t1);
     let t3 = dag.add_task(TestTaskWithInput).depends_on(t2);
 
     // All should return TaskHandles
-    let _: TaskHandle<_> = t1;
-    let _: TaskHandle<_> = t2;
-    let _: TaskHandle<_> = t3;
+    let _ = t1;
+    let _ = t2;
+    let _ = t3;
 }
 
 #[test]
@@ -84,7 +83,7 @@ fn test_multiple_dependencies() {
         }
     }
 
-    let dag = DagRunner::new();
+    let mut dag = DagRunner::new();
 
     let a = dag.add_task(TestTask { value: 10 });
     let b = dag.add_task(TestTask { value: 20 });
@@ -93,12 +92,12 @@ fn test_multiple_dependencies() {
     let sum = dag.add_task(AddTask).depends_on((a, b));
 
     // Should return a TaskHandle
-    let _: TaskHandle<_> = sum;
+    let _ = sum;
 }
 
 #[test]
 fn test_task_builder_stores_correct_id() {
-    let dag = DagRunner::new();
+    let mut dag = DagRunner::new();
 
     let builder1 = dag.add_task(TestTask { value: 1 });
     let builder2 = dag.add_task(TestTask { value: 2 });

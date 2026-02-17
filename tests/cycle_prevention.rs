@@ -3,7 +3,7 @@
 //! These tests show that even if you try to create cycles, the Rust compiler
 //! prevents it through the type-state pattern.
 
-use dagx::{task, DagRunner, TaskHandle};
+use dagx::{task, DagRunner};
 
 /// Demonstrates that TaskBuilder is consumed by depends_on,
 /// preventing you from wiring the same task multiple times
@@ -25,7 +25,7 @@ fn test_builder_consumed_by_depends_on() {
         }
     }
 
-    let dag = DagRunner::new();
+    let mut dag = DagRunner::new();
     let source = dag.add_task(Source);
     let consumer_builder = dag.add_task(Consumer);
 
@@ -49,11 +49,11 @@ fn test_handle_is_immutable_reference() {
         }
     }
 
-    let dag = DagRunner::new();
+    let mut dag = DagRunner::new();
     let builder = dag.add_task(NoInput);
 
     // Convert to handle (only works because Input = ())
-    let handle: TaskHandle<_> = builder.into();
+    let handle = builder;
 
     // TaskHandle is Copy/Clone - just an ID wrapper
     let _copy1 = handle;
@@ -85,7 +85,7 @@ fn test_ordering_prevents_cycles() {
         }
     }
 
-    let dag = DagRunner::new();
+    let mut dag = DagRunner::new();
     let a_builder = dag.add_task(TaskA);
     let b_builder = dag.add_task(TaskB);
 
@@ -107,7 +107,7 @@ fn test_ordering_prevents_cycles() {
     // So we can only create DAGs, never cycles!
 
     // Let's create a valid DAG instead: A→B (B depends on A)
-    let a_handle: TaskHandle<_> = a_builder.into(); // A has no deps (unit input)
+    let a_handle = a_builder; // A has no deps (unit input)
     let _b_handle = b_builder.depends_on(a_handle);
     // Now we could try: a_handle.depends_on(b_handle)?
     // But TaskHandle has no such method!
@@ -132,13 +132,13 @@ fn test_unit_tasks_cannot_create_cycles() {
         }
     }
 
-    let dag = DagRunner::new();
+    let mut dag = DagRunner::new();
     let task1 = dag.add_task(Task1);
     let task2 = dag.add_task(Task2);
 
     // Both have unit input, so we can convert to handles
-    let _handle1: TaskHandle<_> = task1.into();
-    let _handle2: TaskHandle<_> = task2.into();
+    let _handle1 = task1;
+    let _handle2 = task2;
 
     // Now we have two handles, but...
     // TaskHandle has no methods to add dependencies!
@@ -176,7 +176,7 @@ fn test_three_way_cycle_impossible() {
         }
     }
 
-    let dag = DagRunner::new();
+    let mut dag = DagRunner::new();
     let _a_builder = dag.add_task(A);
     let _b_builder = dag.add_task(B);
     let _c_builder = dag.add_task(C);
@@ -205,7 +205,7 @@ fn test_self_loop_prevented() {
         }
     }
 
-    let dag = DagRunner::new();
+    let mut dag = DagRunner::new();
     let _builder = dag.add_task(SelfReferential);
 
     // To create A→A (self-loop):
@@ -256,7 +256,7 @@ async fn test_type_safety_prevents_invalid_graphs() {
         }
     }
 
-    let dag = DagRunner::new();
+    let mut dag = DagRunner::new();
 
     // Build a valid DAG: two sources, two transforms, one aggregator
     let s1 = dag.add_task(Source);
@@ -270,11 +270,12 @@ async fn test_type_safety_prevents_invalid_graphs() {
     let result = dag.add_task(Aggregate).depends_on((&t1, &t2));
 
     // Execute and verify
-    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+    let mut output = dag
+        .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await
         .unwrap();
 
-    assert_eq!(dag.get(result).unwrap(), 40); // (10*2) + (10*2)
+    assert_eq!(output.get(result).unwrap(), 40); // (10*2) + (10*2)
 
     // Now if we wanted to add a cycle, we'd need to:
     // - Make one of the Source tasks depend on the Aggregate result

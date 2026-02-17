@@ -77,13 +77,13 @@ impl Add {
 #[tokio::main]
 async fn main() {
     // Step 3: Create a new DAG
-    let dag = DagRunner::new();
+    let mut dag = DagRunner::new();
 
     // Step 4: Add source tasks (tasks with no dependencies)
     //
     // add_task() returns a TaskHandle<T> where T is the task's output type
-    let x = dag.add_task(Value::new(2)).into(); // TaskHandle<i32>
-    let y = dag.add_task(Value::new(3)).into(); // TaskHandle<i32>
+    let x = dag.add_task(Value::new(2)); // TaskHandle<i32>
+    let y = dag.add_task(Value::new(3)); // TaskHandle<i32>
 
     // Step 5: Add a task with dependencies
     //
@@ -105,7 +105,8 @@ async fn main() {
     // 1. Tasks with no dependencies run first (x and y in parallel)
     // 2. Once x and y complete, sum runs (it depends on both)
     println!("Running DAG...\n");
-    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+    let mut output = dag
+        .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await
         .unwrap();
 
@@ -113,9 +114,9 @@ async fn main() {
     //
     // Use .get() with a TaskHandle to retrieve the output.
     // Results are not cloned, so you can only retrieve them once.
-    println!("\nResult: {}", dag.get(sum).unwrap());
+    println!("\nResult: {}", output.get(sum).unwrap());
 
     // Note: You can also retrieve intermediate results
-    assert_eq!(dag.get(x).unwrap(), 2);
-    assert_eq!(dag.get(y).unwrap(), 3);
+    assert_eq!(output.get(x).unwrap(), 2);
+    assert_eq!(output.get(y).unwrap(), 3);
 }

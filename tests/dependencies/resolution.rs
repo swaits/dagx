@@ -8,7 +8,7 @@ use std::sync::{Arc, Mutex};
 #[tokio::test]
 async fn test_dependency_resolution_order() -> DagResult<()> {
     // Test that dependencies are resolved in the correct order
-    let dag = DagRunner::new();
+    let mut dag = DagRunner::new();
 
     let execution_log = Arc::new(Mutex::new(Vec::new()));
 
@@ -79,10 +79,11 @@ async fn test_dependency_resolution_order() -> DagResult<()> {
         .depends_on(d)
     };
 
-    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+    let mut output = dag
+        .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await?;
 
-    assert_eq!(dag.get(e)?, 5);
+    assert_eq!(output.get(e)?, 5);
 
     // Verify execution order
     let log = execution_log.lock().unwrap();

@@ -9,7 +9,7 @@ use std::sync::Arc;
 #[tokio::test]
 async fn test_spawner_actually_spawns_tasks() -> DagResult<()> {
     // Verify that the spawner function is actually called for each task
-    let dag = DagRunner::new();
+    let mut dag = DagRunner::new();
     let spawn_count = Arc::new(AtomicUsize::new(0));
 
     // Create 10 independent tasks
@@ -27,12 +27,13 @@ async fn test_spawner_actually_spawns_tasks() -> DagResult<()> {
         .collect();
 
     // Custom spawner that counts invocations
-    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+    let mut output = dag
+        .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await?;
 
     // Verify all tasks were spawned
     for (i, task) in tasks.into_iter().enumerate() {
-        assert_eq!(dag.get(task)?, i as i32);
+        assert_eq!(output.get(task)?, i as i32);
     }
 
     // The spawner should have been called once for each task

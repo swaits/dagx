@@ -178,7 +178,7 @@ impl GenerateReport {
 
 #[tokio::main]
 async fn main() {
-    let dag = DagRunner::new();
+    let mut dag = DagRunner::new();
 
     println!("Building data pipeline DAG...\n");
 
@@ -220,10 +220,11 @@ async fn main() {
 
     // Execute the pipeline
     println!("Executing pipeline...\n");
-    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+    let mut output = dag
+        .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await
         .unwrap();
 
     // Print final report
-    println!("{}", dag.get(report).unwrap());
+    println!("{}", output.get(report).unwrap());
 }

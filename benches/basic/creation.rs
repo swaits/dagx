@@ -21,7 +21,7 @@ pub fn bench_dag_creation(c: &mut Criterion) {
 
     c.bench_function("add_100_tasks", |b| {
         b.iter(|| {
-            let dag = DagRunner::new();
+            let mut dag = DagRunner::new();
             for i in 0..100 {
                 black_box(dag.add_task(Value(i)));
             }

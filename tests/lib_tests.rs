@@ -8,7 +8,7 @@ mod boundaries;
 mod dependencies;
 mod errors;
 mod execution;
+mod interleaving;
 mod parallelism;
 mod runtimes;
-mod timing;
 mod tracing;

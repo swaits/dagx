@@ -1,6 +1,6 @@
 //! Tests for multi-threading and concurrent execution
 
-use dagx::{task, DagResult, DagRunner, TaskHandle};
+use dagx::{task, DagResult, DagRunner};
 use dagx_test::task_fn;
 
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -11,7 +11,7 @@ use tokio::time::sleep;
 #[tokio::test]
 async fn test_concurrent_execution_with_atomic_counter() -> DagResult<()> {
     // Prove concurrent execution using atomic counters to track simultaneous tasks
-    let dag = DagRunner::new();
+    let mut dag = DagRunner::new();
     let concurrent_count = Arc::new(AtomicUsize::new(0));
     let max_concurrent = Arc::new(AtomicUsize::new(0));
 
@@ -62,12 +62,13 @@ async fn test_concurrent_execution_with_atomic_counter() -> DagResult<()> {
         })
         .collect();
 
-    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+    let mut output = dag
+        .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await?;
 
     // Verify all tasks completed
     for (i, task) in tasks.into_iter().enumerate() {
-        assert_eq!(dag.get(task)?, i);
+        assert_eq!(output.get(task)?, i);
     }
 
     // Check that we achieved real parallelism
@@ -90,13 +91,13 @@ async fn test_concurrent_execution_with_atomic_counter() -> DagResult<()> {
 #[tokio::test]
 async fn test_massive_parallel_fanout() -> DagResult<()> {
     // Test extreme parallelism with 1000 parallel tasks
-    let dag = DagRunner::new();
+    let mut dag = DagRunner::new();
 
     let completed = Arc::new(AtomicUsize::new(0));
     let max_concurrent = Arc::new(AtomicUsize::new(0));
     let current = Arc::new(AtomicUsize::new(0));
 
-    let source: TaskHandle<_> = dag.add_task(task_fn::<(), _, _>(|_: ()| 1)).into();
+    let source = dag.add_task(task_fn::<(), _, _>(|_: ()| 1));
 
     struct FanoutTask {
         comp: Arc<AtomicUsize>,
@@ -147,7 +148,8 @@ async fn test_massive_parallel_fanout() -> DagResult<()> {
         .collect();
 
     let start = Instant::now();
-    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+    let mut output = dag
+        .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await?;
     let elapsed = start.elapsed();
 
@@ -155,9 +157,9 @@ async fn test_massive_parallel_fanout() -> DagResult<()> {
     assert_eq!(completed.load(Ordering::SeqCst), 1000);
 
     // Check some results
-    assert_eq!(dag.get(tasks[0])?, 1);
-    assert_eq!(dag.get(tasks[500])?, 501);
-    assert_eq!(dag.get(tasks[999])?, 1000);
+    assert_eq!(output.get(tasks[0])?, 1);
+    assert_eq!(output.get(tasks[500])?, 501);
+    assert_eq!(output.get(tasks[999])?, 1000);
 
     let max_seen = max_concurrent.load(Ordering::SeqCst);
     println!(

@@ -1,7 +1,7 @@
 //! Fan-out pattern benchmarks (1 → N dependencies)
 
 use criterion::Criterion;
-use dagx::{DagRunner, TaskHandle};
+use dagx::DagRunner;
 use dagx_test::task_fn;
 pub fn bench_fanout(c: &mut Criterion) {
     let rt = tokio::runtime::Runtime::new().unwrap();
@@ -10,15 +10,16 @@ pub fn bench_fanout(c: &mut Criterion) {
     c.bench_function("fanout_1_to_100_i32", |b| {
         b.iter(|| {
             rt.block_on(async {
-                let dag = DagRunner::new();
-                let source: TaskHandle<_> = dag.add_task(task_fn::<(), _, _>(|_: ()| 42)).into();
+                let mut dag = DagRunner::new();
+                let source = dag.add_task(task_fn::<(), _, _>(|_: ()| 42));
 
                 for i in 0..100 {
                     dag.add_task(task_fn::<i32, _, _>(move |&x: &i32| x + i))
                         .depends_on(source);
                 }
 
-                dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+                let _output = dag
+                    .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
                     .await
                     .unwrap();
             })
@@ -29,13 +30,11 @@ pub fn bench_fanout(c: &mut Criterion) {
     c.bench_function("fanout_1_to_100_vec", |b| {
         b.iter(|| {
             rt.block_on(async {
-                let dag = DagRunner::new();
-                let source: TaskHandle<_> = dag
-                    .add_task(task_fn::<(), _, _>(|_: ()| {
-                        // Create 1000 strings - framework wraps in Arc automatically
-                        (0..1000).map(|i| format!("Item {}", i)).collect::<Vec<_>>()
-                    }))
-                    .into();
+                let mut dag = DagRunner::new();
+                let source = dag.add_task(task_fn::<(), _, _>(|_: ()| {
+                    // Create 1000 strings - framework wraps in Arc automatically
+                    (0..1000).map(|i| format!("Item {}", i)).collect::<Vec<_>>()
+                }));
 
                 for i in 0..100 {
                     dag.add_task(task_fn::<Vec<_>, _, _>(move |data: &Vec<String>| {
@@ -45,7 +44,8 @@ pub fn bench_fanout(c: &mut Criterion) {
                     .depends_on(source);
                 }
 
-                dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+                let _output = dag
+                    .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
                     .await
                     .unwrap();
             })

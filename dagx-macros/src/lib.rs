@@ -152,8 +152,7 @@ use syn::{parse_macro_input, FnArg, Ident, ImplItem, ItemImpl, Pat, PatType, Ret
 /// }
 ///
 /// // Generated:
-/// impl Task for Add {
-///     type Input = (i32, i32);
+/// impl Task<(i32, i32)> for Add {
 ///     type Output = i32;
 ///
 ///     async fn run(&mut self, input: Self::Input) -> Self::Output {
@@ -183,8 +182,7 @@ use syn::{parse_macro_input, FnArg, Ident, ImplItem, ItemImpl, Pat, PatType, Ret
 /// }
 ///
 /// // Generated:
-/// impl Task for Counter {
-///     type Input = i32;
+/// impl Task<(i32)> for Counter {
 ///     type Output = i32;
 ///
 ///     async fn run(&mut self, input: Self::Input) -> Self::Output {
@@ -332,11 +330,10 @@ pub fn task(_attr: TokenStream, item: TokenStream) -> TokenStream {
 
     // Generate the Task trait implementation based on whether we have self and async/sync
     quote! {
-        impl ::dagx::Task for #struct_name {
-            type Input = #input_type;
+        impl ::dagx::Task<#input_type> for #struct_name {
             type Output = #output_type;
 
-            async fn run(mut self, mut input: ::dagx::TaskInput<'_, Self::Input>) -> Self::Output {
+            async fn run(mut self, mut input: ::dagx::TaskInput<'_, #input_type>) -> Self::Output {
                 #param_destructure
                 #run_call
             }

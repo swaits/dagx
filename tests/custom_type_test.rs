@@ -1,5 +1,5 @@
 // Test that custom types work with the #[task] macro
-use dagx::{task, DagRunner, TaskHandle};
+use dagx::{task, DagRunner};
 
 #[derive(Clone, Debug, PartialEq)]
 struct Person {
@@ -51,33 +51,35 @@ impl PersonToCompany {
 
 #[tokio::test]
 async fn test_custom_type_single_dependency() {
-    let dag = DagRunner::new();
+    let mut dag = DagRunner::new();
 
     let fetch = dag.add_task(FetchPerson);
     let process = dag.add_task(ProcessPerson).depends_on(fetch);
 
-    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+    let mut output = dag
+        .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await
         .unwrap();
 
-    let result = dag.get(process).unwrap();
+    let result = output.get(process).unwrap();
     assert_eq!(result, "Alice is 30 years old");
 }
 
 #[tokio::test]
 async fn test_custom_type_passthrough() {
-    let dag = DagRunner::new();
+    let mut dag = DagRunner::new();
 
-    let fetch: TaskHandle<_> = dag.add_task(FetchPerson).into();
+    let fetch = dag.add_task(FetchPerson);
     let transform = dag.add_task(PersonToCompany).depends_on(fetch);
     let process = dag.add_task(ProcessPerson).depends_on(fetch);
 
-    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+    let mut output = dag
+        .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await
         .unwrap();
 
-    let person_result = dag.get(process).unwrap();
-    let company_result = dag.get(transform).unwrap();
+    let person_result = output.get(process).unwrap();
+    let company_result = output.get(transform).unwrap();
 
     assert_eq!(person_result.as_str(), "Alice is 30 years old");
     assert_eq!(company_result.name, "Alice's Company");
@@ -86,20 +88,21 @@ async fn test_custom_type_passthrough() {
 
 #[tokio::test]
 async fn test_custom_type_fan_out() {
-    let dag = DagRunner::new();
+    let mut dag = DagRunner::new();
 
-    let fetch: TaskHandle<_> = dag.add_task(FetchPerson).into();
+    let fetch = dag.add_task(FetchPerson);
     let process1 = dag.add_task(ProcessPerson).depends_on(fetch);
     let process2 = dag.add_task(ProcessPerson).depends_on(fetch);
     let process3 = dag.add_task(ProcessPerson).depends_on(fetch);
 
-    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+    let mut output = dag
+        .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await
         .unwrap();
 
-    let result1 = dag.get(process1).unwrap();
-    let result2 = dag.get(process2).unwrap();
-    let result3 = dag.get(process3).unwrap();
+    let result1 = output.get(process1).unwrap();
+    let result2 = output.get(process2).unwrap();
+    let result3 = output.get(process3).unwrap();
 
     assert_eq!(result1, "Alice is 30 years old");
     assert_eq!(result2, "Alice is 30 years old");

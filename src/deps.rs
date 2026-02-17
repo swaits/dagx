@@ -7,36 +7,7 @@
 //! This trait is internal and not meant for external implementation. Users should only
 //! use the provided implementations.
 
-use crate::builder::TaskBuilder;
-use crate::task::Task;
-use crate::types::{NodeId, TaskHandle};
-
-trait IntoNodeRef {
-    type Output;
-    fn into_node_ref(self) -> NodeId;
-}
-
-impl<T> IntoNodeRef for &TaskHandle<T> {
-    type Output = T;
-    fn into_node_ref(self) -> NodeId {
-        self.id
-    }
-}
-
-impl<T> IntoNodeRef for TaskHandle<T> {
-    type Output = T;
-    fn into_node_ref(self) -> NodeId {
-        self.id
-    }
-}
-
-impl<'runner, Tk: Task, Deps> IntoNodeRef for TaskBuilder<'runner, Tk, Deps> {
-    type Output = Tk::Output;
-
-    fn into_node_ref(self) -> NodeId {
-        self.id
-    }
-}
+use crate::builder::{NodeId, TaskHandle};
 
 pub(crate) trait DepsTuple<Input> {
     fn to_node_ids(self) -> Vec<NodeId>;
@@ -50,21 +21,21 @@ impl DepsTuple<()> for () {
 }
 
 // Implementation for single dependency (all forms)
-impl<T> DepsTuple<(T::Output,)> for T
+impl<T, O> DepsTuple<(O,)> for T
 where
-    T: IntoNodeRef,
+    T: Into<TaskHandle<O>>,
 {
     fn to_node_ids(self) -> Vec<NodeId> {
-        vec![self.into_node_ref()]
+        vec![self.into().id]
     }
 }
 
-impl<T> DepsTuple<T::Output> for (T,)
+impl<T, O> DepsTuple<O> for (T,)
 where
-    T: IntoNodeRef,
+    T: Into<TaskHandle<O>>,
 {
     fn to_node_ids(self) -> Vec<NodeId> {
-        vec![self.0.into_node_ref()]
+        vec![self.0.into().id]
     }
 }
 
@@ -82,13 +53,14 @@ where
 /// task.depends_on((&dag.add_task(TaskA), &dag.add_task(TaskB)))
 /// ```
 macro_rules! impl_deps_tuple {
-    ($($T:ident),+) => {
+    ($($T:ident : $O:ident),+) => {
         // For tuples of any combination of &TaskHandle, TaskHandle, and TaskBuilder
-        impl<$($T: IntoNodeRef),+> DepsTuple<($($T::Output,)+)> for ($($T,)+) {
+        impl<$($T: Into<TaskHandle<$O>>, $O),+> DepsTuple<($($O,)+)> for ($($T,)+)
+        {
             #[allow(non_snake_case)]
             fn to_node_ids(self) -> Vec<NodeId> {
                 let ($($T,)+) = self;
-                vec![$($T.into_node_ref(),)+]
+                vec![$($T.into().id,)+]
             }
         }
     };
@@ -96,13 +68,13 @@ macro_rules! impl_deps_tuple {
 
 // Generate DepsTuple implementations for tuples of size 2-8.
 // Supporting up to 8 elements covers the vast majority of use cases.
-impl_deps_tuple!(T1, T2);
-impl_deps_tuple!(T1, T2, T3);
-impl_deps_tuple!(T1, T2, T3, T4);
-impl_deps_tuple!(T1, T2, T3, T4, T5);
-impl_deps_tuple!(T1, T2, T3, T4, T5, T6);
-impl_deps_tuple!(T1, T2, T3, T4, T5, T6, T7);
-impl_deps_tuple!(T1, T2, T3, T4, T5, T6, T7, T8);
+impl_deps_tuple!(T1:O1, T2:O2);
+impl_deps_tuple!(T1:O1, T2:O2, T3:O3);
+impl_deps_tuple!(T1:O1, T2:O2, T3:O3, T4:O4);
+impl_deps_tuple!(T1:O1, T2:O2, T3:O3, T4:O4, T5:O5);
+impl_deps_tuple!(T1:O1, T2:O2, T3:O3, T4:O4, T5:O5, T6:O6);
+impl_deps_tuple!(T1:O1, T2:O2, T3:O3, T4:O4, T5:O5, T6:O6, T7:O7);
+impl_deps_tuple!(T1:O1, T2:O2, T3:O3, T4:O4, T5:O5, T6:O6, T7:O7, T8:O8);
 
 #[cfg(test)]
 mod tests;

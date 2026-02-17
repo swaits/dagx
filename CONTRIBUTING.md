@@ -21,10 +21,12 @@ cargo clippy -- -D warnings
 ## Development Setup
 
 **Prerequisites:**
+
 - Rust 1.81+ (edition 2021)
 - Git
 
 **Optional tools:**
+
 ```bash
 rustup component add rustfmt clippy
 cargo install cargo-llvm-cov  # For coverage
@@ -67,7 +69,8 @@ cargo build --examples  # Examples compile
 - All doc examples must compile
 
 Example:
-```rust
+
+````rust
 /// Adds a task to the DAG.
 ///
 /// # Examples
@@ -75,23 +78,25 @@ Example:
 /// ```
 /// use dagx::DagRunner;
 ///
-/// let dag = DagRunner::new();
+/// let mut dag = DagRunner::new();
 /// let task = dag.add_task(MyTask::new());
 /// ```
 pub fn add_task<T: Task>(&self, task: T) -> TaskBuilder<T> {
     // ...
 }
-```
+````
 
 ## Testing
 
 **Test organization:**
+
 - Unit tests: `#[cfg(test)]` modules in source files
 - Integration tests: `tests/` directory
 - Examples: `examples/` directory (must compile)
 - Doctests: In `///` comments (must pass)
 
 **Runtime testing:**
+
 ```bash
 cargo test                           # Default (tokio)
 cargo test --test async_std_runtime  # async-std
@@ -99,6 +104,7 @@ cargo test --test smol_runtime       # smol
 ```
 
 **Benchmarks:**
+
 ```bash
 cargo bench
 # View results: open target/criterion/report/index.html
@@ -130,6 +136,7 @@ Closes #123
 **Types**: `feat`, `fix`, `docs`, `test`, `refactor`, `perf`, `chore`
 
 **Examples:**
+
 - `feat: add timeout support for tasks`
 - `fix: correct cycle detection in diamond DAG`
 - `docs: clarify TaskHandle usage in README`
@@ -137,12 +144,14 @@ Closes #123
 ## Pull Requests
 
 **PR description should include:**
+
 - What changed and why
 - How it was tested
 - Any breaking changes
 - Link to related issue (if applicable)
 
 **Review process:**
+
 - Maintainer reviews within 1 week
 - Address feedback
 - Once approved, maintainer merges

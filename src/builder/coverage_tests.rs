@@ -25,19 +25,20 @@ async fn test_unit_struct_with_state() {
         }
     }
 
-    let dag = DagRunner::new();
+    let mut dag = DagRunner::new();
 
     // Create task with initial state
     let builder = dag.add_task(StatefulTask::new(21));
 
     // Explicit conversion - triggers line 71
-    let handle: TaskHandle<_> = builder.into();
+    let handle = builder;
 
-    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+    let mut output = dag
+        .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await
         .unwrap();
 
-    assert_eq!(dag.get(handle).unwrap(), 42);
+    assert_eq!(output.get(handle).unwrap(), 42);
 }
 
 #[test]
@@ -51,12 +52,12 @@ fn test_taskbuilder_conversion_without_running() {
         }
     }
 
-    let dag = DagRunner::new();
+    let mut dag = DagRunner::new();
     let builder = dag.add_task(TestTask);
     let builder_id = builder.id;
 
     // Convert without running the DAG
-    let handle: TaskHandle<String> = builder.into();
+    let handle: TaskHandle<String> = builder;
 
     // Verify the ID was transferred correctly
     assert_eq!(handle.id, builder_id);

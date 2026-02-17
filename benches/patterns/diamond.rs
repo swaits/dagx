@@ -1,7 +1,7 @@
 //! Diamond pattern benchmarks (fan-out then fan-in)
 
 use criterion::Criterion;
-use dagx::{DagRunner, TaskHandle};
+use dagx::DagRunner;
 use dagx_test::task_fn;
 pub fn bench_diamond(c: &mut Criterion) {
     let rt = tokio::runtime::Runtime::new().unwrap();
@@ -9,11 +9,10 @@ pub fn bench_diamond(c: &mut Criterion) {
     c.bench_function("diamond_pattern_50", |b| {
         b.iter(|| {
             rt.block_on(async {
-                let dag = DagRunner::new();
+                let mut dag = DagRunner::new();
 
                 for i in 0..50 {
-                    let source: TaskHandle<_> =
-                        dag.add_task(task_fn::<(), _, _>(move |_: ()| i)).into();
+                    let source = dag.add_task(task_fn::<(), _, _>(move |_: ()| i));
 
                     let left = dag
                         .add_task(task_fn::<i32, _, _>(|&x: &i32| x * 2))
@@ -26,7 +25,8 @@ pub fn bench_diamond(c: &mut Criterion) {
                         .depends_on((&left, &right));
                 }
 
-                dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+                let _output = dag
+                    .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
                     .await
                     .unwrap();
             })

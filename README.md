@@ -80,21 +80,21 @@ impl Add {
 
 #[tokio::main]
 async fn main() {
-    let dag = DagRunner::new();
+    let mut dag = DagRunner::new();
 
     // Add source tasks with no dependencies
     let x = dag.add_task(Value(2));
-    let y: TaskHandle<_> = dag.add_task(Value(3)).into();
+    let y = dag.add_task(Value(3));
 
     // Add task that depends on both x and y.
     // Here, y could be reused as a dependency for other tasks, while x could not.
     let sum = dag.add_task(Add).depends_on((x, &y));
 
     // Execute with true parallelism
-    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await.unwrap();
+    let mut output = dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await.unwrap();
 
     // Retrieve results
-    assert_eq!(dag.get(sum).unwrap(), 5);
+    assert_eq!(output.get(sum).unwrap(), 5);
 }
 ```
 
@@ -171,7 +171,7 @@ impl Counter {
 The `DagRunner` orchestrates task execution:
 
 ```rust
-let dag = DagRunner::new();
+let mut dag = DagRunner::new();
 let handle = dag.add_task(MyTask::new());
 ```
 

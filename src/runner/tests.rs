@@ -3,9 +3,10 @@
 use std::collections::HashMap;
 use std::hash::Hasher;
 
+use crate::builder::TaskHandle;
 use crate::error::DagError;
 use crate::runner::{DagRunner, PassThroughHasher};
-use crate::types::TaskHandle;
+use crate::DagOutput;
 
 // Initialize tracing subscriber for tests (idempotent)
 #[cfg(feature = "tracing")]
@@ -40,16 +41,16 @@ impl TestTask {
 #[test]
 fn test_dag_runner_new() {
     // Test that DagRunner::new() creates a new instance
-    let dag = DagRunner::new();
+    let mut dag = DagRunner::new();
 
     // Initial state should be empty
-    assert_eq!(dag.nodes.lock().len(), 0);
-    assert_eq!(dag.edges.lock().len(), 0);
-    assert_eq!(dag.dependents.lock().len(), 0);
+    assert_eq!(dag.nodes.len(), 0);
+    assert_eq!(dag.edges.len(), 0);
+    assert_eq!(dag.dependents.len(), 0);
 
     // Adding a task works
     dag.add_task(TestTask { value: 42 });
-    assert_eq!(dag.nodes.lock().len(), 1);
+    assert_eq!(dag.nodes.len(), 1);
 }
 
 #[test]
@@ -58,19 +59,20 @@ fn test_dag_runner_default() {
     let dag = DagRunner::default();
 
     // Should behave the same as new()
-    assert_eq!(dag.nodes.lock().len(), 0);
-    assert_eq!(dag.edges.lock().len(), 0);
-    assert_eq!(dag.dependents.lock().len(), 0);
+    assert_eq!(dag.nodes.len(), 0);
+    assert_eq!(dag.edges.len(), 0);
+    assert_eq!(dag.dependents.len(), 0);
 }
 
 #[tokio::test]
 async fn test_get_wrong_type() {
     init_tracing();
     // Test getting with wrong type - this should return TypeMismatch
-    let dag = DagRunner::new();
+    let mut dag = DagRunner::new();
     let handle = dag.add_task(TestTask { value: 42 });
 
-    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+    let mut output = dag
+        .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await
         .unwrap();
 
@@ -80,7 +82,7 @@ async fn test_get_wrong_type() {
         _phantom: std::marker::PhantomData,
     };
 
-    let result = dag.get(fake_handle);
+    let result = output.get(fake_handle);
     assert!(result.is_err());
 
     // When downcast fails, we get TypeMismatch
@@ -96,78 +98,18 @@ async fn test_get_wrong_type() {
 async fn test_get_result_not_found() {
     init_tracing();
     // Test getting a result before running the DAG
-    let dag = DagRunner::new();
+    let mut dag = DagRunner::new();
     let handle = dag.add_task(TestTask { value: 42 });
     let handle_id = handle.id.0; // Save ID before moving handle
+    let mut output = DagOutput::new(HashMap::default());
 
-    let result = dag.get(handle);
+    let result = output.get(handle);
     assert!(result.is_err());
     match result.unwrap_err() {
         DagError::ResultNotFound { task_id } => {
             assert_eq!(task_id, handle_id);
         }
         _ => panic!("Expected ResultNotFound error"),
-    }
-}
-
-#[tokio::test]
-async fn test_concurrent_run_protection() {
-    init_tracing();
-    // Test that run_lock prevents concurrent runs
-    use std::sync::Arc;
-    use std::time::Duration;
-    use tokio::time::sleep;
-
-    let dag = DagRunner::new();
-
-    // Add a task that takes some time
-    struct SlowTask;
-    #[crate::task]
-    impl SlowTask {
-        async fn run(&self) -> i32 {
-            sleep(Duration::from_millis(100)).await;
-            42
-        }
-    }
-
-    dag.add_task(SlowTask);
-
-    // Wrap in Arc for sharing between tasks
-    let dag = Arc::new(dag);
-    let dag1 = Arc::clone(&dag);
-    let dag2 = Arc::clone(&dag);
-
-    // Use a barrier to ensure both runs start at exactly the same time
-    let barrier = Arc::new(tokio::sync::Barrier::new(2));
-    let barrier1 = barrier.clone();
-    let barrier2 = barrier.clone();
-
-    // Start two runs concurrently
-    let handle1 = tokio::spawn(async move {
-        barrier1.wait().await;
-        dag1.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
-            .await
-    });
-
-    let handle2 = tokio::spawn(async move {
-        barrier2.wait().await;
-        dag2.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
-            .await
-    });
-
-    // One should succeed, one should fail (concurrent execution not supported)
-    let result1 = handle1.await.unwrap();
-    let result2 = handle2.await.unwrap();
-
-    // Exactly one should be ok, one should be err
-    assert!(result1.is_ok() != result2.is_ok());
-
-    // The error should be about concurrent execution
-    if let Err(e) = result1 {
-        assert!(matches!(e, crate::error::DagError::ConcurrentExecution));
-    }
-    if let Err(e) = result2 {
-        assert!(matches!(e, crate::error::DagError::ConcurrentExecution));
     }
 }
 
@@ -179,15 +121,16 @@ async fn test_invalid_node_id_in_get() {
 
     // Create a handle with an ID that doesn't exist
     let invalid_handle: TaskHandle<i32> = TaskHandle {
-        id: crate::types::NodeId(999),
+        id: crate::builder::NodeId(999),
         _phantom: std::marker::PhantomData,
     };
 
-    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+    let mut output = dag
+        .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await
         .unwrap();
 
-    let result = dag.get(invalid_handle);
+    let result = output.get(invalid_handle);
     assert!(result.is_err());
 
     // With centralized output storage, we get ResultNotFound for invalid node IDs
@@ -228,8 +171,8 @@ async fn test_task_panic_in_multi_task_layer() {
         }
     }
 
-    let dag = DagRunner::new();
-    let source: TaskHandle<_> = dag.add_task(Source).into();
+    let mut dag = DagRunner::new();
+    let source = dag.add_task(Source);
 
     // Create two tasks in the same layer - one panics, one doesn't
     let _panic_task = dag.add_task(PanicTask).depends_on(source);

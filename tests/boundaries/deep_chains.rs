@@ -9,13 +9,13 @@ use std::sync::Arc;
 #[tokio::test]
 async fn test_multiple_parallel_deep_chains() -> DagResult<()> {
     // Test 10 parallel chains of depth 500 each
-    let dag = DagRunner::new();
+    let mut dag = DagRunner::new();
 
     let mut chain_ends = Vec::new();
 
     for chain_id in 0..8 {
         let first = dag.add_task(task_fn::<(), _, _>(move |_: ()| chain_id * 1000));
-        let mut current: dagx::TaskHandle<i32> = first.into();
+        let mut current: dagx::TaskHandle<i32> = first;
 
         for _ in 0..500 {
             current = dag
@@ -51,7 +51,8 @@ async fn test_multiple_parallel_deep_chains() -> DagResult<()> {
             &chain_ends[7],
         ));
 
-    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+    let mut output = dag
+        .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await?;
 
     // Each chain: start + 500
@@ -59,7 +60,7 @@ async fn test_multiple_parallel_deep_chains() -> DagResult<()> {
     // Chain 1: 1000 + 500 = 1500
     // ...
     // Sum = 500*8 + (0+1000+2000+...+7000) = 4000 + 28000 = 32000
-    assert_eq!(dag.get(final_task)?, 32000);
+    assert_eq!(output.get(final_task)?, 32000);
 
     Ok(())
 }
@@ -67,7 +68,7 @@ async fn test_multiple_parallel_deep_chains() -> DagResult<()> {
 #[tokio::test]
 async fn test_deep_chain_execution_order() -> DagResult<()> {
     // Verify tasks in a deep chain execute in correct order
-    let dag = DagRunner::new();
+    let mut dag = DagRunner::new();
     let order = Arc::new(AtomicUsize::new(0));
 
     let first = dag.add_task(task_fn::<(), _, _>({
@@ -78,7 +79,7 @@ async fn test_deep_chain_execution_order() -> DagResult<()> {
             0
         }
     }));
-    let mut current: dagx::TaskHandle<i32> = first.into();
+    let mut current: dagx::TaskHandle<i32> = first;
 
     for expected in 1..100 {
         current = dag
@@ -93,11 +94,12 @@ async fn test_deep_chain_execution_order() -> DagResult<()> {
             .depends_on(current);
     }
 
-    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+    let mut output = dag
+        .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await?;
 
     assert_eq!(order.load(Ordering::SeqCst), 100);
-    assert_eq!(dag.get(current)?, 99);
+    assert_eq!(output.get(current)?, 99);
 
     Ok(())
 }
@@ -105,12 +107,12 @@ async fn test_deep_chain_execution_order() -> DagResult<()> {
 #[tokio::test]
 async fn test_deep_binary_tree() -> DagResult<()> {
     // Test a deep binary tree structure (depth 10 = 1023 nodes)
-    let dag = DagRunner::new();
+    let mut dag = DagRunner::new();
 
-    fn build_tree(dag: &DagRunner, depth: usize, value: i32) -> dagx::TaskHandle<i32> {
+    fn build_tree(dag: &mut DagRunner, depth: usize, value: i32) -> dagx::TaskHandle<i32> {
         if depth == 0 {
             let task = dag.add_task(task_fn::<(), _, _>(move |_: ()| value));
-            task.into() // Convert TaskBuilder to TaskHandle
+            task // Convert TaskBuilder to TaskHandle
         } else {
             let left = build_tree(dag, depth - 1, value * 2);
             let right = build_tree(dag, depth - 1, value * 2 + 1);
@@ -122,14 +124,15 @@ async fn test_deep_binary_tree() -> DagResult<()> {
         }
     }
 
-    let root = build_tree(&dag, 10, 1);
+    let root = build_tree(&mut dag, 10, 1);
 
-    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+    let mut output = dag
+        .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await?;
 
     // Sum of all values in a complete binary tree with values 1024..2047
     // This is sum from 2^10 to 2^11-1 = 1024 * 1023 / 2 + 1024 * 512 = 1047552
-    let result = dag.get(root)?;
+    let result = output.get(root)?;
     assert!(result > 0);
 
     Ok(())
@@ -138,13 +141,13 @@ async fn test_deep_binary_tree() -> DagResult<()> {
 #[tokio::test]
 async fn test_fibonacci_chain() -> DagResult<()> {
     // Test a Fibonacci-like dependency pattern
-    let dag = DagRunner::new();
+    let mut dag = DagRunner::new();
 
     let f0_builder = dag.add_task(task_fn::<(), _, _>(|_: ()| 0i64));
     let f1_builder = dag.add_task(task_fn::<(), _, _>(|_: ()| 1i64));
 
-    let mut prev2: dagx::TaskHandle<i64> = f0_builder.into();
-    let mut prev1: dagx::TaskHandle<i64> = f1_builder.into();
+    let mut prev2: dagx::TaskHandle<i64> = f0_builder;
+    let mut prev1: dagx::TaskHandle<i64> = f1_builder;
 
     for _ in 2..50 {
         let next = dag
@@ -155,11 +158,12 @@ async fn test_fibonacci_chain() -> DagResult<()> {
         prev1 = next;
     }
 
-    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+    let mut output = dag
+        .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await?;
 
     // 50th Fibonacci number (0-indexed) = 7778742049
-    assert_eq!(dag.get(prev1)?, 7778742049);
+    assert_eq!(output.get(prev1)?, 7778742049);
 
     Ok(())
 }
@@ -167,13 +171,13 @@ async fn test_fibonacci_chain() -> DagResult<()> {
 #[tokio::test]
 async fn test_zigzag_dependencies() -> DagResult<()> {
     // Test a zigzag pattern: two chains that cross-reference each other
-    let dag = DagRunner::new();
+    let mut dag = DagRunner::new();
 
     let a_first = dag.add_task(task_fn::<(), _, _>(|_: ()| 1));
     let b_first = dag.add_task(task_fn::<(), _, _>(|_: ()| 2));
 
-    let mut chain_a: dagx::TaskHandle<i32> = a_first.into();
-    let mut chain_b: dagx::TaskHandle<i32> = b_first.into();
+    let mut chain_a: dagx::TaskHandle<i32> = a_first;
+    let mut chain_b: dagx::TaskHandle<i32> = b_first;
 
     for i in 0..100 {
         if i % 2 == 0 {
@@ -194,10 +198,11 @@ async fn test_zigzag_dependencies() -> DagResult<()> {
         .add_task(task_fn::<(i32, i32), _, _>(|(a, b): (&i32, &i32)| a + b))
         .depends_on((&chain_a, &chain_b));
 
-    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+    let mut output = dag
+        .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await?;
 
-    let result = dag.get(final_task)?;
+    let result = output.get(final_task)?;
     assert!(result > 100);
 
     Ok(())

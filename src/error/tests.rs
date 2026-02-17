@@ -55,16 +55,6 @@ fn test_dag_error_display_result_not_found() {
 }
 
 #[test]
-fn test_dag_error_display_concurrent_execution() {
-    let err = DagError::ConcurrentExecution;
-    let display = format!("{}", err);
-
-    assert!(display.contains("already running"));
-    assert!(display.contains("concurrent execution not supported"));
-    assert!(display.contains("Wait for the current execution"));
-}
-
-#[test]
 fn test_dag_error_std_error_impl() {
     // Test that DagError implements std::error::Error
     let err = DagError::InvalidDependency { task_id: 1 };

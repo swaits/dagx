@@ -95,15 +95,15 @@ impl Add {
 #[test_case(AsyncExecutorRuntimeTest)]
 fn test_basic_dag(runner: impl RuntimeTest) {
     runner.run_dagx_test(|spawner| async {
-        let dag = DagRunner::new();
+        let mut dag = DagRunner::new();
 
         let x = dag.add_task(Value(2));
         let y = dag.add_task(Value(3));
         let sum = dag.add_task(Add).depends_on((x, y));
 
-        dag.run(spawner).await.unwrap();
+        let mut output = dag.run(spawner).await.unwrap();
 
-        assert_eq!(dag.get(sum).unwrap(), 5);
+        assert_eq!(output.get(sum).unwrap(), 5);
     })
 }
 
@@ -113,16 +113,16 @@ fn test_basic_dag(runner: impl RuntimeTest) {
 #[test_case(AsyncExecutorRuntimeTest)]
 fn test_parallel_execution(runner: impl RuntimeTest) {
     runner.run_dagx_test(|spawner| async {
-        let dag = DagRunner::new();
+        let mut dag = DagRunner::new();
 
         let tasks: Vec<_> = (0..10)
             .map(|i| dag.add_task(task_fn::<(), _, _>(move |_: ()| i * 2)))
             .collect();
 
-        dag.run(spawner).await.unwrap();
+        let mut output = dag.run(spawner).await.unwrap();
 
         for (i, task) in tasks.into_iter().enumerate() {
-            assert_eq!(dag.get(task).unwrap(), i * 2);
+            assert_eq!(output.get(task).unwrap(), i * 2);
         }
     });
 }
@@ -133,7 +133,7 @@ fn test_parallel_execution(runner: impl RuntimeTest) {
 #[test_case(AsyncExecutorRuntimeTest)]
 fn test_complex_dependencies(runner: impl RuntimeTest) {
     runner.run_dagx_test(|spawner| async {
-        let dag = DagRunner::new();
+        let mut dag = DagRunner::new();
 
         let a = dag.add_task(Value(10));
         let b = dag.add_task(Value(20));
@@ -142,8 +142,8 @@ fn test_complex_dependencies(runner: impl RuntimeTest) {
             .add_task(task_fn::<i32, _, _>(|&x: &i32| x * 2))
             .depends_on(sum);
 
-        dag.run(spawner).await.unwrap();
+        let mut output = dag.run(spawner).await.unwrap();
 
-        assert_eq!(dag.get(double).unwrap().clone(), 60);
+        assert_eq!(output.get(double).unwrap().clone(), 60);
     });
 }

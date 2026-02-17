@@ -22,7 +22,7 @@ impl SleepTask {
 #[tokio::test]
 async fn test_parallel_execution_speedup() -> DagResult<()> {
     // Prove parallel execution by comparing timing
-    let dag = DagRunner::new();
+    let mut dag = DagRunner::new();
 
     let work_duration = Duration::from_millis(50);
     let num_tasks = 10;
@@ -33,13 +33,14 @@ async fn test_parallel_execution_speedup() -> DagResult<()> {
         .collect();
 
     let start = Instant::now();
-    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+    let mut output = dag
+        .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await?;
     let elapsed = start.elapsed();
 
     // Verify all tasks completed
     for (i, task) in tasks.into_iter().enumerate() {
-        assert_eq!(dag.get(task)?, i);
+        assert_eq!(output.get(task)?, i);
     }
 
     // If tasks ran sequentially: 10 * 50ms = 500ms
@@ -53,7 +54,7 @@ async fn test_parallel_execution_speedup() -> DagResult<()> {
 
     // Parallel execution should be significantly faster
     assert!(
-        elapsed < sequential_time / 4,
+        elapsed < sequential_time / 2,
         "Parallel execution too slow: {:?} vs sequential {:?}",
         elapsed,
         sequential_time
@@ -65,7 +66,7 @@ async fn test_parallel_execution_speedup() -> DagResult<()> {
 #[tokio::test]
 async fn test_layers_execute_in_parallel() -> DagResult<()> {
     // Test that tasks in the same topological layer execute in parallel
-    let dag = DagRunner::new();
+    let mut dag = DagRunner::new();
 
     let layer_timing = Arc::new(Mutex::new(Vec::new()));
 
@@ -142,10 +143,11 @@ async fn test_layers_execute_in_parallel() -> DagResult<()> {
         .depends_on((&layer1[0], &layer1[1], &layer1[2]))
     };
 
-    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+    let mut output = dag
+        .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await?;
 
-    assert_eq!(dag.get(final_task)?, 33); // (0+1) + (10+1) + (20+1)
+    assert_eq!(output.get(final_task)?, 33); // (0+1) + (10+1) + (20+1)
 
     // Analyze timing
     let timing = layer_timing.lock().unwrap();

@@ -17,8 +17,6 @@ pub enum DagError {
     TaskPanicked { task_id: u32, panic_message: String },
     /// Result not found for task
     ResultNotFound { task_id: u32 },
-    /// Attempted to run the DAG while it's already running
-    ConcurrentExecution,
 }
 
 impl std::fmt::Display for DagError {
@@ -63,14 +61,6 @@ impl std::fmt::Display for DagError {
                      \n\
                      Call dag.run(|fut| async move {{ tokio::spawn(fut).await.unwrap() }}).",
                     task_id
-                )
-            }
-            DagError::ConcurrentExecution => {
-                write!(
-                    f,
-                    "DAG is already running - concurrent execution not supported.\n\
-                     \n\
-                     Wait for the current execution to complete before starting another."
                 )
             }
         }

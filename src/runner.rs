@@ -10,34 +10,18 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::future::Future;
 use std::hash::{BuildHasher, Hasher};
 use std::panic::AssertUnwindSafe;
-use std::sync::{
-    atomic::{AtomicBool, Ordering},
-    Arc,
-};
+use std::sync::Arc;
 
 use futures_util::future::BoxFuture;
 use futures_util::{stream::FuturesUnordered, FutureExt, StreamExt, TryFutureExt};
-use parking_lot::Mutex;
 
 #[cfg(feature = "tracing")]
 use tracing::{debug, error, info, trace};
 
-use crate::builder::TaskBuilder;
+use crate::builder::{NodeId, TaskWire};
 use crate::error::{DagError, DagResult};
 use crate::node::{ExecutableNode, TypedNode};
-use crate::task::Task;
-use crate::types::{NodeId, Pending, TaskHandle};
-
-// Guard to ensure run_lock is released even on early return or panic
-struct RunGuard<'a> {
-    lock: &'a AtomicBool,
-}
-
-impl<'a> Drop for RunGuard<'a> {
-    fn drop(&mut self) {
-        self.lock.store(false, Ordering::SeqCst);
-    }
-}
+use crate::DagOutput;
 
 #[derive(Default, Clone)]
 pub(crate) struct PassThroughHasher {
@@ -76,10 +60,10 @@ pub(crate) type PassThroughHashMap<K, V> = HashMap<K, V, PassThroughHasher>;
 /// # Workflow
 ///
 /// 1. Create a new DAG with [`DagRunner::new`]
-/// 2. Add tasks with [`DagRunner::add_task`] to get [`TaskBuilder`] builders
-/// 3. Wire dependencies with [`TaskBuilder::depends_on`]
+/// 2. Add tasks with [`DagRunner::add_task`] to get builders
+/// 3. Wire dependencies with [`crate::TaskBuilder::depends_on`]
 /// 4. Execute all tasks with [`DagRunner::run`]
-/// 5. Optionally retrieve outputs with [`DagRunner::get`]
+/// 5. Optionally retrieve outputs with [`DagOutput::get`]
 ///
 /// # Examples
 ///
@@ -107,16 +91,16 @@ pub(crate) type PassThroughHashMap<K, V> = HashMap<K, V, PassThroughHasher>;
 /// }
 ///
 /// # async {
-/// let dag = DagRunner::new();
+/// let mut dag = DagRunner::new();
 ///
 /// // Construct instances using ::new() pattern
 /// let x = dag.add_task(LoadValue::new(2));
 /// let y = dag.add_task(LoadValue::new(3));
 /// let sum = dag.add_task(Add).depends_on((x, y));
 ///
-/// dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await.unwrap();
+///let mut output = dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await.unwrap();
 ///
-/// assert_eq!(dag.get(sum).unwrap(), 5);
+/// assert_eq!(output.get(sum).unwrap(), 5);
 /// # };
 /// ```
 ///
@@ -127,13 +111,9 @@ pub(crate) type PassThroughHashMap<K, V> = HashMap<K, V, PassThroughHasher>;
 /// Outputs are Arc-wrapped and stored separately for retrieval via get().
 /// Arc enables efficient sharing during fanout without cloning data.
 pub struct DagRunner {
-    pub(crate) nodes: Mutex<Vec<Option<Box<dyn ExecutableNode + Sync>>>>,
-    pub(crate) outputs:
-        Mutex<PassThroughHashMap<NodeId, std::sync::Arc<dyn std::any::Any + Send + Sync>>>,
-    pub(crate) edges: Mutex<PassThroughHashMap<NodeId, Vec<NodeId>>>, // node -> dependencies
-    pub(crate) dependents: Mutex<PassThroughHashMap<NodeId, Vec<NodeId>>>, // node -> tasks that depend on it
-    pub(crate) next_id: Mutex<u32>,
-    pub(crate) run_lock: AtomicBool, // Ensures only one run() at a time
+    pub(crate) nodes: Vec<Option<Box<dyn ExecutableNode + Sync>>>,
+    pub(crate) edges: PassThroughHashMap<NodeId, Vec<NodeId>>, // node -> dependencies
+    pub(crate) dependents: PassThroughHashMap<NodeId, Vec<NodeId>>, // node -> tasks that depend on it
 }
 
 impl Default for DagRunner {
@@ -150,31 +130,21 @@ impl DagRunner {
     /// ```
     /// use dagx::DagRunner;
     ///
-    /// let dag = DagRunner::new();
+    /// let mut dag = DagRunner::new();
     /// ```
     pub fn new() -> Self {
         Self {
-            nodes: Mutex::new(Vec::new()),
-            outputs: Mutex::new(HashMap::default()),
-            edges: Mutex::new(HashMap::default()),
-            dependents: Mutex::new(HashMap::default()),
-            next_id: Mutex::new(0),
-            run_lock: AtomicBool::new(false),
+            nodes: Vec::new(),
+            edges: HashMap::default(),
+            dependents: HashMap::default(),
         }
-    }
-
-    pub(crate) fn alloc_id(&self) -> NodeId {
-        let mut next_id = self.next_id.lock();
-        let id = NodeId(*next_id);
-        *next_id += 1;
-        id
     }
 
     /// Add a task instance to the DAG, returning a node builder for wiring dependencies.
     ///
-    /// The returned [`TaskBuilder<Tk, Pending>`](TaskBuilder) can be used to:
-    /// - Specify dependencies via [`TaskBuilder::depends_on`]
-    /// - Used directly as a [`TaskHandle`] to the task's output
+    /// If the task has no dependencies, a [`crate::TaskHandle`] will be returned.
+    /// If not, the returned [`crate::TaskBuilder`] can be used to
+    /// specify dependencies via [`crate::TaskBuilder::depends_on`].
     ///
     /// # Examples
     ///
@@ -214,7 +184,7 @@ impl DagRunner {
     /// }
     ///
     /// # async {
-    /// let dag = DagRunner::new();
+    /// let mut dag = DagRunner::new();
     ///
     /// // Construct task with initial value of 10
     /// let base = dag.add_task(LoadValue::new(10));
@@ -222,17 +192,16 @@ impl DagRunner {
     /// // Construct task with offset of 1
     /// let inc = dag.add_task(AddOffset::new(1)).depends_on(base);
     ///
-    /// dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await.unwrap();
-    /// assert_eq!(dag.get(inc).unwrap(), 11);
+    ///let mut output = dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await.unwrap();
+    /// assert_eq!(output.get(inc).unwrap(), 11);
     /// # };
     /// ```
-    pub fn add_task<Tk>(&self, task: Tk) -> TaskBuilder<'_, Tk, Pending>
+    pub fn add_task<'dag, Input, Tk>(&'dag mut self, task: Tk) -> Tk::Retval<'dag>
     where
-        Tk: Task + Sync + 'static,
-        Tk::Input: 'static,
-        Tk::Output: 'static,
+        Tk: TaskWire<Input>,
+        Input: Send + Sync + 'static,
     {
-        let id = self.alloc_id();
+        let id = NodeId(self.nodes.len() as u32);
 
         #[cfg(feature = "tracing")]
         debug!(
@@ -242,15 +211,11 @@ impl DagRunner {
         );
 
         let node = TypedNode::new(task);
-        self.nodes.lock().push(Some(Box::new(node)));
-        self.edges.lock().insert(id, Vec::new());
-        self.dependents.lock().insert(id, Vec::new());
+        self.nodes.push(Some(Box::new(node)));
+        self.edges.insert(id, Vec::new());
+        self.dependents.insert(id, Vec::new());
 
-        TaskBuilder {
-            id,
-            dag: self,
-            _phantom: std::marker::PhantomData,
-        }
+        Tk::new_from_dag(id, self)
     }
 
     /// Run the entire DAG to completion using the provided spawner.
@@ -299,41 +264,24 @@ impl DagRunner {
     /// }
     ///
     /// # async {
-    /// let dag = DagRunner::new();
+    /// let mut dag = DagRunner::new();
     ///
     /// let a = dag.add_task(Value(1));
     /// let b = dag.add_task(Value(2));
     /// let sum = dag.add_task(Add).depends_on((a, b));
     ///
-    /// dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await.unwrap(); // Executes all tasks
+    ///let mut output = dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await.unwrap(); // Executes all tasks
     /// # };
     /// ```
     #[inline]
     #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, spawner)))]
-    pub async fn run<S, F>(&self, spawner: S) -> DagResult<()>
+    pub async fn run<S, F>(mut self, spawner: S) -> DagResult<DagOutput>
     where
         S: Fn(BoxFuture<'static, DagResult<Arc<dyn Any + Send + Sync>>>) -> F,
         F: Future<Output = DagResult<Arc<dyn Any + Send + Sync>>>,
     {
         #[cfg(feature = "tracing")]
         info!("starting DAG execution");
-        // Acquire run lock to prevent concurrent executions
-        // Use atomic compare_exchange to check if already running
-        if self
-            .run_lock
-            .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
-            .is_err()
-        {
-            #[cfg(feature = "tracing")]
-            error!("DAG is already running - concurrent execution not supported");
-
-            return Err(DagError::ConcurrentExecution);
-        }
-
-        // Guard ensures lock is released on drop (even on early return or panic)
-        let _run_guard = RunGuard {
-            lock: &self.run_lock,
-        };
 
         // Build topological layers
         let layers = self.compute_layers()?;
@@ -345,8 +293,6 @@ impl DagRunner {
             layer_count = layers.len(),
             total_tasks, "computed topological layers"
         );
-
-        let edges = self.edges.lock().clone();
 
         let mut outputs: PassThroughHashMap<NodeId, Arc<dyn Any + Send + Sync>> =
             HashMap::with_capacity_and_hasher(total_tasks, PassThroughHasher::default());
@@ -392,13 +338,10 @@ impl DagRunner {
                 );
 
                 // Take ownership of the node
-                let node = {
-                    let mut nodes_lock = self.nodes.lock();
-                    nodes_lock[node_id.0 as usize].take()
-                };
+                let node = self.nodes[node_id.0 as usize].take();
 
                 if let Some(node) = node {
-                    let dependencies: Vec<_> = edges[&node_id]
+                    let dependencies: Vec<_> = self.edges[&node_id]
                         .iter()
                         .flat_map(|dep| outputs.get(dep))
                         .cloned()
@@ -456,12 +399,9 @@ impl DagRunner {
                         trace!(task_id = node_id.0, "spawning task");
 
                         // Take ownership of the node
-                        let node = {
-                            let mut nodes_lock = self.nodes.lock();
-                            nodes_lock[node_id.0 as usize].take()
-                        };
+                        let node = self.nodes[node_id.0 as usize].take();
                         if let Some(node) = node {
-                            let dependencies: Vec<_> = edges[&node_id]
+                            let dependencies: Vec<_> = self.edges[&node_id]
                                 .iter()
                                 .flat_map(|dep| outputs.get(dep))
                                 .cloned()
@@ -522,13 +462,6 @@ impl DagRunner {
             }
         }
 
-        // Insert all successful outputs (avoiding holding lock across await)
-        let mut outputs_lock = self.outputs.lock();
-        for (node_id, output) in outputs {
-            outputs_lock.insert(node_id, output);
-        }
-        drop(outputs_lock);
-
         // Return first error if any
         if let Some(err) = first_error {
             #[cfg(feature = "tracing")]
@@ -539,73 +472,7 @@ impl DagRunner {
         #[cfg(feature = "tracing")]
         info!("DAG execution completed successfully");
 
-        Ok(())
-    }
-
-    /// Retrieve a task's output after [`DagRunner::run`].
-    ///
-    /// # Behavior
-    ///
-    /// All task outputs are stored after execution and can be retrieved via get().
-    /// Each task's output can only be taken once, after which it will return `DagError::ResultNotFound`.
-    ///
-    /// # Errors
-    ///
-    /// Returns `DagError::ResultNotFound` if:
-    /// - The task hasn't been executed yet
-    /// - The handle is invalid
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// # use dagx::{task, DagRunner, Task};
-    /// #
-    /// struct Configuration {
-    ///     setting: i32,
-    /// }
-    ///
-    /// impl Configuration {
-    ///     fn new(setting: i32) -> Self {
-    ///         Self { setting }
-    ///     }
-    /// }
-    ///
-    /// #[task]
-    /// impl Configuration {
-    ///     async fn run(&mut self) -> i32 { self.setting }
-    /// }
-    ///
-    /// # async {
-    /// let dag = DagRunner::new();
-    ///
-    /// // Construct task with specific setting value
-    /// let task = dag.add_task(Configuration::new(42));
-    ///
-    /// dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await.unwrap();
-    ///
-    /// assert_eq!(dag.get(task).unwrap(), 42);
-    /// # };
-    /// ```
-    pub fn get<T: 'static + Send + Sync, H>(&self, handle: H) -> DagResult<T>
-    where
-        H: Into<TaskHandle<T>>,
-    {
-        let handle: TaskHandle<T> = handle.into();
-        let mut outputs = self.outputs.lock();
-
-        let arc_output = outputs.remove(&handle.id).ok_or(DagError::ResultNotFound {
-            task_id: handle.id.0,
-        })?;
-
-        // Downcast Arc<dyn Any> to Arc<T>
-        let output = arc_output
-            .downcast::<T>()
-            .map_err(|_| DagError::TypeMismatch {
-                expected: std::any::type_name::<T>(),
-                found: "unknown",
-            })?;
-
-        Ok(Arc::into_inner(output).unwrap())
+        Ok(DagOutput::new(outputs))
     }
 
     #[inline]
@@ -617,18 +484,11 @@ impl DagRunner {
         let mut layers = Vec::new();
 
         // Calculate in-degrees: for each node, count how many dependencies it has
-        let edges = self.edges.lock();
 
-        // Compiler optimization hint: provides bounds information for HashSet sizing.
-        // This variable guides the optimizer's understanding of graph size, improving
-        // hash table and iterator performance in the topological sort below.
-        let _total_nodes = edges.len();
-
-        for (&node, deps) in edges.iter() {
+        for (&node, deps) in self.edges.iter() {
             let degree = deps.len();
             in_degree.insert(node, degree);
         }
-        drop(edges); // Release lock early
 
         // Find all nodes with in-degree 0 (sources - nodes with no dependencies)
         let mut queue: VecDeque<NodeId> = in_degree
@@ -653,8 +513,7 @@ impl DagRunner {
                     visited.insert(node);
 
                     // For each node that depends on the current node
-                    let dependents = self.dependents.lock();
-                    if let Some(deps) = dependents.get(&node) {
+                    if let Some(deps) = self.dependents.get(&node) {
                         for &dependent in deps {
                             if let Some(degree) = in_degree.get_mut(&dependent) {
                                 *degree -= 1;
