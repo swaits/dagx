@@ -21,13 +21,13 @@ where
     _phantom: std::marker::PhantomData<fn(I) -> O>,
 }
 
-impl<I, O, F> Task for TaskFn<I, O, F>
+impl<I, O, F> Task<I::Input> for TaskFn<I, O, F>
 where
     for<'input> F: FnMut(I::Retv<'input>) -> O + Send,
     I: ExtractInput + Send + Sync + 'static,
-    O: Send + Sync,
+    I::Input: Send + Sync + 'static,
+    O: Send + Sync + 'static,
 {
-    type Input = I::Input;
     type Output = O;
 
     async fn run(mut self, input: TaskInput<'_, I::Input>) -> O {

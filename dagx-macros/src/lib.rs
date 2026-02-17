@@ -332,11 +332,10 @@ pub fn task(_attr: TokenStream, item: TokenStream) -> TokenStream {
 
     // Generate the Task trait implementation based on whether we have self and async/sync
     quote! {
-        impl ::dagx::Task for #struct_name {
-            type Input = #input_type;
+        impl ::dagx::Task<#input_type> for #struct_name {
             type Output = #output_type;
 
-            async fn run(mut self, mut input: ::dagx::TaskInput<'_, Self::Input>) -> Self::Output {
+            async fn run(mut self, mut input: ::dagx::TaskInput<'_, #input_type>) -> Self::Output {
                 #param_destructure
                 #run_call
             }

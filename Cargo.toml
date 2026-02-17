@@ -32,7 +32,6 @@ workspace = true
 
 [dependencies]
 futures-util = { version = "0.3", default-features = false, features = ["std"] }
-parking_lot = "0.12"
 dagx-macros = { version = "0.3.1", path = "./dagx-macros" }
 tracing = { version = "0.1", optional = true }
 

@@ -8,6 +8,7 @@
 
 use std::any::Any;
 use std::future::Future;
+use std::marker::PhantomData;
 use std::pin::Pin;
 use std::sync::Arc;
 
@@ -50,20 +51,32 @@ pub(crate) trait ExecutableNode: Send {
 /// Each task executes exactly once, taking ownership and producing an output.
 ///
 /// The output is also returned from execute_with_deps for central storage.
-pub(crate) struct TypedNode<T: Task> {
+pub(crate) struct TypedNode<Input, T>
+where
+    Input: Send + Sync + 'static,
+    T: Task<Input> + 'static,
+{
     pub(crate) task: T,
+    phantom: PhantomData<Input>,
 }
 
-impl<T: Task + 'static> TypedNode<T> {
+impl<Input, T> TypedNode<Input, T>
+where
+    T: Task<Input>,
+    Input: Send + Sync + 'static,
+{
     pub(crate) fn new(task: T) -> Self {
-        Self { task }
+        Self {
+            task,
+            phantom: PhantomData,
+        }
     }
 }
 
-impl<T: Task + 'static> ExecutableNode for TypedNode<T>
+impl<Input, T> ExecutableNode for TypedNode<Input, T>
 where
-    T::Input: 'static,
-    T::Output: 'static,
+    T: Task<Input>,
+    Input: Send + Sync + 'static,
 {
     fn execute_with_deps(
         self: Box<Self>,

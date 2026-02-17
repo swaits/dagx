@@ -9,11 +9,10 @@ struct CustomTask {
     state: i32,
 }
 
-impl Task for CustomTask {
-    type Input = (i32,);
+impl Task<(i32,)> for CustomTask {
     type Output = i32;
 
-    async fn run(mut self, input: TaskInput<'_, Self::Input>) -> i32 {
+    async fn run(mut self, input: TaskInput<'_, (i32,)>) -> i32 {
         self.state += input.next().0;
         self.state
     }

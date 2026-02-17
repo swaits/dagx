@@ -1,8 +1,8 @@
 //! Unit tests for deps module
 
+use crate::builder::{NodeId, TaskHandle};
 use crate::deps::DepsTuple;
 use crate::runner::DagRunner;
-use crate::types::{NodeId, TaskHandle};
 
 // Test task for dependency testing
 struct TestTask {
@@ -78,7 +78,7 @@ fn test_deps_tuple_single_handle_tuple_owned() {
 #[test]
 fn test_deps_tuple_task_builder_ref() {
     // Test lines 51-55 in deps.rs - &TaskBuilder
-    let dag = DagRunner::new();
+    let mut dag = DagRunner::new();
     let builder = dag.add_task(TestTask { value: 42 });
     let builder_id = builder.id;
 
@@ -92,7 +92,7 @@ fn test_deps_tuple_task_builder_ref() {
 #[test]
 fn test_deps_tuple_task_builder_tuple() {
     // Test lines 57-61 in deps.rs - (&TaskBuilder,)
-    let dag = DagRunner::new();
+    let mut dag = DagRunner::new();
     let builder = dag.add_task(TestTask { value: 100 });
     let builder_id = builder.id;
 
@@ -134,7 +134,7 @@ fn test_deps_tuple_multiple_handles() {
 #[test]
 fn test_deps_tuple_multiple_builders() {
     // Test macro-generated implementations for multiple builders
-    let dag = DagRunner::new();
+    let mut dag = DagRunner::new();
     let builder1 = dag.add_task(TestTask { value: 10 });
     let builder1_id = builder1.id;
     let builder2 = dag.add_task(TestTask { value: 20 });

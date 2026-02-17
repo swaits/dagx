@@ -17,7 +17,6 @@ dagx is a task execution library designed for safety and predictability. This do
 - **Compile-time type safety**: Dependencies are validated at compile time, preventing type errors
 - **Cycle detection**: Runtime detection of circular dependencies
 - **Memory safety**: Rust's ownership system prevents memory corruption
-- **Thread safety**: Interior mutability uses `parking_lot::Mutex` for safe concurrent access
 
 ### What dagx Does NOT Provide
 

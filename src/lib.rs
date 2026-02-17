@@ -42,18 +42,18 @@
 //! }
 //!
 //! # async {
-//! let dag = DagRunner::new();
+//! let mut dag = DagRunner::new();
 //!
 //! // Add source tasks
 //! let x = dag.add_task(Value(2));
-//! let y: TaskHandle<_> = dag.add_task(Value(3)).into(); // Allows y to be reused as a dependency
+//! let y = dag.add_task(Value(3)).into(); // Allows y to be reused as a dependency
 //!
 //! // Add task with dependencies
 //! let sum = dag.add_task(Add).depends_on((x, &y));
 //!
 //! // Execute and retrieve results
-//! dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await.unwrap();
-//! assert_eq!(dag.get(sum).unwrap(), 5);
+//!let mut output = dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await.unwrap();
+//! assert_eq!(output.get(sum).unwrap(), 5);
 //! # };
 //! ```
 //!
@@ -212,7 +212,7 @@
 //!
 //! A [`TaskHandle<T>`] is a typed, opaque reference to a task's output. Use it to:
 //! - Wire dependencies between tasks
-//! - Retrieve results after execution with [`DagRunner::get`]
+//! - Retrieve results after execution with [`DagOutput::get`]
 //!
 //! ## Dependency Patterns
 //!
@@ -230,7 +230,7 @@
 //! #     async fn run(&self) -> i32 { self.0 }
 //! # }
 //! # async {
-//! # let dag = DagRunner::new();
+//! # let mut dag = DagRunner::new();
 //! let source = dag.add_task(Value(42));
 //! # };
 //! ```
@@ -252,7 +252,7 @@
 //!     async fn run(input: &i32) -> i32 { input * 2 }
 //! }
 //! # async {
-//! # let dag = DagRunner::new();
+//! # let mut dag = DagRunner::new();
 //! # let source = dag.add_task(Value(42));
 //! let doubled = dag.add_task(Double).depends_on(source);
 //! # };
@@ -275,7 +275,7 @@
 //!     async fn run(a: &i32, b: &i32) -> i32 { a + b }
 //! }
 //! # async {
-//! # let dag = DagRunner::new();
+//! # let mut dag = DagRunner::new();
 //! # let x = dag.add_task(Value(2));
 //! # let y = dag.add_task(Value(3));
 //! let sum = dag.add_task(Add).depends_on((x, y));
@@ -317,16 +317,16 @@
 //! }
 //!
 //! # async {
-//! let dag = DagRunner::new();
+//! let mut dag = DagRunner::new();
 //!
 //! let base = dag.add_task(Value(10)).into();
 //! let plus1 = dag.add_task(Add(1)).depends_on(&base);
 //! let times2 = dag.add_task(Scale(2)).depends_on(&base);
 //!
-//! dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await.unwrap();
+//!let mut output = dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await.unwrap();
 //!
-//! assert_eq!(dag.get(plus1).unwrap(), 11);
-//! assert_eq!(dag.get(times2).unwrap(), 20);
+//! assert_eq!(output.get(plus1).unwrap(), 11);
+//! assert_eq!(output.get(times2).unwrap(), 20);
 //! # };
 //! ```
 //!
@@ -373,16 +373,16 @@
 //! }
 //!
 //! # async {
-//! let dag = DagRunner::new();
+//! let mut dag = DagRunner::new();
 //!
 //! let name = dag.add_task(Name("Alice".to_string()));
 //! let age = dag.add_task(Age(30));
 //! let active = dag.add_task(Active(true));
 //! let result = dag.add_task(FormatUser).depends_on((name, age, active));
 //!
-//! dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await.unwrap();
+//!let mut output = dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await.unwrap();
 //!
-//! assert_eq!(dag.get(result).unwrap(), "User: Alice, Age: 30, Active: true");
+//! assert_eq!(output.get(result).unwrap(), "User: Alice, Age: 30, Active: true");
 //! # };
 //! ```
 //!
@@ -419,7 +419,7 @@
 //! }
 //!
 //! # async {
-//! let dag = DagRunner::new();
+//! let mut dag = DagRunner::new();
 //!
 //! // Layer 1: Sources
 //! let x = dag.add_task(Value(2));
@@ -433,9 +433,9 @@
 //! // Layer 3: Final result
 //! let total = dag.add_task(Add).depends_on((&sum_xy, &prod_yz)); // 5 + 15 = 20
 //!
-//! dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await.unwrap();
+//!let mut output = dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await.unwrap();
 //!
-//! assert_eq!(dag.get(total).unwrap(), 20);
+//! assert_eq!(output.get(total).unwrap(), 20);
 //! # };
 //! ```
 //!
@@ -470,14 +470,14 @@
 //! }
 //!
 //! # async {
-//! let dag = DagRunner::new();
+//! let mut dag = DagRunner::new();
 //!
 //! let user = dag.add_task(CreateUser);
 //! let formatted = dag.add_task(FormatUser).depends_on(user);
 //!
-//! dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await.unwrap();
+//!let mut output = dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await.unwrap();
 //!
-//! assert_eq!(dag.get(formatted).unwrap(), "Alice is 30 years old");
+//! assert_eq!(output.get(formatted).unwrap(), "Alice is 30 years old");
 //! # };
 //! ```
 //!
@@ -497,21 +497,21 @@
 //! // With Tokio
 //! #[tokio::main]
 //! async fn main() {
-//!     let dag = DagRunner::new();
+//!     let mut dag = DagRunner::new();
 //!     // ... build and run DAG
 //! }
 //!
 //! // With async-std
 //! #[async_std::main]
 //! async fn main() {
-//!     let dag = DagRunner::new();
+//!     let mut dag = DagRunner::new();
 //!     // ... build and run DAG
 //! }
 //!
 //! // With smol
 //! fn main() {
 //!     smol::block_on(async {
-//!         let dag = DagRunner::new();
+//!         let mut dag = DagRunner::new();
 //!         // ... build and run DAG
 //!     });
 //! }
@@ -522,9 +522,9 @@
 //! dagx uses [`DagResult<T>`] (an alias for `Result<T, DagError>`) for operations that
 //! can fail:
 //!
-//! - [`DagRunner::run`] returns `DagResult<()>` and can fail if tasks panic or if multiple
+//! - [`DagRunner::run`] returns `DagResult<DagOutput>` and can fail if tasks panic or if multiple
 //!   concurrent runs are attempted
-//! - [`DagRunner::get`] returns `DagResult<T>` and can fail if the task hasn't executed or
+//! - [`DagOutput::get`] returns `DagResult<T>` and can fail if the task hasn't executed or
 //!   the handle is invalid
 //!
 //! You can handle errors explicitly or use `.unwrap()` for simple cases:
@@ -538,14 +538,14 @@
 //! #     async fn run(&self) -> i32 { self.0 }
 //! # }
 //! # async {
-//! # let dag = DagRunner::new();
+//! # let mut dag = DagRunner::new();
 //! # let node = dag.add_task(Value(42));
 //! // Simple approach with .unwrap()
-//! dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await.unwrap();
-//! let result = dag.get(node).unwrap();
+//!let mut output = dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await.unwrap();
+//! let result = output.get(node).unwrap();
 //!
 //! // Or handle errors explicitly
-//! match dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await {
+//! matchlet mut output = dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await {
 //!     Ok(_) => println!("DAG executed successfully"),
 //!     Err(e) => eprintln!("DAG execution failed: {}", e),
 //! }
@@ -651,7 +651,7 @@
 //! }
 //!
 //! # async {
-//! let dag = DagRunner::new();
+//! let mut dag = DagRunner::new();
 //! let data = dag.add_task(FetchData).into();
 //!
 //! // All three tasks get efficient Arc-wrapped sharing automatically
@@ -659,7 +659,7 @@
 //! let task2 = dag.add_task(ProcessData).depends_on(&data);
 //! let task3 = dag.add_task(ProcessData).depends_on(&data);
 //!
-//! dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await.unwrap();
+//!let mut output = dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await.unwrap();
 //! # };
 //! ```
 //!
@@ -668,7 +668,7 @@
 //! - Framework wraps it in `Arc<T>` internally
 //! - For fan-out (1→N), Arc is cloned N times (just atomic pointer increments - O(1))
 //! - Each downstream task receives `&T` after extracting from Arc
-//! - When you call `dag.get()`, the Arc is cloned and inner value extracted
+//! - When you call `output.get()`, the Arc is cloned and inner value extracted
 //!
 //! **Performance characteristics:**
 //! - **Heap types** (Vec, String, HashMap): Arc overhead is negligible (~few ns)
@@ -771,16 +771,16 @@ mod builder;
 mod deps;
 mod error;
 mod node;
+mod output;
 mod runner;
 mod task;
-mod types;
 
 // Public re-exports
-pub use builder::TaskBuilder;
+pub use builder::{TaskBuilder, TaskHandle};
 pub use error::{DagError, DagResult};
+pub use output::DagOutput;
 pub use runner::DagRunner;
 pub use task::{Task, TaskInput};
-pub use types::{Pending, TaskHandle};
 
 // Re-export the procedural macro
 pub use dagx_macros::task;

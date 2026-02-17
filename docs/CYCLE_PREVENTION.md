@@ -8,7 +8,7 @@ Most DAG libraries check for cycles when you execute the graph:
 
 ```rust
 // Other libraries: cycle detected at RUNTIME
-let dag = DagRunner::new();
+let mut dag = DagRunner::new();
 let a = dag.add_task(TaskA);
 let b = dag.add_task(TaskB);
 a.depends_on(b);
@@ -20,7 +20,7 @@ dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
 
 ```rust
 // dagx: cycle prevented at COMPILE TIME
-let dag = DagRunner::new();
+let mut dag = DagRunner::new();
 let a_builder = dag.add_task(TaskA);
 let b_builder = dag.add_task(TaskB);
 

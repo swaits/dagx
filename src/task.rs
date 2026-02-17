@@ -92,11 +92,13 @@ use std::{any::Any, future::Future, marker::PhantomData, slice::Iter, sync::Arc}
 ///
 /// Downstream tasks receive `&T` after ExtractInput extracts from the Arc. This is transparent
 /// to your task code - you work with `T`, the framework handles Arc wrapping/unwrapping.
-pub trait Task: Send {
-    type Input: Send;
-    type Output: Send + Sync; // Sync required for Arc-wrapping and cross-thread sharing
+pub trait Task<Input>: Send
+where
+    Input: Send + Sync + 'static,
+{
+    type Output: Send + Sync + 'static; // Sync required for Arc-wrapping and cross-thread sharing
 
-    fn run(self, input: TaskInput<Self::Input>) -> impl Future<Output = Self::Output> + Send;
+    fn run(self, input: TaskInput<Input>) -> impl Future<Output = Self::Output> + Send;
 }
 
 pub struct TaskInput<'inputs, Input: Send> {

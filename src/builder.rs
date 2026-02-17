@@ -3,10 +3,11 @@
 //! TaskBuilder uses compile-time type checking to ensure dependencies are wired correctly.
 //! The type parameter tracks whether dependencies have been specified yet.
 
+use std::marker::PhantomData;
+
 use crate::deps::DepsTuple;
 use crate::runner::DagRunner;
 use crate::task::Task;
-use crate::types::{NodeId, TaskHandle};
 
 #[cfg(feature = "tracing")]
 use tracing::debug;
@@ -57,17 +58,26 @@ use tracing::debug;
 /// let b = b.depends_on(a);
 /// // Now b is a TaskHandle<i32>
 ///
-/// dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await.unwrap();
-/// assert_eq!(dag.get(b).unwrap(), 20);
+///let mut output = dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await.unwrap();
+/// assert_eq!(output.get(b).unwrap(), 20);
 /// # };
 /// ```
-pub struct TaskBuilder<'a, Tk: Task, Deps> {
+#[must_use]
+pub struct TaskBuilder<'a, Input, Tk>
+where
+    Tk: Task<Input>,
+    Input: Send + Sync + 'static,
+{
     pub(crate) id: NodeId,
-    pub(crate) dag: &'a DagRunner,
-    pub(crate) _phantom: std::marker::PhantomData<(Tk, Deps)>,
+    pub(crate) dag: &'a mut DagRunner,
+    pub(crate) _phantom: PhantomData<(Tk, Input)>,
 }
 
-impl<'a, Tk: Task, Deps> TaskBuilder<'a, Tk, Deps> {
+impl<'a, Input, Tk> TaskBuilder<'a, Input, Tk>
+where
+    Tk: Task<Input>,
+    Input: Send + Sync + 'static,
+{
     /// Provide all dependencies exactly once as a tuple.
     ///
     /// The dependencies must match the task's `Input` type exactly:
@@ -107,7 +117,7 @@ impl<'a, Tk: Task, Deps> TaskBuilder<'a, Tk, Deps> {
     /// }
     ///
     /// # async {
-    /// let dag = DagRunner::new();
+    /// let mut dag = DagRunner::new();
     ///
     /// let x = dag.add_task(Value(2)).into();
     /// let y = dag.add_task(Value(3));
@@ -118,13 +128,13 @@ impl<'a, Tk: Task, Deps> TaskBuilder<'a, Tk, Deps> {
     /// // Multiple dependencies: tuple form
     /// let sum = dag.add_task(Add).depends_on((&x, y));
     ///
-    /// dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await.unwrap();
+    ///let mut output = dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await.unwrap();
     /// # };
     /// ```
     #[allow(private_bounds)]
     pub fn depends_on<D>(self, deps: D) -> TaskHandle<Tk::Output>
     where
-        D: DepsTuple<Tk::Input>,
+        D: DepsTuple<Input>,
     {
         // Register dependencies in the DAG
         let dep_ids = deps.to_node_ids();
@@ -137,27 +147,141 @@ impl<'a, Tk: Task, Deps> TaskBuilder<'a, Tk, Deps> {
             "wiring task dependencies"
         );
 
-        let mut edges = self.dag.edges.lock();
-        let mut dependents = self.dag.dependents.lock();
-
         for &dep_id in &dep_ids {
             // Add edge from this node to dependency
-            if let Some(node_edges) = edges.get_mut(&self.id) {
+            if let Some(node_edges) = self.dag.edges.get_mut(&self.id) {
                 node_edges.push(dep_id);
             }
 
             // Add this node as dependent of the dependency
-            if let Some(node_dependents) = dependents.get_mut(&dep_id) {
+            if let Some(node_dependents) = self.dag.dependents.get_mut(&dep_id) {
                 node_dependents.push(self.id);
             }
         }
 
         TaskHandle {
             id: self.id,
-            _phantom: std::marker::PhantomData,
+            _phantom: PhantomData,
         }
     }
 }
 
+/// Opaque node identifier
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
+pub struct NodeId(pub u32);
+
+/// Opaque, typed token for a node's output.
+///
+/// A `TaskHandle<T>` provides compile-time type-safe access to a task's output.
+/// You can:
+/// 1. Pass it to [`crate::TaskBuilder::depends_on`] to wire up dependencies
+/// 2. Use it with [`crate::DagOutput::get`] to retrieve the output after [`crate::DagRunner::run`]
+///
+/// Handles are cheap to clone and copy.
+///
+/// # Examples
+///
+/// ```no_run
+/// # use dagx::{task, DagRunner, Task};
+/// #
+/// # struct LoadValue { value: i32 }
+/// # impl LoadValue { pub fn new(v: i32) -> Self { Self { value: v } } }
+/// # #[task]
+/// # impl LoadValue {
+/// #     async fn run(&mut self) -> i32 { self.value }
+/// # }
+/// # async {
+/// let mut dag = DagRunner::new();
+/// let node = dag.add_task(LoadValue::new(42));
+///
+///let mut output = dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await.unwrap();
+///
+/// assert_eq!(output.get(node).unwrap(), 42);
+/// # };
+/// ```
+pub struct TaskHandle<T> {
+    pub(crate) id: NodeId,
+    pub(crate) _phantom: PhantomData<fn() -> T>,
+}
+
+impl<T> Clone for TaskHandle<T> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl<T> Copy for TaskHandle<T> {}
+
+// TaskHandle can be converted from &TaskHandle (for .get() calls)
+impl<T> From<&TaskHandle<T>> for TaskHandle<T> {
+    fn from(handle: &TaskHandle<T>) -> Self {
+        *handle
+    }
+}
+
+/// Takes a task and converts it to either a TaskBuilder or a TaskHandle,
+/// depending on whether it has inputs or not.
+///
+/// This is useful to enforce at compile time that a task with unit input never has
+/// depends_on called, and that it can be used directly as a dependency
+/// without converting it manually to a TaskHandle.
+pub trait TaskWire<Input>: Task<Input> + Sync + 'static
+where
+    Input: Send + Sync + 'static,
+{
+    type Retval<'dag>;
+
+    fn new_from_dag<'dag>(id: NodeId, dag: &'dag mut DagRunner) -> Self::Retval<'dag>;
+}
+
+impl<Tk> TaskWire<()> for Tk
+where
+    Tk: Task<()> + Sync + 'static,
+{
+    type Retval<'dag> = TaskHandle<Tk::Output>;
+
+    fn new_from_dag(id: NodeId, _dag: &mut DagRunner) -> Self::Retval<'static> {
+        Self::Retval {
+            id,
+            _phantom: PhantomData,
+        }
+    }
+}
+
+/// Macro to implement TaskWire for different tuple sizes.
+macro_rules! impl_wire_tuple {
+    ($($T:ident),+) => {
+        // For tuples of any combination of &TaskHandle, TaskHandle, and TaskBuilder
+        impl<Tk, $($T: Send + Sync + 'static),+> TaskWire<($($T,)+)> for Tk
+        where
+            Tk: Task<($($T,)+)> + Sync + 'static
+        {
+            type Retval<'dag> = TaskBuilder<'dag, ($($T,)+), Tk>;
+
+            fn new_from_dag<'dag>(id: NodeId, dag: &'dag mut DagRunner) -> Self::Retval<'dag> {
+                Self::Retval {
+                    id,
+                    dag,
+                    _phantom: PhantomData,
+                }
+            }
+        }
+    };
+}
+
+// Generate DepsTuple implementations for tuples of size 2-8.
+// Supporting up to 8 elements covers the vast majority of use cases.
+impl_wire_tuple!(T1);
+impl_wire_tuple!(T1, T2);
+impl_wire_tuple!(T1, T2, T3);
+impl_wire_tuple!(T1, T2, T3, T4);
+impl_wire_tuple!(T1, T2, T3, T4, T5);
+impl_wire_tuple!(T1, T2, T3, T4, T5, T6);
+impl_wire_tuple!(T1, T2, T3, T4, T5, T6, T7);
+impl_wire_tuple!(T1, T2, T3, T4, T5, T6, T7, T8);
+
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod coverage_tests;
