@@ -140,7 +140,7 @@ async fn test_layers_execute_in_parallel() -> DagResult<()> {
                 a + b + c
             },
         ))
-        .depends_on((&layer1[0], &layer1[1], &layer1[2]))
+        .depends_on((layer1[0], layer1[1], layer1[2]))
     };
 
     let mut output = dag

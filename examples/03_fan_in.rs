@@ -29,7 +29,7 @@
 //! ## Key Concepts
 //! - **Fan-in**: Multiple tasks' outputs are consumed by a single downstream task
 //! - **Aggregation**: Combining multiple values into a single result
-//! - **Parameter order**: The order in `.depends_on((&a, &b, &c))` must match
+//! - **Parameter order**: The order in `.depends_on((a, b, c))` must match
 //!   the function signature `fn run(a: &T1, b: &T2, c: &T3)`
 //!
 //! ## Use Cases

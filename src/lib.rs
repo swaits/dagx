@@ -320,8 +320,8 @@
 //! let mut dag = DagRunner::new();
 //!
 //! let base = dag.add_task(Value(10)).into();
-//! let plus1 = dag.add_task(Add(1)).depends_on(&base);
-//! let times2 = dag.add_task(Scale(2)).depends_on(&base);
+//! let plus1 = dag.add_task(Add(1)).depends_on(base);
+//! let times2 = dag.add_task(Scale(2)).depends_on(base);
 //!
 //!let mut output = dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await.unwrap();
 //!
@@ -656,9 +656,9 @@
 //! let data = dag.add_task(FetchData).into();
 //!
 //! // All three tasks get efficient Arc-wrapped sharing automatically
-//! let task1 = dag.add_task(ProcessData).depends_on(&data);
-//! let task2 = dag.add_task(ProcessData).depends_on(&data);
-//! let task3 = dag.add_task(ProcessData).depends_on(&data);
+//! let task1 = dag.add_task(ProcessData).depends_on(data);
+//! let task2 = dag.add_task(ProcessData).depends_on(data);
+//! let task3 = dag.add_task(ProcessData).depends_on(data);
 //!
 //!let mut output = dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await.unwrap();
 //! # };
@@ -784,4 +784,5 @@ pub use runner::DagRunner;
 pub use task::{Task, TaskInput};
 
 // Re-export the procedural macro
+#[cfg(feature = "derive")]
 pub use dagx_macros::task;

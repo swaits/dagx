@@ -41,14 +41,14 @@ async fn test_multiple_parallel_deep_chains() -> DagResult<()> {
             },
         ))
         .depends_on((
-            &chain_ends[0],
-            &chain_ends[1],
-            &chain_ends[2],
-            &chain_ends[3],
-            &chain_ends[4],
-            &chain_ends[5],
-            &chain_ends[6],
-            &chain_ends[7],
+            chain_ends[0],
+            chain_ends[1],
+            chain_ends[2],
+            chain_ends[3],
+            chain_ends[4],
+            chain_ends[5],
+            chain_ends[6],
+            chain_ends[7],
         ));
 
     let mut output = dag
@@ -120,7 +120,7 @@ async fn test_deep_binary_tree() -> DagResult<()> {
             dag.add_task(task_fn::<(i32, i32), _, _>(move |(l, r): (&i32, &i32)| {
                 l + r
             }))
-            .depends_on((&left, &right))
+            .depends_on((left, right))
         }
     }
 
@@ -152,7 +152,7 @@ async fn test_fibonacci_chain() -> DagResult<()> {
     for _ in 2..50 {
         let next = dag
             .add_task(task_fn::<(i64, i64), _, _>(|(a, b): (&i64, &i64)| a + b))
-            .depends_on((&prev2, &prev1));
+            .depends_on((prev2, prev1));
 
         prev2 = prev1;
         prev1 = next;
@@ -196,7 +196,7 @@ async fn test_zigzag_dependencies() -> DagResult<()> {
     // Final task depends on both chains
     let final_task = dag
         .add_task(task_fn::<(i32, i32), _, _>(|(a, b): (&i32, &i32)| a + b))
-        .depends_on((&chain_a, &chain_b));
+        .depends_on((chain_a, chain_b));
 
     let mut output = dag
         .run(|fut| async move { tokio::spawn(fut).await.unwrap() })

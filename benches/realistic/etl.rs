@@ -88,7 +88,7 @@ pub fn bench_etl_pipeline(c: &mut Criterion) {
                                 )
                             },
                         ))
-                        .depends_on((&validate, &scores, &names));
+                        .depends_on((validate, scores, names));
 
                         let _output = dag
                             .run(|fut| async move { tokio::spawn(fut).await.unwrap() })

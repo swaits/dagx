@@ -140,14 +140,5 @@ impl_task_input!(A, B, C, D, E, F);
 impl_task_input!(A, B, C, D, E, F, G);
 impl_task_input!(A, B, C, D, E, F, G, H);
 
-impl TaskInput<'static, ()> {
-    pub fn empty() -> Self {
-        Self {
-            inputs: [].iter(),
-            phantom: PhantomData,
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests;

@@ -57,7 +57,7 @@ fn test_deps_tuple_single_handle_tuple_ref() {
         id: NodeId(7),
         _phantom: std::marker::PhantomData,
     };
-    let node_ids = (&handle,).to_node_ids();
+    let node_ids = (handle,).to_node_ids();
     assert_eq!(node_ids.len(), 1);
     assert_eq!(node_ids[0], NodeId(7));
 }
@@ -114,7 +114,7 @@ fn test_deps_tuple_multiple_handles() {
     };
 
     // Test 2-tuple
-    let node_ids = (&handle1, &handle2).to_node_ids();
+    let node_ids = (handle1, handle2).to_node_ids();
     assert_eq!(node_ids.len(), 2);
     assert_eq!(node_ids[0], NodeId(1));
     assert_eq!(node_ids[1], NodeId(2));
@@ -124,7 +124,7 @@ fn test_deps_tuple_multiple_handles() {
         id: NodeId(3),
         _phantom: std::marker::PhantomData,
     };
-    let node_ids = (&handle1, &handle2, &handle3).to_node_ids();
+    let node_ids = (handle1, handle2, handle3).to_node_ids();
     assert_eq!(node_ids.len(), 3);
     assert_eq!(node_ids[0], NodeId(1));
     assert_eq!(node_ids[1], NodeId(2));
@@ -162,7 +162,7 @@ fn test_deps_tuple_large_tuples() {
     }
 
     // Test 4-tuple
-    let node_ids = (&handles[0], &handles[1], &handles[2], &handles[3]).to_node_ids();
+    let node_ids = (handles[0], handles[1], handles[2], handles[3]).to_node_ids();
     assert_eq!(node_ids.len(), 4);
     for (i, node_id) in node_ids.iter().enumerate().take(4) {
         assert_eq!(*node_id, NodeId(i as u32));
@@ -170,34 +170,12 @@ fn test_deps_tuple_large_tuples() {
 
     // Test 8-tuple
     let node_ids = (
-        &handles[0],
-        &handles[1],
-        &handles[2],
-        &handles[3],
-        &handles[4],
-        &handles[5],
-        &handles[6],
-        &handles[7],
+        handles[0], handles[1], handles[2], handles[3], handles[4], handles[5], handles[6],
+        handles[7],
     )
         .to_node_ids();
     assert_eq!(node_ids.len(), 8);
     for (i, node_id) in node_ids.iter().enumerate().take(8) {
         assert_eq!(*node_id, NodeId(i as u32));
     }
-}
-
-#[test]
-fn test_deps_handle_ref_explicit() {
-    // Test explicit &TaskHandle DepsTuple impl (line 27-28 in deps.rs)
-    let handle: TaskHandle<i32> = TaskHandle {
-        id: NodeId(77),
-        _phantom: std::marker::PhantomData,
-    };
-
-    // Create a reference and explicitly call to_node_ids
-    let handle_ref = &handle;
-    let node_ids = DepsTuple::<(i32,)>::to_node_ids(handle_ref);
-
-    assert_eq!(node_ids.len(), 1);
-    assert_eq!(node_ids[0], NodeId(77));
 }

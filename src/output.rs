@@ -51,10 +51,7 @@ impl DagOutput {
     /// assert_eq!(output.get(task).unwrap(), 42);
     /// # };
     /// ```
-    pub fn get<T: 'static + Send + Sync, H>(&mut self, handle: H) -> DagResult<T>
-    where
-        H: Into<TaskHandle<T>>,
-    {
+    pub fn get<T: 'static + Send + Sync>(&mut self, handle: TaskHandle<T>) -> DagResult<T> {
         let handle: TaskHandle<T> = handle.into();
 
         let arc_output = self

@@ -460,13 +460,13 @@ impl DagRunner {
                     }
                 }
             }
-        }
 
-        // Return first error if any
-        if let Some(err) = first_error {
-            #[cfg(feature = "tracing")]
-            error!(?err, "DAG execution failed");
-            return Err(err);
+            // Return first error if any
+            if let Some(err) = first_error {
+                #[cfg(feature = "tracing")]
+                error!(?err, "DAG execution failed");
+                return Err(err);
+            }
         }
 
         #[cfg(feature = "tracing")]

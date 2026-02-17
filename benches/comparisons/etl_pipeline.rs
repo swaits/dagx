@@ -51,7 +51,7 @@ pub fn bench_etl_pipeline(c: &mut Criterion) {
                             result
                         },
                     ))
-                    .depends_on((&transform1, &transform2, &transform3));
+                    .depends_on((transform1, transform2, transform3));
 
                 // Validate
                 let validate = dag

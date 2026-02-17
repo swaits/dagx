@@ -53,7 +53,7 @@ async fn test_diamond_error_propagation() {
         .depends_on(source);
 
     dag.add_task(task_fn::<(i32, i32), _, _>(|(l, r): (&i32, &i32)| l + r))
-        .depends_on((&left, &right));
+        .depends_on((left, right));
 
     assert!(matches!(
         dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })

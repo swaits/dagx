@@ -203,20 +203,18 @@ async fn main() {
     // Stage 3: Statistical analysis (parallel operations on transformed data)
     let sum = dag
         .add_task(ComputeSum)
-        .depends_on((&transformed_1, &transformed_2, &transformed_3));
+        .depends_on((transformed_1, transformed_2, transformed_3));
 
     let product =
         dag.add_task(ComputeProduct)
-            .depends_on((&transformed_1, &transformed_2, &transformed_3));
+            .depends_on((transformed_1, transformed_2, transformed_3));
 
     let max = dag
         .add_task(FindMax)
-        .depends_on((&transformed_1, &transformed_2, &transformed_3));
+        .depends_on((transformed_1, transformed_2, transformed_3));
 
     // Stage 4: Final report
-    let report = dag
-        .add_task(GenerateReport)
-        .depends_on((&sum, &product, &max));
+    let report = dag.add_task(GenerateReport).depends_on((sum, product, max));
 
     // Execute the pipeline
     println!("Executing pipeline...\n");

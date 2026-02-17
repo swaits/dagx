@@ -212,13 +212,6 @@ impl<T> Clone for TaskHandle<T> {
 
 impl<T> Copy for TaskHandle<T> {}
 
-// TaskHandle can be converted from &TaskHandle (for .get() calls)
-impl<T> From<&TaskHandle<T>> for TaskHandle<T> {
-    fn from(handle: &TaskHandle<T>) -> Self {
-        *handle
-    }
-}
-
 /// Takes a task and converts it to either a TaskBuilder or a TaskHandle,
 /// depending on whether it has inputs or not.
 ///
@@ -269,8 +262,6 @@ macro_rules! impl_wire_tuple {
     };
 }
 
-// Generate DepsTuple implementations for tuples of size 2-8.
-// Supporting up to 8 elements covers the vast majority of use cases.
 impl_wire_tuple!(T1);
 impl_wire_tuple!(T1, T2);
 impl_wire_tuple!(T1, T2, T3);

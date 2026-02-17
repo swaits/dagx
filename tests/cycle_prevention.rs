@@ -267,7 +267,7 @@ async fn test_type_safety_prevents_invalid_graphs() {
     let t2 = dag.add_task(Transform).depends_on(s2);
 
     // Aggregate depends on transforms
-    let result = dag.add_task(Aggregate).depends_on((&t1, &t2));
+    let result = dag.add_task(Aggregate).depends_on((t1, t2));
 
     // Execute and verify
     let mut output = dag
