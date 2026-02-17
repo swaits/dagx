@@ -3,7 +3,6 @@
 //! One source task feeding 100 dependent tasks
 
 use criterion::Criterion;
-use dagx::TaskHandle;
 
 pub fn bench_wide_fanout(c: &mut Criterion) {
     let rt = tokio::runtime::Runtime::new().unwrap();
@@ -16,8 +15,8 @@ pub fn bench_wide_fanout(c: &mut Criterion) {
                 use dagx::DagRunner;
                 use dagx_test::task_fn;
 
-                let dag = DagRunner::new();
-                let source: TaskHandle<_> = dag.add_task(task_fn::<(), _, _>(|_: ()| 42)).into();
+                let mut dag = DagRunner::new();
+                let source = dag.add_task(task_fn::<(), _, _>(|_: ()| 42));
 
                 // Create 100 tasks that all depend on source
                 for i in 0..100 {
@@ -25,7 +24,8 @@ pub fn bench_wide_fanout(c: &mut Criterion) {
                         .depends_on(source);
                 }
 
-                dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+                let _output = dag
+                    .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
                     .await
                     .unwrap();
             })

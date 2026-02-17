@@ -115,7 +115,7 @@ async fn main() -> DagResult<()> {
     println!("Running PARALLEL computation (4 workers on separate threads)...");
     let (parallel_time, parallel_result) = {
         let start = Instant::now();
-        let dag = DagRunner::new();
+        let mut dag = DagRunner::new();
 
         // Create 4 workers - dagx will run them in parallel
         let sum1 = dag.add_task(ComputeSum::new(1, 251, WORK_DELAY));
@@ -125,10 +125,11 @@ async fn main() -> DagResult<()> {
 
         let total = dag.add_task(Aggregate).depends_on((sum1, sum2, sum3, sum4));
 
-        dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+        let mut output = dag
+            .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
             .await?;
 
-        let result = dag.get(total)?;
+        let result = output.get(total)?;
         let elapsed = start.elapsed();
 
         println!(

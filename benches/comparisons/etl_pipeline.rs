@@ -15,7 +15,7 @@ pub fn bench_etl_pipeline(c: &mut Criterion) {
                 use dagx::DagRunner;
                 use dagx_test::task_fn;
 
-                let dag = DagRunner::new();
+                let mut dag = DagRunner::new();
 
                 // Extract from 3 sources
                 let source1 = dag.add_task(task_fn::<(), _, _>(|_: ()| vec![1, 2, 3, 4, 5]));
@@ -70,10 +70,11 @@ pub fn bench_etl_pipeline(c: &mut Criterion) {
                     }))
                     .depends_on(validate);
 
-                dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+                let mut output = dag
+                    .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
                     .await
                     .unwrap();
-                dag.get(load).unwrap()
+                output.get(load).unwrap()
             })
         });
     });

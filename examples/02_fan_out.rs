@@ -55,7 +55,7 @@
 //!   Squared: 100
 //! ```
 
-use dagx::{task, DagRunner, TaskHandle};
+use dagx::{task, DagRunner};
 
 // Source task with a value field
 struct Source {
@@ -127,10 +127,10 @@ impl Power {
 
 #[tokio::main]
 async fn main() {
-    let dag = DagRunner::new();
+    let mut dag = DagRunner::new();
 
     // Single source task - constructed with ::new()
-    let source: TaskHandle<_> = dag.add_task(Source::new(10)).into();
+    let source = dag.add_task(Source::new(10));
 
     // Multiple downstream tasks consuming the same value
     // Each constructed differently to show flexibility
@@ -140,14 +140,15 @@ async fn main() {
 
     // Run the DAG
     println!("Running fan-out DAG...\n");
-    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+    let mut output = dag
+        .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await
         .unwrap();
 
     // Print all results
     println!("\nResults:");
-    println!("  Source: {}", dag.get(source).unwrap());
-    println!("  Plus One: {}", dag.get(plus_one).unwrap());
-    println!("  Times Two: {}", dag.get(times_two).unwrap());
-    println!("  Squared: {}", dag.get(squared).unwrap());
+    println!("  Source: {}", output.get(source).unwrap());
+    println!("  Plus One: {}", output.get(plus_one).unwrap());
+    println!("  Times Two: {}", output.get(times_two).unwrap());
+    println!("  Squared: {}", output.get(squared).unwrap());
 }

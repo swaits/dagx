@@ -1,7 +1,7 @@
 //! ETL (Extract, Transform, Load) pipeline benchmark
 
 use criterion::{BenchmarkId, Criterion};
-use dagx::{DagRunner, TaskHandle};
+use dagx::DagRunner;
 use dagx_test::task_fn;
 pub fn bench_etl_pipeline(c: &mut Criterion) {
     let rt = tokio::runtime::Runtime::new().unwrap();
@@ -17,23 +17,21 @@ pub fn bench_etl_pipeline(c: &mut Criterion) {
             |b, &count| {
                 b.iter(|| {
                     rt.block_on(async {
-                        let dag = DagRunner::new();
+                        let mut dag = DagRunner::new();
 
                         // Extract: Load JSON-like data (framework wraps in Arc automatically)
-                        let extract: TaskHandle<_> = dag
-                            .add_task(task_fn::<(), _, _>(move |_: ()| {
-                                (0..count)
-                                    .map(|i| {
-                                        format!(
-                                            "{{\"id\":{},\"name\":\"User{}\",\"score\":{}}}",
-                                            i,
-                                            i,
-                                            i * 10
-                                        )
-                                    })
-                                    .collect::<Vec<_>>()
-                            }))
-                            .into();
+                        let extract = dag.add_task(task_fn::<(), _, _>(move |_: ()| {
+                            (0..count)
+                                .map(|i| {
+                                    format!(
+                                        "{{\"id\":{},\"name\":\"User{}\",\"score\":{}}}",
+                                        i,
+                                        i,
+                                        i * 10
+                                    )
+                                })
+                                .collect::<Vec<_>>()
+                        }));
 
                         // Transform: Three parallel transformations
 
@@ -92,7 +90,8 @@ pub fn bench_etl_pipeline(c: &mut Criterion) {
                         ))
                         .depends_on((&validate, &scores, &names));
 
-                        dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+                        let _output = dag
+                            .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
                             .await
                             .unwrap();
                     })

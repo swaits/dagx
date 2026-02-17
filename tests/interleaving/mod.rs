@@ -4,19 +4,19 @@ use dagx::{task, DagResult, DagRunner};
 use dagx_test::task_fn;
 
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use tokio::sync::Barrier;
 
 #[tokio::test]
 async fn test_forced_interleaving_with_barriers() -> DagResult<()> {
     // Force specific interleaving using barriers
-    let dag = DagRunner::new();
+    let mut dag = DagRunner::new();
     let barrier = Arc::new(Barrier::new(3));
-    let order = Arc::new(parking_lot::Mutex::new(Vec::new()));
+    let order = Arc::new(Mutex::new(Vec::new()));
 
     struct InterleaveTask {
         barrier: Arc<Barrier>,
-        order: Arc<parking_lot::Mutex<Vec<String>>>,
+        order: Arc<Mutex<Vec<String>>>,
         prefix: &'static str,
         value: i32,
     }
@@ -24,9 +24,15 @@ async fn test_forced_interleaving_with_barriers() -> DagResult<()> {
     #[task]
     impl InterleaveTask {
         async fn run(&self) -> i32 {
-            self.order.lock().push(format!("{}_start", self.prefix));
+            self.order
+                .lock()
+                .unwrap()
+                .push(format!("{}_start", self.prefix));
             self.barrier.wait().await;
-            self.order.lock().push(format!("{}_end", self.prefix));
+            self.order
+                .lock()
+                .unwrap()
+                .push(format!("{}_end", self.prefix));
             self.value
         }
     }
@@ -58,13 +64,14 @@ async fn test_forced_interleaving_with_barriers() -> DagResult<()> {
         ))
         .depends_on((t1, t2, t3));
 
-    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+    let mut output = dag
+        .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await?;
 
-    assert_eq!(dag.get(collector)?, 6);
+    assert_eq!(output.get(collector)?, 6);
 
     // Check interleaving pattern
-    let events = order.lock().clone();
+    let events = order.lock().unwrap().clone();
     assert_eq!(events.len(), 6);
 
     // All starts should come before all ends due to barrier
@@ -80,14 +87,13 @@ async fn test_forced_interleaving_with_barriers() -> DagResult<()> {
 #[tokio::test]
 async fn test_alternating_execution_pattern() -> DagResult<()> {
     // Create an alternating execution pattern
-    let dag = DagRunner::new();
+    let mut dag = DagRunner::new();
     let turn = Arc::new(AtomicUsize::new(0));
-    let events: Arc<parking_lot::Mutex<Vec<String>>> =
-        Arc::new(parking_lot::Mutex::new(Vec::new()));
+    let events: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(Vec::new()));
 
     struct FirstA {
         turn: Arc<AtomicUsize>,
-        events: Arc<parking_lot::Mutex<Vec<String>>>,
+        events: Arc<Mutex<Vec<String>>>,
     }
 
     #[task]
@@ -96,22 +102,20 @@ async fn test_alternating_execution_pattern() -> DagResult<()> {
             while self.turn.load(Ordering::SeqCst) != 0 {
                 tokio::task::yield_now().await;
             }
-            self.events.lock().push("A0".to_string());
+            self.events.lock().unwrap().push("A0".to_string());
             self.turn.store(1, Ordering::SeqCst);
             0
         }
     }
 
-    let first_a = dag.add_task(FirstA {
+    let mut chain_a = dag.add_task(FirstA {
         turn: turn.clone(),
         events: events.clone(),
     });
 
-    let mut chain_a: dagx::TaskHandle<i32> = first_a.into();
-
     struct FirstB {
         turn: Arc<AtomicUsize>,
-        events: Arc<parking_lot::Mutex<Vec<String>>>,
+        events: Arc<Mutex<Vec<String>>>,
     }
 
     #[task]
@@ -120,22 +124,20 @@ async fn test_alternating_execution_pattern() -> DagResult<()> {
             while self.turn.load(Ordering::SeqCst) != 1 {
                 tokio::task::yield_now().await;
             }
-            self.events.lock().push("B0".to_string());
+            self.events.lock().unwrap().push("B0".to_string());
             self.turn.store(2, Ordering::SeqCst);
             0
         }
     }
 
-    let first_b = dag.add_task(FirstB {
+    let mut chain_b = dag.add_task(FirstB {
         turn: turn.clone(),
         events: events.clone(),
     });
 
-    let mut chain_b: dagx::TaskHandle<i32> = first_b.into();
-
     struct ChainA {
         turn: Arc<AtomicUsize>,
-        events: Arc<parking_lot::Mutex<Vec<String>>>,
+        events: Arc<Mutex<Vec<String>>>,
         idx: usize,
     }
 
@@ -145,7 +147,7 @@ async fn test_alternating_execution_pattern() -> DagResult<()> {
             while self.turn.load(Ordering::SeqCst) != self.idx * 2 {
                 tokio::task::yield_now().await;
             }
-            self.events.lock().push(format!("A{}", self.idx));
+            self.events.lock().unwrap().push(format!("A{}", self.idx));
             self.turn.store(self.idx * 2 + 1, Ordering::SeqCst);
             x + 1
         }
@@ -153,7 +155,7 @@ async fn test_alternating_execution_pattern() -> DagResult<()> {
 
     struct ChainB {
         turn: Arc<AtomicUsize>,
-        events: Arc<parking_lot::Mutex<Vec<String>>>,
+        events: Arc<Mutex<Vec<String>>>,
         idx: usize,
     }
 
@@ -163,7 +165,7 @@ async fn test_alternating_execution_pattern() -> DagResult<()> {
             while self.turn.load(Ordering::SeqCst) != self.idx * 2 + 1 {
                 tokio::task::yield_now().await;
             }
-            self.events.lock().push(format!("B{}", self.idx));
+            self.events.lock().unwrap().push(format!("B{}", self.idx));
             self.turn.store(self.idx * 2 + 2, Ordering::SeqCst);
             x + 1
         }
@@ -187,11 +189,12 @@ async fn test_alternating_execution_pattern() -> DagResult<()> {
             .depends_on(chain_b);
     }
 
-    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+    let _output = dag
+        .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await?;
 
     // Check alternating pattern
-    let event_list = events.lock().clone();
+    let event_list = events.lock().unwrap().clone();
     assert_eq!(
         event_list,
         vec!["A0", "B0", "A1", "B1", "A2", "B2", "A3", "B3", "A4", "B4"]
@@ -203,7 +206,7 @@ async fn test_alternating_execution_pattern() -> DagResult<()> {
 #[tokio::test]
 async fn test_layered_interleaving() -> DagResult<()> {
     // Test interleaving across DAG layers
-    let dag = DagRunner::new();
+    let mut dag = DagRunner::new();
     let layer_active = Arc::new(AtomicUsize::new(0));
 
     struct Layer1Task {
@@ -228,7 +231,6 @@ async fn test_layered_interleaving() -> DagResult<()> {
                 active: layer_active.clone(),
                 idx: i,
             })
-            .into()
         })
         .collect();
 
@@ -264,11 +266,12 @@ async fn test_layered_interleaving() -> DagResult<()> {
         })
         .depends_on((&layer2[0], &layer2[1]));
 
-    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+    let mut output = dag
+        .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await?;
 
     // Sum of 0+1+2+3 = 6
-    assert_eq!(dag.get(layer3)?, 6);
+    assert_eq!(output.get(layer3)?, 6);
 
     Ok(())
 }

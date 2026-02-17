@@ -1,7 +1,7 @@
 //! Mixed realistic patterns - fan-out, fan-in, and processing
 
 use criterion::Criterion;
-use dagx::{DagRunner, TaskHandle};
+use dagx::DagRunner;
 use dagx_test::task_fn;
 pub fn bench_mixed_patterns(c: &mut Criterion) {
     let rt = tokio::runtime::Runtime::new().unwrap();
@@ -9,16 +9,14 @@ pub fn bench_mixed_patterns(c: &mut Criterion) {
     c.bench_function("mixed_patterns_realistic", |b| {
         b.iter(|| {
             rt.block_on(async {
-                let dag = DagRunner::new();
+                let mut dag = DagRunner::new();
 
                 // Stage 1: Load data (framework wraps in Arc automatically)
-                let data: TaskHandle<_> = dag
-                    .add_task(task_fn::<(), _, _>(|_: ()| {
-                        (0..1000)
-                            .map(|i| format!("Record-{:04}", i))
-                            .collect::<Vec<_>>()
-                    }))
-                    .into();
+                let data = dag.add_task(task_fn::<(), _, _>(|_: ()| {
+                    (0..1000)
+                        .map(|i| format!("Record-{:04}", i))
+                        .collect::<Vec<_>>()
+                }));
 
                 // Stage 2: Fan-out for parallel analysis
                 let analysis1 = dag
@@ -54,7 +52,8 @@ pub fn bench_mixed_patterns(c: &mut Criterion) {
                     .depends_on(summary);
                 }
 
-                dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+                let _output = dag
+                    .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
                     .await
                     .unwrap();
             })

@@ -15,7 +15,7 @@ pub fn bench_linear_pipeline(c: &mut Criterion) {
                 use dagx::DagRunner;
                 use dagx_test::task_fn;
 
-                let dag = DagRunner::new();
+                let mut dag = DagRunner::new();
 
                 let a = dag.add_task(task_fn::<(), _, _>(|_: ()| 1));
                 let b = dag
@@ -31,10 +31,11 @@ pub fn bench_linear_pipeline(c: &mut Criterion) {
                     .add_task(task_fn::<i32, _, _>(|&x: &i32| x * 3))
                     .depends_on(d);
 
-                dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+                let mut output = dag
+                    .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
                     .await
                     .unwrap();
-                dag.get(e).unwrap()
+                output.get(e).unwrap()
             })
         });
     });

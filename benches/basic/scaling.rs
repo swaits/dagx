@@ -15,11 +15,12 @@ pub fn bench_dag_scaling(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::from_parameter(size), size, |b, &size| {
             b.iter(|| {
                 rt.block_on(async {
-                    let dag = DagRunner::new();
+                    let mut dag = DagRunner::new();
                     for i in 0..size {
                         dag.add_task(task_fn::<(), _, _>(move |_: ()| i));
                     }
-                    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+                    let _output = dag
+                        .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
                         .await
                         .unwrap();
                 })

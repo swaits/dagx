@@ -51,9 +51,7 @@ fn test_dag_error_display_result_not_found() {
 
     assert!(display.contains("Result not found"));
     assert!(display.contains("task #7"));
-    assert!(display.contains(
-        "Calllet mut output = dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })"
-    ));
+    assert!(display.contains("Call dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })"));
 }
 
 #[test]

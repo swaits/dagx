@@ -157,14 +157,14 @@ section "TESTING"
 
 echo "→ Running library unit tests..."
 cargo test --lib || check_fail "Library unit tests failed"
-check_pass "Library unit tests pass (70 tests)"
+check_pass "Library unit tests pass"
 
 echo ""
 echo "→ Running integration tests with all feature combinations..."
 cargo test --test '*' --no-default-features || check_fail "Integration tests failed (no features)"
 cargo test --test '*' --all-features || check_fail "Integration tests failed (all features)"
 cargo test --test '*' || check_fail "Integration tests failed (default features)"
-check_pass "Integration tests pass across all feature combinations (280+ tests total)"
+check_pass "Integration tests pass across all feature combinations"
 
 echo ""
 echo "→ Running doc tests with all features..."

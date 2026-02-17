@@ -209,7 +209,7 @@ async fn main() {
     // Example 1: Successful path
     println!("Example 1: Valid input");
     {
-        let dag = DagRunner::new();
+        let mut dag = DagRunner::new();
 
         let input = dag.add_task(StringSource("42"));
 
@@ -222,11 +222,12 @@ async fn main() {
         let processed = dag.add_task(ProcessData).depends_on(validated);
         let logged = dag.add_task(LogError).depends_on(processed);
 
-        dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+        let mut output = dag
+            .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
             .await
             .unwrap();
 
-        match dag.get(logged).unwrap().as_ref() {
+        match output.get(logged).unwrap().as_ref() {
             Ok(result) => println!("Final result: {}\n", result),
             Err(e) => eprintln!("Final error: {}\n", e),
         }
@@ -235,7 +236,7 @@ async fn main() {
     // Example 2: Parse error
     println!("Example 2: Invalid input (parse error)");
     {
-        let dag = DagRunner::new();
+        let mut dag = DagRunner::new();
 
         let input = dag.add_task(StringSource("not a number"));
 
@@ -248,11 +249,12 @@ async fn main() {
         let processed = dag.add_task(ProcessData).depends_on(validated);
         let logged = dag.add_task(LogError).depends_on(processed);
 
-        dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+        let mut output = dag
+            .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
             .await
             .unwrap();
 
-        match dag.get(logged).unwrap().as_ref() {
+        match output.get(logged).unwrap().as_ref() {
             Ok(result) => println!("Final result: {}\n", result),
             Err(e) => eprintln!("Final error: {}\n", e),
         }
@@ -261,7 +263,7 @@ async fn main() {
     // Example 3: Validation error
     println!("Example 3: Out of range");
     {
-        let dag = DagRunner::new();
+        let mut dag = DagRunner::new();
 
         let input = dag.add_task(StringSource("150"));
 
@@ -274,11 +276,12 @@ async fn main() {
         let processed = dag.add_task(ProcessData).depends_on(validated);
         let logged = dag.add_task(LogError).depends_on(processed);
 
-        dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+        let mut output = dag
+            .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
             .await
             .unwrap();
 
-        match dag.get(logged).unwrap().as_ref() {
+        match output.get(logged).unwrap().as_ref() {
             Ok(result) => println!("Final result: {}\n", result),
             Err(e) => eprintln!("Final error: {}\n", e),
         }
@@ -287,7 +290,7 @@ async fn main() {
     // Example 4: Error recovery with fallback
     println!("Example 4: Error recovery with fallback");
     {
-        let dag = DagRunner::new();
+        let mut dag = DagRunner::new();
 
         let input = dag.add_task(StringSource("invalid"));
 
@@ -297,11 +300,12 @@ async fn main() {
             .add_task(WithFallback { fallback: 0 })
             .depends_on(parsed);
 
-        dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+        let mut output = dag
+            .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
             .await
             .unwrap();
 
-        let result = dag.get(with_fallback).unwrap();
+        let result = output.get(with_fallback).unwrap();
         println!("Recovered with fallback: {}\n", result);
     }
 

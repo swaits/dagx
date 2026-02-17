@@ -8,17 +8,18 @@ use tokio::task::yield_now;
 #[tokio::test]
 async fn test_dag_with_only_source_tasks() -> DagResult<()> {
     // Test a DAG with multiple source tasks but no dependencies
-    let dag = DagRunner::new();
+    let mut dag = DagRunner::new();
 
     let tasks: Vec<_> = (0..100)
         .map(|i| dag.add_task(task_fn::<(), _, _>(move |_: ()| i)))
         .collect();
 
-    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+    let mut output = dag
+        .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await?;
 
     for (i, task) in tasks.into_iter().enumerate() {
-        assert_eq!(dag.get(task)?, i);
+        assert_eq!(output.get(task)?, i);
     }
 
     Ok(())
@@ -38,20 +39,21 @@ async fn test_single_self_contained_stateful_task() -> DagResult<()> {
         }
     }
 
-    let dag = DagRunner::new();
+    let mut dag = DagRunner::new();
     let task = dag.add_task(Counter { value: 21 });
 
-    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+    let mut output = dag
+        .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await?;
 
-    assert_eq!(dag.get(task)?, 42);
+    assert_eq!(output.get(task)?, 42);
     Ok(())
 }
 
 #[tokio::test]
 async fn test_minimal_task_with_minimal_async_work() -> DagResult<()> {
     // Test a task that does the absolute minimum async work
-    let dag = DagRunner::new();
+    let mut dag = DagRunner::new();
 
     struct YieldTask;
 
@@ -65,9 +67,10 @@ async fn test_minimal_task_with_minimal_async_work() -> DagResult<()> {
 
     let task = dag.add_task(YieldTask);
 
-    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+    let mut output = dag
+        .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await?;
 
-    assert_eq!(dag.get(task)?, 1337);
+    assert_eq!(output.get(task)?, 1337);
     Ok(())
 }

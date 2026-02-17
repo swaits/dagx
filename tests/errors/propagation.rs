@@ -1,17 +1,17 @@
 //! Tests for error propagation through the DAG
 
-use dagx::{task, DagRunner, TaskHandle};
+use dagx::{task, DagError, DagRunner};
 use dagx_test::task_fn;
 
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tokio::time::sleep;
 
 #[tokio::test]
 async fn test_linear_error_propagation() {
-    let dag = DagRunner::new();
+    let mut dag = DagRunner::new();
 
-    let t1: TaskHandle<_> = dag.add_task(task_fn::<(), _, _>(|_: ()| 1)).into();
+    let t1 = dag.add_task(task_fn::<(), _, _>(|_: ()| 1));
     let t2 = dag
         .add_task(task_fn::<i32, _, _>(|&x: &i32| -> i32 {
             panic!("Error at t2 with input {}", x);
@@ -20,28 +20,19 @@ async fn test_linear_error_propagation() {
     let t3 = dag
         .add_task(task_fn::<i32, _, _>(|&x: &i32| x + 1))
         .depends_on(t2);
-    let t4 = dag
-        .add_task(task_fn::<i32, _, _>(|&x: &i32| x * 2))
+    dag.add_task(task_fn::<i32, _, _>(|&x: &i32| x * 2))
         .depends_on(t3);
 
-    let _ = dag
-        .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
-        .await;
-
-    // t1 succeeds
-    assert_eq!(dag.get(t1).unwrap(), 1);
-
-    // t2 fails
-    assert!(dag.get(t2).is_err());
-
-    // t3 and t4 fail due to dependency
-    assert!(dag.get(t3).is_err());
-    assert!(dag.get(t4).is_err());
+    assert!(matches!(
+        dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+            .await,
+        Err(DagError::TaskPanicked { .. })
+    ));
 }
 
 #[tokio::test]
 async fn test_diamond_error_propagation() {
-    let dag = DagRunner::new();
+    let mut dag = DagRunner::new();
 
     //     source
     //     /    \
@@ -49,7 +40,7 @@ async fn test_diamond_error_propagation() {
     //     \    /
     //      sink
 
-    let source: TaskHandle<_> = dag.add_task(task_fn::<(), _, _>(|_: ()| 100)).into();
+    let source = dag.add_task(task_fn::<(), _, _>(|_: ()| 100));
 
     let left = dag
         .add_task(task_fn::<i32, _, _>(|&x: &i32| x / 2))
@@ -61,61 +52,45 @@ async fn test_diamond_error_propagation() {
         }))
         .depends_on(source);
 
-    let sink = dag
-        .add_task(task_fn::<(i32, i32), _, _>(|(l, r): (&i32, &i32)| l + r))
+    dag.add_task(task_fn::<(i32, i32), _, _>(|(l, r): (&i32, &i32)| l + r))
         .depends_on((&left, &right));
 
-    let _ = dag
-        .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
-        .await;
-
-    assert_eq!(dag.get(source).unwrap(), 100);
-    assert_eq!(dag.get(left).unwrap(), 50);
-    assert!(dag.get(right).is_err());
-    assert!(dag.get(sink).is_err()); // Fails due to right dependency
+    assert!(matches!(
+        dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+            .await,
+        Err(DagError::TaskPanicked { .. })
+    ));
 }
 
 #[tokio::test]
 async fn test_error_in_wide_fanout() {
-    let dag = DagRunner::new();
+    let mut dag = DagRunner::new();
 
-    let source: TaskHandle<_> = dag
-        .add_task(task_fn::<(), _, _>(|_: ()| -> i32 {
-            panic!("Source fails");
-        }))
-        .into();
+    let source = dag.add_task(task_fn::<(), _, _>(|_: ()| -> i32 {
+        panic!("Source fails");
+    }));
 
     // Create wide fanout from failing source
-    let dependents: Vec<_> = (0..20)
-        .map(|i| {
-            dag.add_task(task_fn::<i32, _, _>(move |&x: &i32| x + i))
-                .depends_on(source)
-        })
-        .collect();
-
-    let _ = dag
-        .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
-        .await;
-
-    // Source fails
-    assert!(dag.get(source).is_err());
-
-    // All dependents fail
-    for dependent in &dependents {
-        assert!(dag.get(dependent).is_err());
+    for i in 0..20 {
+        dag.add_task(task_fn::<i32, _, _>(move |&x: &i32| x + i))
+            .depends_on(source);
     }
+
+    assert!(matches!(
+        dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+            .await,
+        Err(DagError::TaskPanicked { .. })
+    ));
 }
 
 #[tokio::test]
 async fn test_selective_error_propagation() {
-    let dag = DagRunner::new();
+    let mut dag = DagRunner::new();
 
     // Source that produces a Result
-    let source: TaskHandle<_> = dag
-        .add_task(task_fn::<(), _, _>(|_: ()| {
-            Result::<i32, String>::Err("Source error".to_string())
-        }))
-        .into();
+    let source = dag.add_task(task_fn::<(), _, _>(|_: ()| {
+        Result::<i32, String>::Err("Source error".to_string())
+    }));
 
     // Handler that processes the Result
     let handler = dag
@@ -140,34 +115,35 @@ async fn test_selective_error_propagation() {
         }))
         .depends_on(handler);
 
-    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+    let mut output = dag
+        .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await
         .unwrap();
 
     // Source returns an Err variant (not a panic)
-    assert_eq!(dag.get(source).unwrap(), Err("Source error".to_string()));
+    assert_eq!(output.get(source).unwrap(), Err("Source error".to_string()));
 
     // Handler processes it
-    assert_eq!(dag.get(handler).unwrap(), -1);
+    assert_eq!(output.get(handler).unwrap(), -1);
 
     // Final task handles the error case
-    assert_eq!(dag.get(final_task).unwrap(), "Handled error case");
+    assert_eq!(output.get(final_task).unwrap(), "Handled error case");
 }
 
 #[tokio::test]
 async fn test_error_propagation_timing() {
-    let dag = DagRunner::new();
-    let propagation_order = Arc::new(parking_lot::Mutex::new(Vec::new()));
+    let mut dag = DagRunner::new();
+    let propagation_order = Arc::new(Mutex::new(Vec::new()));
 
     struct T1Task {
-        order: Arc<parking_lot::Mutex<Vec<&'static str>>>,
+        order: Arc<Mutex<Vec<&'static str>>>,
     }
 
     #[task]
     impl T1Task {
         async fn run(&self) -> i32 {
             sleep(Duration::from_millis(10)).await;
-            self.order.lock().push("t1_complete");
+            self.order.lock().unwrap().push("t1_complete");
             1
         }
     }
@@ -177,13 +153,13 @@ async fn test_error_propagation_timing() {
     });
 
     struct T2Task {
-        order: Arc<parking_lot::Mutex<Vec<&'static str>>>,
+        order: Arc<Mutex<Vec<&'static str>>>,
     }
 
     #[task]
     impl T2Task {
         async fn run(&self, x: &i32) -> i32 {
-            self.order.lock().push("t2_start");
+            self.order.lock().unwrap().push("t2_start");
             sleep(Duration::from_millis(10)).await;
             panic!("t2 fails with {x}");
         }
@@ -200,7 +176,7 @@ async fn test_error_propagation_timing() {
             let order = propagation_order.clone();
             move |x: &i32| {
                 let order = order.clone();
-                order.lock().push("t3_should_not_run");
+                order.lock().unwrap().push("t3_should_not_run");
                 x + 1
             }
         }))
@@ -210,7 +186,7 @@ async fn test_error_propagation_timing() {
         .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await;
 
-    let order = propagation_order.lock().clone();
+    let order = propagation_order.lock().unwrap().clone();
 
     // t1 completes, t2 starts and fails, t3 never runs
     assert!(order.contains(&"t1_complete"));

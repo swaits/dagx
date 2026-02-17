@@ -118,7 +118,7 @@ impl BuildProfile {
 
 #[tokio::main]
 async fn main() {
-    let dag = DagRunner::new();
+    let mut dag = DagRunner::new();
 
     // Multiple independent source tasks
     let name = dag.add_task(FetchName);
@@ -133,10 +133,11 @@ async fn main() {
 
     // Run the DAG
     println!("Running fan-in DAG...\n");
-    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+    let mut output = dag
+        .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await
         .unwrap();
 
     // Print result
-    println!("\n{}", dag.get(profile).unwrap());
+    println!("\n{}", output.get(profile).unwrap());
 }

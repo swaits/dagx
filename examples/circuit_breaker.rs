@@ -381,7 +381,7 @@ async fn main() {
         // Create shared circuit breaker: 3 failures trigger open, 3 second recovery timeout
         let circuit = Arc::new(CircuitBreaker::new(3, Duration::from_secs(3)));
 
-        let dag = DagRunner::new();
+        let mut dag = DagRunner::new();
 
         // Request 1: Success (circuit closed)
         let call1 = dag.add_task(ProtectedServiceCall::new(
@@ -390,56 +390,60 @@ async fn main() {
             false, // success
         ));
 
-        dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+        let mut output = dag
+            .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
             .await
             .unwrap();
 
-        println!("Result 1: {:?}\n", dag.get(call1).unwrap());
+        println!("Result 1: {:?}\n", output.get(call1).unwrap());
 
         // Request 2: Failure (circuit closed, count = 1)
-        let dag = DagRunner::new();
+        let mut dag = DagRunner::new();
         let call2 = dag.add_task(ProtectedServiceCall::new(
             "ServiceCall-2",
             circuit.clone(),
             true, // fail
         ));
 
-        dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+        let mut output = dag
+            .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
             .await
             .unwrap();
 
-        println!("Result 2: {:?}\n", dag.get(call2).unwrap());
+        println!("Result 2: {:?}\n", output.get(call2).unwrap());
 
         // Request 3: Failure (circuit closed, count = 2)
-        let dag = DagRunner::new();
+        let mut dag = DagRunner::new();
         let call3 = dag.add_task(ProtectedServiceCall::new(
             "ServiceCall-3",
             circuit.clone(),
             true, // fail
         ));
 
-        dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+        let mut output = dag
+            .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
             .await
             .unwrap();
 
-        println!("Result 3: {:?}\n", dag.get(call3).unwrap());
+        println!("Result 3: {:?}\n", output.get(call3).unwrap());
 
         // Request 4: Failure (circuit closed, count = 3, opens!)
-        let dag = DagRunner::new();
+        let mut dag = DagRunner::new();
         let call4 = dag.add_task(ProtectedServiceCall::new(
             "ServiceCall-4",
             circuit.clone(),
             true, // fail
         ));
 
-        dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+        let mut output = dag
+            .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
             .await
             .unwrap();
 
-        println!("Result 4: {:?}\n", dag.get(call4).unwrap());
+        println!("Result 4: {:?}\n", output.get(call4).unwrap());
 
         // Request 5: Circuit is now open, fails fast with fallback
-        let dag = DagRunner::new();
+        let mut dag = DagRunner::new();
         let call5 = dag.add_task(ProtectedServiceCall::new(
             "ServiceCall-5",
             circuit.clone(),
@@ -450,11 +454,12 @@ async fn main() {
             .add_task(FallbackService::new("ServiceCall-5"))
             .depends_on(call5);
 
-        dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+        let mut output = dag
+            .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
             .await
             .unwrap();
 
-        println!("Result 5: {:?}\n", dag.get(fallback5).unwrap());
+        println!("Result 5: {:?}\n", output.get(fallback5).unwrap());
 
         // Example 2: Circuit recovery after timeout
         println!("Example 2: Circuit recovery after timeout\n");
@@ -462,32 +467,34 @@ async fn main() {
         sleep(Duration::from_secs(3)).await;
 
         // Request 6: Circuit should be half-open, test succeeds, closes circuit
-        let dag = DagRunner::new();
+        let mut dag = DagRunner::new();
         let call6 = dag.add_task(ProtectedServiceCall::new(
             "ServiceCall-6",
             circuit.clone(),
             false, // success
         ));
 
-        dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+        let mut output = dag
+            .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
             .await
             .unwrap();
 
-        println!("Result 6: {:?}\n", dag.get(call6).unwrap());
+        println!("Result 6: {:?}\n", output.get(call6).unwrap());
 
         // Request 7: Circuit is now closed again, normal operation
-        let dag = DagRunner::new();
+        let mut dag = DagRunner::new();
         let call7 = dag.add_task(ProtectedServiceCall::new(
             "ServiceCall-7",
             circuit.clone(),
             false, // success
         ));
 
-        dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+        let mut output = dag
+            .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
             .await
             .unwrap();
 
-        println!("Result 7: {:?}\n", dag.get(call7).unwrap());
+        println!("Result 7: {:?}\n", output.get(call7).unwrap());
     }
 
     println!("=== Circuit Breaker Example Complete ===");

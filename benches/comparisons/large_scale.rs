@@ -17,12 +17,13 @@ pub fn bench_large_scale(c: &mut Criterion) {
                 use dagx::DagRunner;
                 use dagx_test::task_fn;
 
-                let dag = DagRunner::new();
+                let mut dag = DagRunner::new();
                 for i in 0..10_000 {
                     dag.add_task(task_fn::<(), _, _>(move |_: ()| i * 2));
                 }
 
-                dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+                let _output = dag
+                    .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
                     .await
                     .unwrap();
             })

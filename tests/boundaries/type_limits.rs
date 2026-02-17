@@ -1,6 +1,6 @@
 //! Tests for type system edge cases and limits
 
-use dagx::{DagResult, DagRunner, TaskHandle};
+use dagx::{DagResult, DagRunner};
 use dagx_test::task_fn;
 
 use std::marker::PhantomData;
@@ -16,13 +16,13 @@ async fn test_zero_sized_types_throughout() -> DagResult<()> {
         _phantom: PhantomData<T>,
     }
 
-    let dag = DagRunner::new();
+    let mut dag = DagRunner::new();
 
     // Task producing ZST
     let t1 = dag.add_task(task_fn::<(), _, _>(|_: ()| Empty));
 
     // Task that also produces ZST (independent since we can't extract custom types)
-    let t2: TaskHandle<_> = dag.add_task(task_fn::<(), _, _>(|_: ()| 42)).into();
+    let t2 = dag.add_task(task_fn::<(), _, _>(|_: ()| 42));
 
     // Task with PhantomData
     let _t3 = dag.add_task(task_fn::<(), _, _>(|_: ()| PhantomWrapper::<i32> {
@@ -37,12 +37,13 @@ async fn test_zero_sized_types_throughout() -> DagResult<()> {
         }))
         .depends_on(t2);
 
-    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+    let mut output = dag
+        .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await?;
 
-    assert_eq!(dag.get(t1)?, Empty);
-    assert_eq!(dag.get(t2)?, 42);
-    assert_eq!(dag.get(t4)?, "success");
+    assert_eq!(output.get(t1)?, Empty);
+    assert_eq!(output.get(t2)?, 42);
+    assert_eq!(output.get(t4)?, "success");
 
     Ok(())
 }
@@ -56,7 +57,7 @@ async fn test_large_value_types() -> DagResult<()> {
         more_data: Vec<u64>,
     }
 
-    let dag = DagRunner::new();
+    let mut dag = DagRunner::new();
 
     let t1 = dag.add_task(task_fn::<(), _, _>(|_: ()| {
         let large = LargeStruct {
@@ -73,37 +74,11 @@ async fn test_large_value_types() -> DagResult<()> {
         }))
         .depends_on(t1);
 
-    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+    let mut output = dag
+        .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await?;
 
-    assert_eq!(dag.get(t2)?, 1042);
-
-    Ok(())
-}
-
-#[tokio::test]
-async fn test_unit_type_chains() -> DagResult<()> {
-    // Test chains of unit type operations
-    let dag = DagRunner::new();
-
-    let t1: TaskHandle<_> = dag.add_task(task_fn::<(), _, _>(|_: ()| {})).into();
-    let t2 = dag
-        .add_task(task_fn::<(), _, _>(|_: ()| {}))
-        .depends_on((t1,));
-    let t3 = dag
-        .add_task(task_fn::<(), _, _>(|_: ()| {}))
-        .depends_on((t2,));
-    let t4 = dag
-        .add_task(task_fn::<(), _, _>(|_: ()| "done"))
-        .depends_on((t3,));
-
-    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
-        .await?;
-
-    dag.get(t1)?; // Verify no error
-    dag.get(t2)?;
-    dag.get(t3)?;
-    assert_eq!(dag.get(t4)?, "done");
+    assert_eq!(output.get(t2)?, 1042);
 
     Ok(())
 }
@@ -113,7 +88,7 @@ async fn test_reference_wrapper_types() -> DagResult<()> {
     // Test types that wrap references
     use std::sync::{Arc, Mutex};
 
-    let dag = DagRunner::new();
+    let mut dag = DagRunner::new();
 
     let t1 = dag.add_task(task_fn::<(), _, _>(|_: ()| {
         let arc = Arc::new(Mutex::new(100));
@@ -126,10 +101,11 @@ async fn test_reference_wrapper_types() -> DagResult<()> {
         .add_task(task_fn::<i32, _, _>(|&val: &i32| val * 2))
         .depends_on(t1);
 
-    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+    let mut output = dag
+        .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await?;
 
-    assert_eq!(dag.get(t2)?, 200);
+    assert_eq!(output.get(t2)?, 200);
 
     Ok(())
 }

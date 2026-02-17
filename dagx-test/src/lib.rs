@@ -5,6 +5,8 @@
 
 #![cfg(not(tarpaulin_include))]
 
+use std::marker::PhantomData;
+
 use crate::extract::ExtractInput;
 
 use dagx::{Task, TaskInput};
@@ -18,7 +20,7 @@ where
     O: Send,
 {
     f: F,
-    _phantom: std::marker::PhantomData<fn(I) -> O>,
+    _phantom: PhantomData<fn(I) -> O>,
 }
 
 impl<I, O, F> Task<I::Input> for TaskFn<I, O, F>
@@ -45,6 +47,6 @@ where
 {
     TaskFn {
         f,
-        _phantom: std::marker::PhantomData,
+        _phantom: PhantomData,
     }
 }

@@ -12,7 +12,7 @@ pub fn bench_10k_breakdown(c: &mut Criterion) {
     // a) Adding 10k tasks (construction only)
     group.bench_function("construction", |b| {
         b.iter(|| {
-            let dag = DagRunner::new();
+            let mut dag = DagRunner::new();
             for i in 0..10_000 {
                 dag.add_task(task_fn::<(), _, _>(move |_: ()| i));
             }
@@ -23,11 +23,12 @@ pub fn bench_10k_breakdown(c: &mut Criterion) {
     group.bench_function("full_execution", |b| {
         b.iter(|| {
             rt.block_on(async {
-                let dag = DagRunner::new();
+                let mut dag = DagRunner::new();
                 for i in 0..10_000 {
                     dag.add_task(task_fn::<(), _, _>(move |_: ()| i));
                 }
-                dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+                let _output = dag
+                    .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
                     .await
                     .unwrap();
             })
@@ -38,7 +39,7 @@ pub fn bench_10k_breakdown(c: &mut Criterion) {
     group.bench_function("execution_only", |b| {
         b.iter_batched(
             || {
-                let dag = DagRunner::new();
+                let mut dag = DagRunner::new();
                 for i in 0..10_000 {
                     dag.add_task(task_fn::<(), _, _>(move |_: ()| i));
                 }
@@ -46,7 +47,8 @@ pub fn bench_10k_breakdown(c: &mut Criterion) {
             },
             |dag| {
                 rt.block_on(async {
-                    dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+                    let _output = dag
+                        .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
                         .await
                         .unwrap();
                 })

@@ -541,11 +541,12 @@
 //! # let mut dag = DagRunner::new();
 //! # let node = dag.add_task(Value(42));
 //! // Simple approach with .unwrap()
-//!let mut output = dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await.unwrap();
+//! let mut output = dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await.unwrap();
 //! let result = output.get(node).unwrap();
+//! # let mut dag = DagRunner::new();
 //!
 //! // Or handle errors explicitly
-//! matchlet mut output = dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await {
+//! match dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await {
 //!     Ok(_) => println!("DAG executed successfully"),
 //!     Err(e) => eprintln!("DAG execution failed: {}", e),
 //! }

@@ -3,7 +3,6 @@
 //! Long sequential chain: 100 tasks in sequence
 
 use criterion::Criterion;
-use dagx::TaskHandle;
 
 pub fn bench_deep_chain(c: &mut Criterion) {
     let rt = tokio::runtime::Runtime::new().unwrap();
@@ -16,9 +15,9 @@ pub fn bench_deep_chain(c: &mut Criterion) {
                 use dagx::DagRunner;
                 use dagx_test::task_fn;
 
-                let dag = DagRunner::new();
+                let mut dag = DagRunner::new();
 
-                let first: TaskHandle<_> = dag.add_task(task_fn::<(), _, _>(|_: ()| 0)).into();
+                let first = dag.add_task(task_fn::<(), _, _>(|_: ()| 0));
                 let mut prev = dag
                     .add_task(task_fn::<i32, _, _>(|&x: &i32| x + 1))
                     .depends_on(first);
@@ -29,10 +28,11 @@ pub fn bench_deep_chain(c: &mut Criterion) {
                         .depends_on(prev);
                 }
 
-                dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
+                let mut output = dag
+                    .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
                     .await
                     .unwrap();
-                dag.get(prev).unwrap()
+                output.get(prev).unwrap()
             })
         });
     });

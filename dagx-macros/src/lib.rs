@@ -152,8 +152,7 @@ use syn::{parse_macro_input, FnArg, Ident, ImplItem, ItemImpl, Pat, PatType, Ret
 /// }
 ///
 /// // Generated:
-/// impl Task for Add {
-///     type Input = (i32, i32);
+/// impl Task<(i32, i32)> for Add {
 ///     type Output = i32;
 ///
 ///     async fn run(&mut self, input: Self::Input) -> Self::Output {
@@ -183,8 +182,7 @@ use syn::{parse_macro_input, FnArg, Ident, ImplItem, ItemImpl, Pat, PatType, Ret
 /// }
 ///
 /// // Generated:
-/// impl Task for Counter {
-///     type Input = i32;
+/// impl Task<(i32)> for Counter {
 ///     type Output = i32;
 ///
 ///     async fn run(&mut self, input: Self::Input) -> Self::Output {
