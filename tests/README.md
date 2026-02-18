@@ -4,22 +4,6 @@
 
 Integration and performance tests for dagx. Unit tests live in `src/{module}/tests.rs`.
 
-## Directory Structure
-
-```
-tests/
-├── common/          # Shared test utilities
-├── dependencies/    # Dependency resolution tests
-├── execution/       # Task execution and DAG running
-├── parallelism/     # Parallel execution verification
-├── panic/           # Panic handling and isolation
-├── performance/     # Stress tests and benchmarks
-├── runtimes/        # Runtime compatibility tests
-├── task_patterns/   # Common task pattern tests
-├── type_safety/     # Type system validation
-└── lib_tests.rs     # Main test entry point
-```
-
 ## Running Tests
 
 ```bash
@@ -56,18 +40,16 @@ cargo test --release -- --ignored
 
 ### Integration Tests (`tests/`)
 
-- **execution**: End-to-end DAG execution
+- **boundaries**: Edge cases (very large/very small graphs)
 - **dependencies**: Complex dependency graphs
+- **errors**: Error handling
+- **execution**: End-to-end DAG execution
+- **interleaving**: Layer interleaving patterns
 - **parallelism**: Concurrent task execution
-- **panic**: Error propagation and isolation
-- **performance**: Large DAGs and stress tests
-- **runtimes**: Tokio, async-std, smol compatibility
-- **task_patterns**: Common usage patterns
-- **type_safety**: Type system guarantees
+- **runtimes**: Tokio, smol compatibility
+- **tracing**: Execution observability
 
 ## Writing Tests
-
-Integration tests use common utilities from `tests/common/mod.rs`.
 
 Unit tests should:
 

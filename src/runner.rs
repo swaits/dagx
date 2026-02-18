@@ -2,8 +2,6 @@
 //!
 //! Provides DagRunner for building and executing directed acyclic graphs of async tasks
 //! with compile-time type-safe dependencies.
-//!
-//! Uses Mutex for interior mutability to enable builder pattern (`&self` instead of `&mut self`).
 
 use std::any::Any;
 use std::collections::{HashMap, HashSet, VecDeque};
@@ -23,6 +21,7 @@ use crate::error::{DagError, DagResult};
 use crate::node::{ExecutableNode, TypedNode};
 use crate::DagOutput;
 
+/// Fast hasher using values as hashes
 #[derive(Default, Clone)]
 pub(crate) struct PassThroughHasher {
     hash: u64,
@@ -82,7 +81,6 @@ pub(crate) type PassThroughHashMap<K, V> = HashMap<K, V, PassThroughHasher>;
 ///     async fn run(&mut self) -> i32 { self.value }
 /// }
 ///
-/// // Unit struct - no fields needed
 /// struct Add;
 ///
 /// #[task]
@@ -103,17 +101,12 @@ pub(crate) type PassThroughHashMap<K, V> = HashMap<K, V, PassThroughHasher>;
 /// assert_eq!(output.get(sum).unwrap(), 5);
 /// # };
 /// ```
-///
-/// Uses Mutex for interior mutability to enable the builder pattern (`&self` not `&mut self`).
-/// This allows fluent chaining of `add_task()` calls.
-///
-/// Nodes use Option to allow taking ownership during execution.
-/// Outputs are Arc-wrapped and stored separately for retrieval via get().
-/// Arc enables efficient sharing during fanout without cloning data.
 pub struct DagRunner {
     pub(crate) nodes: Vec<Option<Box<dyn ExecutableNode + Sync>>>,
-    pub(crate) edges: PassThroughHashMap<NodeId, Vec<NodeId>>, // node -> dependencies
-    pub(crate) dependents: PassThroughHashMap<NodeId, Vec<NodeId>>, // node -> tasks that depend on it
+    /// node -> dependencies
+    pub(crate) edges: PassThroughHashMap<NodeId, Vec<NodeId>>,
+    /// node -> tasks that depend on it
+    pub(crate) dependents: PassThroughHashMap<NodeId, Vec<NodeId>>,
 }
 
 impl Default for DagRunner {
@@ -143,8 +136,8 @@ impl DagRunner {
     /// Add a task instance to the DAG, returning a node builder for wiring dependencies.
     ///
     /// If the task has no dependencies, a [`crate::TaskHandle`] will be returned.
-    /// If not, the returned [`crate::TaskBuilder`] can be used to
-    /// specify dependencies via [`crate::TaskBuilder::depends_on`].
+    /// If not, dependencies should be specified for the returned [`crate::TaskBuilder`]
+    /// using [`crate::TaskBuilder::depends_on`].
     ///
     /// # Examples
     ///
@@ -220,11 +213,9 @@ impl DagRunner {
 
     /// Run the entire DAG to completion using the provided spawner.
     ///
-    /// This method:
     /// - Executes tasks in topological order (respecting dependencies)
     /// - Runs ready tasks with maximum parallelism (executor-limited)
     /// - Executes each task at most once
-    /// - Waits for **all sinks** (tasks with no dependents) to complete
     /// - Is runtime-agnostic via the spawner function
     ///
     /// # Parameters
@@ -233,13 +224,11 @@ impl DagRunner {
     ///   and returns a handle to the task. This is the only way to run tasks on separate threads. Examples:
     ///   - Tokio: `|fut| { tokio::spawn(fut).await.unwrap() }`
     ///   - Smol: `|fut| { smol::spawn(fut) }`
-    ///   - Async-std: `|fut| { async_std::task::spawn(fut) }`
-    ///   - Single-threaded: `|fut| fut`
-    ///     - For computationally light tasks, concurrency without parallelism can be significantly faster.
+    ///   - Single-threaded on invoking runtime: `|fut| fut`
+    ///     - Can be faster in situations where waiting time dominates
     ///
     /// # Errors
     ///
-    /// - Returns `DagError::ConcurrentExecution` if the DAG is already executing
     /// - Returns `DagError::TaskPanicked` if any task panics during execution
     ///
     /// # Examples
@@ -298,36 +287,24 @@ impl DagRunner {
             HashMap::with_capacity_and_hasher(total_tasks, PassThroughHasher::default());
         let mut first_error = None;
 
+        // Panic handling is required to maintain behavioral consistency, as
+        // different async runtimes (Tokio, async-std, smol, embassy-rs) handle panics in
+        // spawned tasks differently.
+        //
+        // This ensures tasks behave in the same way whether executed inline or on the spawner
+        // across every runtime.
         for layer in layers {
             #[cfg(feature = "tracing")]
             {
                 debug!(task_count = layer.len(), "executing layer");
             }
-            // ============================================================================
-            // PERFORMANCE OPTIMIZATION: Inline execution for single-task layers
-            // ============================================================================
+            // Performance optimization: Inline execution for single-task layers
             //
             // When a layer contains exactly one task (common in deep chains, linear
             // pipelines), we execute it inline rather than spawning it. This provides
             // 10-100x performance improvements for sequential workloads by eliminating:
             //   - Task spawning overhead
             //   - Context switching to/from the runtime
-            //
-            // CRITICAL: Panic handling is required to maintain behavioral consistency.
-            // All async runtimes (Tokio, async-std, smol, embassy-rs) catch panics in
-            // spawned tasks and convert them to errors. We must do the same for inline
-            // execution to ensure tasks behave identically regardless of execution path.
-            //
-            // Without panic catching:
-            //   - Spawned task panics → caught by runtime → becomes error (expected)
-            //   - Inline task panics → bubbles up → crashes program (surprising!)
-            //
-            // With panic catching (current implementation):
-            //   - Spawned task panics → caught by runtime → becomes error
-            //   - Inline task panics → caught by us → becomes error (consistent!)
-            //
-            // This ensures the optimization is transparent to users.
-            // ============================================================================
             if layer.len() == 1 {
                 let node_id = layer[0];
 
@@ -348,11 +325,6 @@ impl DagRunner {
                         .collect();
 
                     // Execute inline with panic handling.
-                    //
-                    // FutureExt::catch_unwind() ensures panics are caught and converted to
-                    // DagError::TaskPanicked, matching the behavior of async runtimes when
-                    // they spawn tasks. This guarantees consistent error handling whether
-                    // a task executes inline (single-task layer) or spawned (multi-task layer).
                     let result = AssertUnwindSafe(node.execute_with_deps(dependencies))
                         .catch_unwind()
                         .await
@@ -461,7 +433,7 @@ impl DagRunner {
                 }
             }
 
-            // Return first error if any
+            // Return first error if any, aborting execution after this layer
             if let Some(err) = first_error {
                 #[cfg(feature = "tracing")]
                 error!(?err, "DAG execution failed");
@@ -475,7 +447,6 @@ impl DagRunner {
         Ok(DagOutput::new(outputs))
     }
 
-    #[inline]
     fn compute_layers(&self) -> DagResult<Vec<Vec<NodeId>>> {
         #[cfg(feature = "tracing")]
         debug!("computing topological layers");
@@ -541,10 +512,6 @@ impl DagRunner {
         //
         // This eliminates the need for runtime cycle detection, providing both
         // safety guarantees and performance benefits (no validation overhead).
-
-        // Compiler optimization barrier: ensures visited set is fully populated.
-        // This assertion compiles to nothing in release builds but guides the optimizer's
-        // understanding of the HashSet state, improving subsequent code generation.
         debug_assert!(!visited.is_empty() || layers.is_empty());
 
         #[cfg(feature = "tracing")]
@@ -553,9 +520,6 @@ impl DagRunner {
         Ok(layers)
     }
 }
-
-// Note: We cannot implement Default for DagRunner anymore since new() returns Arc<Self>.
-// Users should call DagRunner::new() directly.
 
 #[cfg(test)]
 mod tests;

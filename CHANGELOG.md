@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Now able to return bare tuples as task outputs
+- No longer able to create a DAG with cyclic dependencies ([#3](https://github.com/swaits/dagx/pull/3))
+- The `#[task]` macro no longer requires an explicit return type ([#2](https://github.com/swaits/dagx/pull/2))
+
+### Changed
+
+- Task inputs no longer need to be `Clone` ([#7](https://github.com/swaits/dagx/pull/7))
+- Building a DAG is now a single-threaded operation ([#12](https://github.com/swaits/dagx/pull/12))
+- Running a DAG now consumes the `DagRunner` and returns a `DagOutput` from which to get results ([#12](https://github.com/swaits/dagx/pull/12))
+- `#[task]` macro support is now gated behind the `derive` default feature
+- Tasks now receive input via the `TaskInput` type, which guarantees via the public API that dependencies can be extracted ([#7](https://github.com/swaits/dagx/pull/7))
+- Task outputs are now extracted as owned values, not clones of an Arc value ([#7](https://github.com/swaits/dagx/pull/7))
+
+### Internal
+
+- The `task_fn` macro has been extracted to the dagx-test crate
+- Task inputs are passed to tasks directly from the runner, not through channels ([#1](https://github.com/swaits/dagx/pull/1))
+- Redundant tests/examples/benchmarks removed to lower maintenance and refactor burden ([#11](https://github.com/swaits/dagx/pull/11))
+- parking_lot dependency removed ([#12](https://github.com/swaits/dagx/pull/12))
+- futures dependency replaced with futures-util ([#8](https://github.com/swaits/dagx/pull/8))
+
 ## [0.3.1] - 2025-10-10
 
 [View changes](https://github.com/swaits/dagx/compare/v0.3.0...v0.3.1)

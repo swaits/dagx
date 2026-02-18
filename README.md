@@ -10,34 +10,20 @@ A minimal, type-safe, runtime-agnostic async DAG (Directed Acyclic Graph) execut
 
 ## Why dagx?
 
-### 🚀 Blazing Fast: 1.04-129x faster than dagrs
+### Blazing Fast: 1-100x faster than dagrs
 
-| Workload          | Tasks  | dagx    | dagrs   | Speedup            |
-| ----------------- | ------ | ------- | ------- | ------------------ |
-| Sequential chain  | 5      | 3.0 µs  | 385 µs  | **129x faster** 🚀 |
-| Sequential chain  | 100    | 79 µs   | 703 µs  | **8.9x faster**    |
-| Diamond pattern   | 4      | 11 µs   | 387 µs  | **34x faster**     |
-| Fan-out (1→100)   | 101    | 155 µs  | 595 µs  | **3.85x faster**   |
-| Independent tasks | 10,000 | 12.7 ms | 13.3 ms | **1.04x faster**   |
+| Workload          | Tasks  | dagx      | dagrs     | Speedup            |
+| ----------------- | ------ | --------- | --------- | ------------------ |
+| Sequential chain  | 5      | 1.02 µs   | 770.42 µs | **755x faster** 🚀 |
+| Diamond pattern   | 4      | 5.16 µs   | 770.87 µs | **149x faster**    |
+| Sequential chain  | 100    | 25.09 µs  | 1.19 ms   | **47.4x faster**   |
+| Fan-out (1→100)   | 101    | 100.75 µs | 1.02 ms   | **10.1x faster**   |
+| Independent tasks | 10,000 | 8.61 ms   | 15.37 ms  | **1.79x faster**   |
 
-**Per-task overhead:**
-
-- Construction: ~100 ns/task
-- Inline execution (sequential): ~790 ns/task
-- Parallel execution: ~1.3 µs/task
-
-### 🛡️ Compile-Time Safety
-
-- **Cycles are impossible** — the type system prevents them at compile time, zero runtime overhead
-- **No runtime type errors** — dependencies validated at compile time
-- **Compiler-verified correctness** — no surprise failures in production
-
-See [how it works](docs/CYCLE_PREVENTION.md).
-
-### ✨ Simple API
+### Simple API
 
 ```rust
-let sum = dag.add_task(Add).depends_on((&x, &y));
+let sum = dag.add_task(Add).depends_on((x, y));
 dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await?;
 ```
 
@@ -87,8 +73,7 @@ async fn main() {
     let y = dag.add_task(Value(3));
 
     // Add task that depends on both x and y.
-    // Here, y could be reused as a dependency for other tasks, while x could not.
-    let sum = dag.add_task(Add).depends_on((x, &y));
+    let sum = dag.add_task(Add).depends_on((x, y));
 
     // Execute with true parallelism
     let mut output = dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await.unwrap();
@@ -98,33 +83,32 @@ async fn main() {
 }
 ```
 
-## Performance
-
-dagx provides true parallel execution with sub-microsecond overhead per task.
-
-**Why is dagx so fast?**
-
-- **Inline fast-path**: Sequential chains execute inline without spawning (8.9-129x faster)
-- **Adaptive execution**: Inline for sequential work, true parallelism for concurrent work
-- **Zero-cost abstractions**: Generics and monomorphization eliminate overhead
-
-See [design philosophy](docs/DESIGN_PHILOSOPHY.md) for details.
-
 ## Features
 
-- **Compile-time cycle prevention**: Type system makes cycles impossible — no runtime checks
-- **Compile-time type safety**: Dependencies validated at compile time, no runtime type errors
-- **Works with ANY type**: Custom types work automatically — just `Send + Sync + 'static`, no trait implementations needed
-- **Runtime-agnostic**: Works with Tokio, async-std, smol, or any async runtime
-- **True parallelism**: Tasks spawn to multiple threads for genuine parallel execution
-- **Type-state pattern**: API prevents incorrect wiring through compile-time errors
-- **Zero-cost abstractions**: Leverages generics and monomorphization for minimal overhead
-- **Flexible task patterns**: Supports stateless, read-only, and mutable state tasks
-- **Simple API**: Just `#[task]`, `DagRunner`, `TaskHandle`, and `TaskBuilder`
-- **Comprehensive error handling**: Result-based errors with actionable messages
-- **Optional tracing**: Zero-cost observability via optional `tracing` feature flag
+### Compile-Time Safety
 
-## Core Concepts
+- **Cycles are impossible** — the type system prevents them at compile time, zero runtime overhead
+- **No runtime type errors** — dependencies validated at compile time
+- **Compiler-verified correctness** — no surprise failures in production
+
+See [how it works](docs/CYCLE_PREVENTION.md).
+
+### Runtime Agnostic
+
+dagx works with any async runtime. Provide a spawner function to `run()`:
+
+```rust
+// With Tokio
+// The join handle result can be unwrapped because dagx catches panics internally
+dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await.unwrap();
+
+// With smol
+dag.run(|fut| smol::spawn(fut)).await.unwrap();
+
+// Single-threaded concurrency on the invoking runtime
+// Can be faster in situations where waiting time dominates
+dag.run(|fut| fut).await.unwrap()
+```
 
 ### Task Patterns
 
@@ -166,73 +150,41 @@ impl Counter {
 }
 ```
 
-### DagRunner
+### Tracing
 
-The `DagRunner` orchestrates task execution:
+dagx provides optional observability using the `tracing` crate, controlled by the `tracing` feature flag.
 
-```rust
-let mut dag = DagRunner::new();
-let handle = dag.add_task(MyTask::new());
+**Enabling Tracing**
+
+```toml
+[dependencies]
+dagx = { version = "0.3", features = ["tracing"] }
+tracing-subscriber = "0.3"
 ```
 
-### TaskHandle
+**Log Levels**
 
-A `TaskHandle<T>` is a typed reference to a task's output. Use it to wire dependencies and retrieve results:
+- **INFO**: DAG execution start/completion
+- **DEBUG**: Task additions, dependency wiring, layer computation
+- **TRACE**: Individual task execution (inline vs spawned), detailed execution flow
+- **ERROR**: Task panics, concurrent execution attempts
 
-```rust
-// Single dependency
-let task = dag.add_task(my_task).depends_on(&upstream);
+### Other
 
-// Multiple dependencies (order matters!)
-let task = dag.add_task(my_task).depends_on((&upstream1, &upstream2));
-```
+- **True parallelism**: Chosen runtime executes tasks concurrently and/or in parallel
+- **No boilerplate**: The `derive` feature and the `#[task]` macro are enabled by default to simplify task implementation.
 
-### Custom Types
+## Performance
 
-**dagx works with ANY type automatically!** As long as your type implements `Send + Sync + 'static`, it works seamlessly:
+dagx provides true parallel execution with sub-microsecond overhead per task.
 
-```rust
-struct User {
-    name: String,
-    age: u32,
-}
+**How is dagx so fast?**
 
-#[task]
-impl CreateUser {
-    async fn run(&self) -> User {
-        User { name: "Alice".to_string(), age: 30 }
-    }
-}
+- **Inline fast-path**: Sequential chains execute inline without spawning
+- **Adaptive execution**: Inline for sequential work, executor-agnostic parallelism for concurrent work
+- **Zero-cost abstractions**: Compile-time graph validation eliminates overhead
 
-#[task]
-impl ProcessUser {
-    async fn run(user: &User) -> String {
-        format!("{} is {} years old", user.name, user.age)
-    }
-}
-```
-
-**No trait implementations needed!** The `#[task]` macro generates type-specific extraction logic automatically. This includes nested structs, collections, enums, and any other type you define.
-
-### Runtime Agnostic
-
-dagx works with any async runtime. Provide a spawner function to `run()`:
-
-```rust
-// With Tokio
-// The join handle result can be unwrapped because dagx catches panics internally
-dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await.unwrap();
-
-// With async-std
-dag.run(|fut| async_std::task::spawn(fut)).await.unwrap();
-
-// With smol
-dag.run(|fut| smol::spawn(fut)).await.unwrap();
-
-// Single-threaded on the invoking runtime
-// Faster for situations with many computationally light tasks
-dag.run(|fut| fut).await.unwrap()
-```
+See [design philosophy](docs/DESIGN_PHILOSOPHY.md) for details.
 
 ## Tutorials & Examples
 
@@ -262,58 +214,17 @@ Real-world patterns:
 - [`data_pipeline.rs`](examples/data_pipeline.rs) - ETL data processing pipeline
 - [`error_handling.rs`](examples/error_handling.rs) - Error propagation and recovery
 
-Run any example: `cargo run --example custom_types`
+Run any example: `cargo run --example circuit_breaker`
 
-## Advanced Topics
+## Documentation
 
-Detailed documentation on dagx internals and advanced features:
+Full API documentation is available at [docs.rs/dagx](https://docs.rs/dagx).
+
+Detailed documentation on dagx's internals and advanced features:
 
 - [**Compile-Time Cycle Prevention**](docs/CYCLE_PREVENTION.md) - How the type system prevents cycles
 - [**Design Philosophy**](docs/DESIGN_PHILOSOPHY.md) - Primitives as scheduler, inline fast-path optimization
-- [**Tracing Support**](docs/TRACING.md) - Zero-cost observability with the `tracing` crate
 - [**Library Comparisons**](docs/COMPARISONS.md) - Detailed comparison with dagrs, async_dag, and others
-
-## Important Limitations
-
-### Tasks Cannot Return Bare Tuples
-
-Tasks cannot return bare tuples as output types. If you need to return multiple values, use one of these workarounds:
-
-**Option 1: Use a struct (recommended)**
-
-```rust
-struct UserData {
-    name: String,
-    age: i32,
-}
-
-struct FetchUser;
-
-#[task]
-impl FetchUser {
-    async fn run(id: &i32) -> UserData {
-        UserData {
-            name: "Alice".to_string(),
-            age: 30,
-        }
-    }
-}
-```
-
-**Option 2: Wrap in Result**
-
-```rust
-struct FetchData;
-
-#[task]
-impl FetchData {
-    async fn run(id: &i32) -> Result<(String, i32), String> {
-        Ok(("Alice".to_string(), 30))
-    }
-}
-```
-
-Structs are preferred because they're self-documenting and easier to refactor.
 
 ## When to Use dagx
 
@@ -346,15 +257,11 @@ xdg-open target/criterion/report/index.html
 start target/criterion/report/index.html
 ```
 
-_Benchmarks run on AMD Ryzen 7 7840U (Zen 4) @ 3.3GHz._
+_Benchmarks run on Intel i9-13950HX @ 5.5GHz._
 
 ## Code of Conduct
 
 This project follows the [Builder's Code of Conduct](https://builderscode.org).
-
-## Documentation
-
-Full API documentation is available at [docs.rs/dagx](https://docs.rs/dagx).
 
 ## Contributing
 

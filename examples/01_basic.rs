@@ -94,7 +94,7 @@ async fn main() {
             label: "Sum".to_string(),
         })
         .depends_on((x, y)); // Pass handles as a tuple
-                               // sum is now TaskHandle<i32>
+                             // sum is now TaskHandle<i32>
 
     // Step 6: Execute the DAG
     //

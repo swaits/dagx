@@ -8,7 +8,7 @@ dagx is a task execution library designed for safety and predictability. This do
 
 | Version | Supported          |
 | ------- | ------------------ |
-| 0.1.x   | :white_check_mark: |
+| 0.3.x   | :white_check_mark: |
 
 ## Security Model
 
@@ -17,10 +17,10 @@ dagx is a task execution library designed for safety and predictability. This do
 - **Compile-time type safety**: Dependencies are validated at compile time, preventing type errors
 - **Cycle detection**: Runtime detection of circular dependencies
 - **Memory safety**: Rust's ownership system prevents memory corruption
+- **Panic isolation**: Panics in any task will be caught and not propagated through the executor
 
 ### What dagx Does NOT Provide
 
-- **Panic isolation**: Panics in one task will propagate and may affect other tasks (see Panic Handling below)
 - **Resource limits**: No built-in timeout, memory limits, or CPU throttling
 - **Sandboxing**: Tasks run with full process privileges
 - **Authentication/Authorization**: No access control between tasks
@@ -30,15 +30,14 @@ dagx is a task execution library designed for safety and predictability. This do
 
 ### 1. Panic Handling
 
-**Current Behavior**: dagx does NOT isolate panics between tasks. If a task panics:
+**Current Behavior**: dagx isolates panics between tasks. If a task panics:
 
-- The panic will propagate through the executor
-- Other tasks in the same execution layer may or may not complete (timing-dependent)
-- The entire DAG execution will terminate
+- The panic will be caught and converted to a `TaskPanicked` error
+- Other tasks in the same execution layer will complete
+- The entire DAG execution will terminate after layer execution has finished and return **only the first panic**
 
 **Recommendation**:
 
-- Use `std::panic::catch_unwind` in tasks that may panic
 - Return `Result<T, E>` from tasks and handle errors explicitly
 - Test panic scenarios thoroughly
 
@@ -249,10 +248,9 @@ impl MonitoredTask {
 
 ### Known Limitations
 
-1. **No panic recovery**: Task panics will crash the DAG execution
-2. **No resource limits**: Tasks can consume unlimited CPU, memory, or time
-3. **No isolation**: All tasks run in the same process with same privileges
-4. **Shared executor**: Tasks compete for executor resources
+1. **No resource limits**: Tasks can consume unlimited CPU, memory, or time
+2. **No isolation**: All tasks run in the same process with same privileges
+3. **Shared executor**: Tasks compete for executor resources
 
 ### Not Security Features
 
@@ -302,7 +300,6 @@ Security updates will be:
 
 - [Rust Security Guidelines](https://anssi-fr.github.io/rust-guide/)
 - [OWASP Secure Coding Practices](https://owasp.org/www-project-secure-coding-practices-quick-reference-guide/)
-- [async-std Security](https://async.rs/security)
 - [Tokio Security](https://tokio.rs/tokio/topics/security)
 
 ## License

@@ -65,8 +65,8 @@ async fn test_tracing_inline_execution() {
 
     // Create a linear chain (should trigger inline execution)
     let a = dag.add_task(Value(1));
-    let b = dag.add_task(Add).depends_on((&a, &a));
-    let c = dag.add_task(Multiply).depends_on((&b, &b));
+    let b = dag.add_task(Add).depends_on((a, a));
+    let c = dag.add_task(Multiply).depends_on((b, b));
 
     let mut output = dag
         .run(|fut| async move { tokio::spawn(fut).await.unwrap() })

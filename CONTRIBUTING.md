@@ -29,8 +29,8 @@ cargo clippy -- -D warnings
 
 ```bash
 rustup component add rustfmt clippy
-cargo install cargo-llvm-cov  # For coverage
-cargo install cargo-audit     # For security checks
+cargo binstall cargo-tarpaulin # For coverage
+cargo binstall cargo-audit     # For security checks
 ```
 
 ## Making Changes
@@ -99,8 +99,6 @@ pub fn add_task<T: Task>(&self, task: T) -> TaskBuilder<T> {
 
 ```bash
 cargo test                           # Default (tokio)
-cargo test --test async_std_runtime  # async-std
-cargo test --test smol_runtime       # smol
 ```
 
 **Benchmarks:**
