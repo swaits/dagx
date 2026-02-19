@@ -6,7 +6,7 @@ use criterion::Criterion;
 
 pub fn bench_large_scale(c: &mut Criterion) {
     let rt = tokio::runtime::Runtime::new().unwrap();
-    let mut group = c.benchmark_group("large_scale_10k_tasks");
+    let mut group = c.benchmark_group("comparisons/large_scale_10k_tasks");
     group.sample_size(10);
     group.measurement_time(std::time::Duration::from_secs(20));
 

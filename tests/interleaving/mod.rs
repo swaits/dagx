@@ -255,7 +255,7 @@ async fn test_layered_interleaving() -> DagResult<()> {
             dag.add_task(Layer23Task {
                 active: layer_active.clone(),
             })
-            .depends_on((&layer1[idx], &layer1[idx + 1]))
+            .depends_on((layer1[idx], layer1[idx + 1]))
         })
         .collect();
 
@@ -264,7 +264,7 @@ async fn test_layered_interleaving() -> DagResult<()> {
         .add_task(Layer23Task {
             active: layer_active.clone(),
         })
-        .depends_on((&layer2[0], &layer2[1]));
+        .depends_on((layer2[0], layer2[1]));
 
     let mut output = dag
         .run(|fut| async move { tokio::spawn(fut).await.unwrap() })

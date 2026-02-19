@@ -54,7 +54,7 @@ async fn test_diamond_dependency() {
         .depends_on(a);
     let d = dag
         .add_task(task_fn::<(i32, i32), _, _>(|(x, y): (&i32, &i32)| x + y))
-        .depends_on((&b, &c));
+        .depends_on((b, c));
 
     let mut output = dag
         .run(|fut| async move { tokio::spawn(fut).await.unwrap() })

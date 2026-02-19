@@ -22,7 +22,7 @@ pub fn bench_diamond(c: &mut Criterion) {
                         .depends_on(source);
 
                     dag.add_task(task_fn::<(i32, i32), _, _>(|(l, r): (&i32, &i32)| l + r))
-                        .depends_on((&left, &right));
+                        .depends_on((left, right));
                 }
 
                 let _output = dag

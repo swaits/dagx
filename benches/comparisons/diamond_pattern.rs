@@ -6,7 +6,7 @@ use criterion::Criterion;
 
 pub fn bench_diamond_pattern(c: &mut Criterion) {
     let rt = tokio::runtime::Runtime::new().unwrap();
-    let mut group = c.benchmark_group("diamond_pattern");
+    let mut group = c.benchmark_group("comparisons/diamond_pattern");
 
     // dagx implementation
     group.bench_function("dagx", |b| {
@@ -26,7 +26,7 @@ pub fn bench_diamond_pattern(c: &mut Criterion) {
                     .depends_on(a);
                 let d = dag
                     .add_task(task_fn::<(i32, i32), _, _>(|(x, y): (&i32, &i32)| x + y))
-                    .depends_on((&b, &c));
+                    .depends_on((b, c));
 
                 let mut output = dag
                     .run(|fut| async move { tokio::spawn(fut).await.unwrap() })

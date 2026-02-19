@@ -7,82 +7,20 @@ use std::{any::Any, future::Future, marker::PhantomData, slice::Iter, sync::Arc}
 
 /// A unit of async work with typed inputs and outputs.
 ///
-/// Use the [`task`](crate::task) macro to implement this trait. The macro automatically
+/// Use the [`crate::task`] macro to implement this trait. The macro automatically
 /// derives `Input` and `Output` types from your `run()` method signature and generates
-/// type-specific extraction logic in `run()`.
+/// extraction logic in `run()`.
 ///
 /// **Custom types work automatically!** As long as your output type implements
-/// `Send + Sync + 'static`, the macro handles everything. No trait implementations needed!
+/// `Send + Sync + 'static`, the macro handles everything.
 ///
-/// # Task Patterns
-///
-/// dagx supports three main task patterns:
-///
-/// ## 1. Stateless Tasks (Pure Functions)
-///
-/// Tasks with no internal state - just transform inputs to outputs:
-///
-/// ```
-/// use dagx::{task, Task};
-///
-/// struct Add;
-///
-/// #[task]
-/// impl Add {
-///     async fn run(a: &i32, b: &i32) -> i32 {
-///         a + b
-///     }
-/// }
-/// ```
-///
-/// ## 2. Stateful Tasks with Shared State (`&self`)
-///
-/// Tasks that read from internal state but don't modify it:
-///
-/// ```
-/// use dagx::{task, Task};
-///
-/// struct Multiplier {
-///     factor: i32,
-/// }
-///
-/// #[task]
-/// impl Multiplier {
-///     async fn run(&self, input: &i32) -> i32 {
-///         input * self.factor
-///     }
-/// }
-/// ```
-///
-/// ## 3. Stateful Tasks with Mutable State (`&mut self`)
-///
-/// Tasks that modify internal state during execution:
-///
-/// ```
-/// use dagx::{task, Task};
-///
-/// struct Counter {
-///     count: i32,
-/// }
-///
-/// #[task]
-/// impl Counter {
-///     async fn run(&mut self, increment: &i32) -> i32 {
-///         self.count += increment;
-///         self.count
-///     }
-/// }
-/// ```
+/// **Note:** When implementing this trait manually for a task with a single dependency, the Input type must be (T,) instead of T.
 ///
 /// # Input Patterns
 ///
 /// - `()`: No dependencies (source task)
 /// - `&T`: Single dependency
 /// - `&A, &B, &C, ...`: Multiple dependencies (up to 8, order matters)
-///
-/// # The Underlying Trait
-///
-/// The `#[task]` macro generates an implementation of this trait:
 ///
 /// # Output Wrapping
 ///
@@ -101,6 +39,17 @@ where
     fn run(self, input: TaskInput<Input>) -> impl Future<Output = Self::Output> + Send;
 }
 
+/// Linear type providing a [`Task`] access to its dependencies.
+///
+/// The framework ensures that all dependencies will be present when this task runs, and
+/// can be retrieved with [`TaskInput::next`]. The nth call to `next` consumes this TaskInput instances and returns a
+/// (&T, TaskInput) tuple with the nth dependency specified in the call to [`crate::TaskBuilder::depends_on`] and a
+/// TaskInput with the remaining dependencies.
+///
+/// No dependencies can be retrieved from an empty TaskInput (Input = ()).
+///
+/// **Note:** Calling [`std::mem::forget`] on a `TaskInput` instance will make it impossible to retrieve outputs of dependencies.
+/// There's no reason to ever do this.
 pub struct TaskInput<'inputs, Input: Send> {
     inputs: Iter<'inputs, Arc<dyn Any + Send + Sync + 'static>>,
     phantom: PhantomData<Input>,
@@ -118,6 +67,7 @@ impl<'inputs, Input: Send> TaskInput<'inputs, Input> {
 macro_rules! impl_task_input {
     ($First:ident $(, $T:ident)*) => {
         impl<'inputs, $First: 'static + Send, $($T: 'static + Send),*> TaskInput<'inputs, ($First, $($T,)*)> {
+            /// Get a reference to the next dependency from this TaskInput, and a [`TaskInput`] instance with the remaining dependencies.
             #[must_use]
             pub fn next(mut self) -> (&'inputs $First, TaskInput<'inputs, ($($T,)*)>) {
                 let value = self.inputs.next().and_then(|value| value.downcast_ref()).unwrap();
@@ -139,15 +89,6 @@ impl_task_input!(A, B, C, D, E);
 impl_task_input!(A, B, C, D, E, F);
 impl_task_input!(A, B, C, D, E, F, G);
 impl_task_input!(A, B, C, D, E, F, G, H);
-
-impl TaskInput<'static, ()> {
-    pub fn empty() -> Self {
-        Self {
-            inputs: [].iter(),
-            phantom: PhantomData,
-        }
-    }
-}
 
 #[cfg(test)]
 mod tests;

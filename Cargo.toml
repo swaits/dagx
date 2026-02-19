@@ -18,7 +18,8 @@ categories = ["asynchronous", "concurrency", "data-structures"]
 exclude = [".claude/", ".jj/", "dagx-spec.md"]
 
 [features]
-default = []
+default = ["derive"]
+derive = ["dep:dagx-macros"]
 tracing = ["dep:tracing"]
 
 [workspace.lints.rust]
@@ -32,7 +33,7 @@ workspace = true
 
 [dependencies]
 futures-util = { version = "0.3", default-features = false, features = ["std"] }
-dagx-macros = { version = "0.3.1", path = "./dagx-macros" }
+dagx-macros = { version = "0.3.1", path = "./dagx-macros", optional = true }
 tracing = { version = "0.1", optional = true }
 
 [dev-dependencies]

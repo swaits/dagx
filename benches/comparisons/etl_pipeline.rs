@@ -6,7 +6,7 @@ use criterion::Criterion;
 
 pub fn bench_etl_pipeline(c: &mut Criterion) {
     let rt = tokio::runtime::Runtime::new().unwrap();
-    let mut group = c.benchmark_group("etl_pipeline");
+    let mut group = c.benchmark_group("comparisons/etl_pipeline");
 
     // dagx implementation
     group.bench_function("dagx", |b| {
@@ -51,7 +51,7 @@ pub fn bench_etl_pipeline(c: &mut Criterion) {
                             result
                         },
                     ))
-                    .depends_on((&transform1, &transform2, &transform3));
+                    .depends_on((transform1, transform2, transform3));
 
                 // Validate
                 let validate = dag

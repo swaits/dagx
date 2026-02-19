@@ -42,7 +42,7 @@ pub fn bench_mixed_patterns(c: &mut Criterion) {
                             format!("Matches: {}, Total bytes: {}, Count: {}", a1, a2, a3)
                         },
                     ))
-                    .depends_on((&analysis1, &analysis2, &analysis3));
+                    .depends_on((analysis1, analysis2, analysis3));
 
                 // Stage 4: Fan-out final report to multiple destinations
                 for i in 0..3 {

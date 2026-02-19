@@ -155,9 +155,10 @@ use syn::{parse_macro_input, FnArg, Ident, ImplItem, ItemImpl, Pat, PatType, Ret
 /// impl Task<(i32, i32)> for Add {
 ///     type Output = i32;
 ///
-///     async fn run(&mut self, input: Self::Input) -> Self::Output {
-///         let (a, b) = input;
-///         Self::run_impl(&a, &b).await
+///     async fn run(&mut self, _input: Self::Input) -> Self::Output {
+///         let (a, _input) = _input.next();
+///         let (b, _input) = _input.next();
+///         Self::run_impl(a, b).await
 ///     }
 /// }
 ///
@@ -165,36 +166,6 @@ use syn::{parse_macro_input, FnArg, Ident, ImplItem, ItemImpl, Pat, PatType, Ret
 ///     #[inline]
 ///     async fn run_impl(a: &i32, b: &i32) -> i32 {
 ///         a + b
-///     }
-/// }
-/// ```
-///
-/// For stateful tasks (with &mut self):
-///
-/// ```ignore
-/// // Your code:
-/// #[task]
-/// impl Counter {
-///     async fn run(&mut self, inc: &i32) -> i32 {
-///         self.count += inc;
-///         self.count
-///     }
-/// }
-///
-/// // Generated:
-/// impl Task<(i32)> for Counter {
-///     type Output = i32;
-///
-///     async fn run(&mut self, input: Self::Input) -> Self::Output {
-///         let inc = input;
-///         self.run_impl(&inc).await
-///     }
-/// }
-///
-/// impl Counter {
-///     async fn run_impl(&mut self, inc: &i32) -> i32 {
-///         self.count += inc;
-///         self.count
 ///     }
 /// }
 /// ```
@@ -273,18 +244,7 @@ pub fn task(_attr: TokenStream, item: TokenStream) -> TokenStream {
     // Extract return type
     let output_type = match &run_method.sig.output {
         ReturnType::Default => syn::parse_quote!(()),
-        ReturnType::Type(_, ty) => {
-            if let Type::Tuple(_tuple) = &**ty {
-                return syn::Error::new_spanned(
-                    ty,
-                    "Returning bare tuples from task functions is currently not supported.\n\n\
-                         Please wrap this in a newtype or struct.",
-                )
-                .into_compile_error()
-                .into();
-            }
-            ty.clone()
-        }
+        ReturnType::Type(_, ty) => ty.clone(),
     };
 
     // Build Input type based on parameter count
@@ -299,7 +259,7 @@ pub fn task(_attr: TokenStream, item: TokenStream) -> TokenStream {
                 let ident = Ident::new(&format!("__dagx_extract_{}", ident), Span::mixed_site());
                 (
                     quote! {
-                        let (#ident, input) = input.next();
+                        let (#ident, _input) = _input.next();
                     },
                     ident,
                 )
@@ -333,7 +293,7 @@ pub fn task(_attr: TokenStream, item: TokenStream) -> TokenStream {
         impl ::dagx::Task<#input_type> for #struct_name {
             type Output = #output_type;
 
-            async fn run(mut self, mut input: ::dagx::TaskInput<'_, #input_type>) -> Self::Output {
+            async fn run(mut self, mut _input: ::dagx::TaskInput<'_, #input_type>) -> Self::Output {
                 #param_destructure
                 #run_call
             }

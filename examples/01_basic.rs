@@ -93,8 +93,8 @@ async fn main() {
         .add_task(Add {
             label: "Sum".to_string(),
         })
-        .depends_on((&x, &y)); // Pass handles as a tuple
-                               // sum is now TaskHandle<i32>
+        .depends_on((x, y)); // Pass handles as a tuple
+                             // sum is now TaskHandle<i32>
 
     // Step 6: Execute the DAG
     //

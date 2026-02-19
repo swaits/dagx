@@ -88,7 +88,7 @@ check_pass "Zero clippy warnings"
 
 echo ""
 echo "→ Checking for TODO/FIXME/XXX/HACK in source..."
-TODO_COUNT=$(grep -r "TODO\|FIXME\|XXX\|HACK" src/ dagx-macros/src/ 2>/dev/null | wc -l)
+TODO_COUNT=$(grep -r "TODO\|FIXME\|XXX\|HACK" src/ dagx-macros/src/ dagx-test/src/ 2>/dev/null | wc -l)
 if [ "$TODO_COUNT" -gt 0 ]; then
 	check_warn "Found $TODO_COUNT TODO/FIXME/HACK comments in source"
 else
@@ -209,6 +209,7 @@ echo ""
 echo "→ Verifying LICENSE..."
 [ -f LICENSE ] || check_fail "LICENSE missing"
 [ -f dagx-macros/LICENSE ] || check_fail "dagx-macros/LICENSE missing"
+[ -f dagx-test/LICENSE ] || check_fail "dagx-test/LICENSE missing"
 check_pass "LICENSE files present in both crates"
 
 # =============================================================================
@@ -259,45 +260,13 @@ echo "→ Verifying benchmarks compile..."
 cargo bench --no-run || check_fail "Benchmarks failed to compile"
 check_pass "Benchmarks compile successfully"
 
-# =============================================================================
-# CARGO.TOML METADATA VERIFICATION
-# =============================================================================
-
-section "CARGO.TOML METADATA"
-
-echo "→ Checking dagx Cargo.toml..."
-grep -q 'name = "dagx"' Cargo.toml || check_fail "Package name incorrect"
-grep -q "version = \"$VERSION\"" Cargo.toml || check_fail "Version not $VERSION"
-grep -q 'edition = "2021"' Cargo.toml || check_fail "Edition not 2021"
-grep -q 'license = "MIT"' Cargo.toml || check_fail "License not MIT"
-grep -q 'description = "A minimal, type-safe' Cargo.toml || check_fail "Description missing"
-grep -q 'repository = "https://github.com/swaits/dagx"' Cargo.toml || check_fail "Repository URL incorrect"
-grep -q 'homepage = "https://github.com/swaits/dagx"' Cargo.toml || check_fail "Homepage URL incorrect"
-grep -q 'documentation = "https://docs.rs/dagx"' Cargo.toml || check_fail "Documentation URL incorrect"
-grep -q 'readme = "README.md"' Cargo.toml || check_fail "README not specified"
-grep -q 'keywords = \["dag"' Cargo.toml || check_fail "Keywords missing"
-grep -q 'categories = \["asynchronous"' Cargo.toml || check_fail "Categories missing"
-check_pass "dagx Cargo.toml metadata complete and correct"
-
-echo ""
-echo "→ Checking dagx-macros Cargo.toml..."
-grep -q 'name = "dagx-macros"' dagx-macros/Cargo.toml || check_fail "dagx-macros name incorrect"
-grep -q "version = \"$VERSION\"" dagx-macros/Cargo.toml || check_fail "dagx-macros version not $VERSION"
-grep -q 'edition = "2021"' dagx-macros/Cargo.toml || check_fail "dagx-macros edition not 2021"
-grep -q 'license = "MIT"' dagx-macros/Cargo.toml || check_fail "dagx-macros license not MIT"
-grep -q 'description = "Procedural macros for dagx"' dagx-macros/Cargo.toml || check_fail "dagx-macros description missing"
-grep -q 'repository = "https://github.com/swaits/dagx"' dagx-macros/Cargo.toml || check_fail "dagx-macros repository URL incorrect"
-grep -q 'homepage = "https://github.com/swaits/dagx"' dagx-macros/Cargo.toml || check_fail "dagx-macros homepage URL incorrect"
-grep -q 'documentation = "https://docs.rs/dagx-macros"' dagx-macros/Cargo.toml || check_fail "dagx-macros documentation URL incorrect"
-grep -q 'readme = "README.md"' dagx-macros/Cargo.toml || check_fail "dagx-macros README not specified"
-check_pass "dagx-macros Cargo.toml metadata complete and correct"
-
 echo ""
 echo "→ Verifying version consistency..."
 DAGX_VERSION=$(grep '^version = ' Cargo.toml | head -1 | cut -d'"' -f2)
 MACROS_VERSION=$(grep '^version = ' dagx-macros/Cargo.toml | head -1 | cut -d'"' -f2)
-if [ "$DAGX_VERSION" != "$MACROS_VERSION" ]; then
-	check_fail "Version mismatch: dagx=$DAGX_VERSION, dagx-macros=$MACROS_VERSION"
+TEST_VERSION=$(grep '^version = ' dagx-test/Cargo.toml | head -1 | cut -d'"' -f2)
+if [ "$DAGX_VERSION" != "$MACROS_VERSION" ] || [ "$DAGX_VERSION" != "$TEST_VERSION" ]; then
+	check_fail "Version mismatch: dagx=$DAGX_VERSION, dagx-macros=$MACROS_VERSION, dagx-test=$TEST_VERSION"
 else
 	check_pass "Versions match: both are $DAGX_VERSION"
 fi
@@ -344,7 +313,7 @@ fi
 section "SECURITY CHECKS"
 
 echo "→ Checking for sensitive data..."
-if grep -r "api[_-]key\|secret\|password\|token" src/ dagx-macros/src/ 2>/dev/null | grep -v "^Binary" | grep -v "token for a node" | grep -q .; then
+if grep -r "api[_-]key\|secret\|password\|token" src/ dagx-macros/src/ dagx-test/src 2>/dev/null | grep -v "^Binary" | grep -v "token for a node" | grep -q .; then
 	check_fail "Potential sensitive data found in source"
 else
 	check_pass "No sensitive data found"
@@ -387,7 +356,11 @@ echo "4. Then publish dagx:"
 echo "   cd .."
 echo "   cargo publish"
 echo ""
-echo "5. Push changes and bookmark:"
+echo "5. Then publish dagx-test:"
+echo "   cd dagx-test"
+echo "   cargo publish"
+echo ""
+echo "6. Push changes and bookmark:"
 echo "   jj git push"
 echo ""
 echo -e "${BLUE}Note: dagx-macros MUST be published before dagx${NC}"

@@ -12,13 +12,14 @@ impl DagOutput {
     /// # Behavior
     ///
     /// All task outputs are stored after execution and can be retrieved via get().
-    /// Each task's output can only be taken once, after which it will return `DagError::ResultNotFound`.
+    /// Each task's output can only be retrieved once, after which it will return `DagError::ResultNotFound`.
     ///
     /// # Errors
     ///
     /// Returns `DagError::ResultNotFound` if:
     /// - The task hasn't been executed yet
     /// - The handle is invalid
+    /// - The output has already been retrieved
     ///
     /// # Examples
     ///
@@ -46,17 +47,12 @@ impl DagOutput {
     /// // Construct task with specific setting value
     /// let task = dag.add_task(Configuration::new(42));
     ///
-    ///let mut output = dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await.unwrap();
+    /// let mut output = dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await.unwrap();
     ///
     /// assert_eq!(output.get(task).unwrap(), 42);
     /// # };
     /// ```
-    pub fn get<T: 'static + Send + Sync, H>(&mut self, handle: H) -> DagResult<T>
-    where
-        H: Into<TaskHandle<T>>,
-    {
-        let handle: TaskHandle<T> = handle.into();
-
+    pub fn get<T: 'static + Send + Sync>(&mut self, handle: TaskHandle<T>) -> DagResult<T> {
         let arc_output = self
             .outputs
             .remove(&handle.id)

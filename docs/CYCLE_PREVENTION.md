@@ -26,12 +26,12 @@ let b_builder = dag.add_task(TaskB);
 
 // To make A depend on B, we need B as a TaskHandle.
 // But calling depends_on() consumes the builder!
-let b_handle = b_builder.depends_on(&some_source);
+let b_handle = b_builder.depends_on(some_source);
 
 // Now we can't make B depend on A because b_builder was moved!
 // This won't compile:
-// a_builder.depends_on(&b_handle);  // ✓ OK: A→B
-// b_handle.depends_on(&a_handle);   // ❌ ERROR: TaskHandle has no depends_on() method!
+// a_builder.depends_on(b_handle);  // ✓ OK: A→B
+// b_handle.depends_on(a_handle);   // ❌ ERROR: TaskHandle has no depends_on() method!
 ```
 
 ## How It Works: The Type-State Pattern
@@ -58,17 +58,15 @@ let b_builder = dag.add_task(TaskB);  // TaskBuilder
 let b_handle = b_builder.into();  // Convert B to TaskHandle (consumes builder)
 
 // To wire B→A, we need A as a TaskHandle
-let a_handle = a_builder.depends_on(&b_handle);  // A now depends on B
+let a_handle = a_builder.depends_on(b_handle);  // A now depends on B
 
 // Now if we try to complete the cycle:
-// a_handle.depends_on(&...);  // ❌ ERROR: no method named `depends_on` found
+// a_handle.depends_on(...);  // ❌ ERROR: no method named `depends_on` found
 ```
 
 **The type system enforces strict topological ordering!** You can't create a `TaskHandle` until all its dependencies exist as handles, which prevents cycles.
 
 ## Proof & Examples
-
-See [`src/cycle_prevention.rs`](../src/cycle_prevention.rs) for comprehensive documentation with `compile_fail` tests proving various cycle attempts don't compile.
 
 See [`tests/cycle_prevention.rs`](../tests/cycle_prevention.rs) for runtime tests demonstrating the type-state pattern in action.
 

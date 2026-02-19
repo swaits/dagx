@@ -54,7 +54,7 @@ async fn test_four_dependencies() -> DagResult<()> {
         .add_task(task_fn::<(i32, i32, i32, i32), _, _>(
             |(a, b, c, d): (&i32, &i32, &i32, &i32)| a + b + c + d,
         ))
-        .depends_on((&deps[0], &deps[1], &deps[2], &deps[3]));
+        .depends_on((deps[0], deps[1], deps[2], deps[3]));
 
     let mut output = dag
         .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
@@ -76,7 +76,7 @@ async fn test_five_dependencies() -> DagResult<()> {
         .add_task(task_fn::<(i32, i32, i32, i32, i32), _, _>(
             |(a, b, c, d, e): (&i32, &i32, &i32, &i32, &i32)| a + b + c + d + e,
         ))
-        .depends_on((&deps[0], &deps[1], &deps[2], &deps[3], &deps[4]));
+        .depends_on((deps[0], deps[1], deps[2], deps[3], deps[4]));
 
     let mut output = dag
         .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
@@ -98,7 +98,7 @@ async fn test_six_dependencies() -> DagResult<()> {
         .add_task(task_fn::<(i32, i32, i32, i32, i32, i32), _, _>(
             |(a, b, c, d, e, f): (&i32, &i32, &i32, &i32, &i32, &i32)| a + b + c + d + e + f,
         ))
-        .depends_on((&deps[0], &deps[1], &deps[2], &deps[3], &deps[4], &deps[5]));
+        .depends_on((deps[0], deps[1], deps[2], deps[3], deps[4], deps[5]));
 
     let mut output = dag
         .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
@@ -123,7 +123,7 @@ async fn test_seven_dependencies() -> DagResult<()> {
             },
         ))
         .depends_on((
-            &deps[0], &deps[1], &deps[2], &deps[3], &deps[4], &deps[5], &deps[6],
+            deps[0], deps[1], deps[2], deps[3], deps[4], deps[5], deps[6],
         ));
 
     let mut output = dag
@@ -149,7 +149,7 @@ async fn test_eight_dependencies() -> DagResult<()> {
             },
         ))
         .depends_on((
-            &deps[0], &deps[1], &deps[2], &deps[3], &deps[4], &deps[5], &deps[6], &deps[7],
+            deps[0], deps[1], deps[2], deps[3], deps[4], deps[5], deps[6], deps[7],
         ));
 
     let mut output = dag
