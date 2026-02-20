@@ -17,7 +17,7 @@ impl DepsTuple<()> for () {
 }
 
 // Implementation for single dependency (all forms)
-impl<O> DepsTuple<(O,)> for TaskHandle<O> {
+impl<O> DepsTuple<(O,)> for &TaskHandle<O> {
     fn to_node_ids(self) -> Vec<NodeId> {
         vec![self.id]
     }
@@ -28,14 +28,14 @@ impl<O> DepsTuple<(O,)> for TaskHandle<O> {
 /// This allows flexible dependency specification:
 /// ```ignore
 /// // Using handles
-/// task.depends_on((handle_a, handle_b))
+/// task.depends_on((&handle_a, &handle_b))
 ///
 /// // Using builders directly
 /// task.depends_on((dag.add_task(TaskA), dag.add_task(TaskB)))
 /// ```
 macro_rules! impl_deps_tuple {
     ($($O:ident),+) => {
-        impl<$($O),+> DepsTuple<($($O,)+)> for ($(TaskHandle<$O>,)+)
+        impl<$($O),+> DepsTuple<($($O,)+)> for ($(&TaskHandle<$O>,)+)
         {
             #[allow(non_snake_case)]
             fn to_node_ids(self) -> Vec<NodeId> {

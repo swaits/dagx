@@ -94,11 +94,11 @@ pub(crate) type PassThroughHashMap<K, V> = HashMap<K, V, PassThroughHasher>;
 /// // Construct instances using ::new() pattern
 /// let x = dag.add_task(LoadValue::new(2));
 /// let y = dag.add_task(LoadValue::new(3));
-/// let sum = dag.add_task(Add).depends_on((x, y));
+/// let sum = dag.add_task(Add).depends_on((&x, &y));
 ///
 ///let mut output = dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await.unwrap();
 ///
-/// assert_eq!(output.get(sum).unwrap(), 5);
+/// assert_eq!(output.get(sum), 5);
 /// # };
 /// ```
 pub struct DagRunner {
@@ -183,10 +183,10 @@ impl DagRunner {
     /// let base = dag.add_task(LoadValue::new(10));
     ///
     /// // Construct task with offset of 1
-    /// let inc = dag.add_task(AddOffset::new(1)).depends_on(base);
+    /// let inc = dag.add_task(AddOffset::new(1)).depends_on(&base);
     ///
     ///let mut output = dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await.unwrap();
-    /// assert_eq!(output.get(inc).unwrap(), 11);
+    /// assert_eq!(output.get(inc), 11);
     /// # };
     /// ```
     pub fn add_task<'dag, Input, Tk>(&'dag mut self, task: Tk) -> Tk::Retval<'dag>
@@ -257,7 +257,7 @@ impl DagRunner {
     ///
     /// let a = dag.add_task(Value(1));
     /// let b = dag.add_task(Value(2));
-    /// let sum = dag.add_task(Add).depends_on((a, b));
+    /// let sum = dag.add_task(Add).depends_on((&a, &b));
     ///
     ///let mut output = dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await.unwrap(); // Executes all tasks
     /// # };

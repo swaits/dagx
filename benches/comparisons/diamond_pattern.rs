@@ -20,19 +20,19 @@ pub fn bench_diamond_pattern(c: &mut Criterion) {
                 let a = dag.add_task(task_fn::<(), _, _>(|_: ()| 10));
                 let b = dag
                     .add_task(task_fn::<i32, _, _>(|&x: &i32| x * 2))
-                    .depends_on(a);
+                    .depends_on(&a);
                 let c = dag
                     .add_task(task_fn::<i32, _, _>(|&x: &i32| x + 5))
-                    .depends_on(a);
+                    .depends_on(&a);
                 let d = dag
                     .add_task(task_fn::<(i32, i32), _, _>(|(x, y): (&i32, &i32)| x + y))
-                    .depends_on((b, c));
+                    .depends_on((&b, &c));
 
                 let mut output = dag
                     .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
                     .await
                     .unwrap();
-                output.get(d).unwrap()
+                output.get(d)
             })
         });
     });

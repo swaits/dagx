@@ -68,7 +68,7 @@ async fn test_concurrent_execution_with_atomic_counter() -> DagResult<()> {
 
     // Verify all tasks completed
     for (i, task) in tasks.into_iter().enumerate() {
-        assert_eq!(output.get(task)?, i);
+        assert_eq!(output.get(task), i);
     }
 
     // Check that we achieved real parallelism
@@ -135,7 +135,7 @@ async fn test_massive_parallel_fanout() -> DagResult<()> {
     }
 
     // Create 1000 tasks all depending on the same source
-    let tasks: Vec<_> = (0..1000)
+    let mut tasks: Vec<_> = (0..1000)
         .map(|i| {
             dag.add_task(FanoutTask {
                 comp: completed.clone(),
@@ -143,7 +143,7 @@ async fn test_massive_parallel_fanout() -> DagResult<()> {
                 curr: current.clone(),
                 idx: i,
             })
-            .depends_on(source)
+            .depends_on(&source)
         })
         .collect();
 
@@ -157,9 +157,9 @@ async fn test_massive_parallel_fanout() -> DagResult<()> {
     assert_eq!(completed.load(Ordering::SeqCst), 1000);
 
     // Check some results
-    assert_eq!(output.get(tasks[0])?, 1);
-    assert_eq!(output.get(tasks[500])?, 501);
-    assert_eq!(output.get(tasks[999])?, 1000);
+    assert_eq!(output.get(tasks.remove(999)), 1000);
+    assert_eq!(output.get(tasks.remove(500)), 501);
+    assert_eq!(output.get(tasks.remove(0)), 1);
 
     let max_seen = max_concurrent.load(Ordering::SeqCst);
     println!(

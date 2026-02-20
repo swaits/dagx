@@ -134,9 +134,9 @@ async fn main() {
 
     // Multiple downstream tasks consuming the same value
     // Each constructed differently to show flexibility
-    let plus_one = dag.add_task(AddOffset::new(1)).depends_on(source);
-    let times_two = dag.add_task(Multiply::new(2)).depends_on(source);
-    let squared = dag.add_task(Power { exponent: 2 }).depends_on(source);
+    let plus_one = dag.add_task(AddOffset::new(1)).depends_on(&source);
+    let times_two = dag.add_task(Multiply::new(2)).depends_on(&source);
+    let squared = dag.add_task(Power { exponent: 2 }).depends_on(&source);
 
     // Run the DAG
     println!("Running fan-out DAG...\n");
@@ -147,8 +147,8 @@ async fn main() {
 
     // Print all results
     println!("\nResults:");
-    println!("  Source: {}", output.get(source).unwrap());
-    println!("  Plus One: {}", output.get(plus_one).unwrap());
-    println!("  Times Two: {}", output.get(times_two).unwrap());
-    println!("  Squared: {}", output.get(squared).unwrap());
+    println!("  Source: {}", output.get(source));
+    println!("  Plus One: {}", output.get(plus_one));
+    println!("  Times Two: {}", output.get(times_two));
+    println!("  Squared: {}", output.get(squared));
 }

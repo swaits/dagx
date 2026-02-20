@@ -4,9 +4,7 @@ use std::collections::HashMap;
 use std::hash::Hasher;
 
 use crate::builder::TaskHandle;
-use crate::error::DagError;
 use crate::runner::{DagRunner, PassThroughHasher};
-use crate::DagOutput;
 
 // Initialize tracing subscriber for tests (idempotent)
 #[cfg(feature = "tracing")]
@@ -65,9 +63,10 @@ fn test_dag_runner_default() {
 }
 
 #[tokio::test]
+#[should_panic]
 async fn test_get_wrong_type() {
     init_tracing();
-    // Test getting with wrong type - this should return TypeMismatch
+    // Test getting with wrong type - this should panic
     let mut dag = DagRunner::new();
     let handle = dag.add_task(TestTask { value: 42 });
 
@@ -82,38 +81,11 @@ async fn test_get_wrong_type() {
         _phantom: std::marker::PhantomData,
     };
 
-    let result = output.get(fake_handle);
-    assert!(result.is_err());
-
-    // When downcast fails, we get TypeMismatch
-    match result.unwrap_err() {
-        DagError::TypeMismatch { expected, .. } => {
-            assert_eq!(expected, std::any::type_name::<String>());
-        }
-        _ => panic!("Expected TypeMismatch error"),
-    }
+    let _result = output.get(fake_handle);
 }
 
 #[tokio::test]
-async fn test_get_result_not_found() {
-    init_tracing();
-    // Test getting a result before running the DAG
-    let mut dag = DagRunner::new();
-    let handle = dag.add_task(TestTask { value: 42 });
-    let handle_id = handle.id.0; // Save ID before moving handle
-    let mut output = DagOutput::new(HashMap::default());
-
-    let result = output.get(handle);
-    assert!(result.is_err());
-    match result.unwrap_err() {
-        DagError::ResultNotFound { task_id } => {
-            assert_eq!(task_id, handle_id);
-        }
-        _ => panic!("Expected ResultNotFound error"),
-    }
-}
-
-#[tokio::test]
+#[should_panic]
 async fn test_invalid_node_id_in_get() {
     init_tracing();
     // Test getting with an invalid node ID
@@ -130,16 +102,7 @@ async fn test_invalid_node_id_in_get() {
         .await
         .unwrap();
 
-    let result = output.get(invalid_handle);
-    assert!(result.is_err());
-
-    // With centralized output storage, we get ResultNotFound for invalid node IDs
-    match result.unwrap_err() {
-        DagError::ResultNotFound { task_id } => {
-            assert_eq!(task_id, 999);
-        }
-        _ => panic!("Expected ResultNotFound error"),
-    }
+    let _result = output.get(invalid_handle);
 }
 
 #[tokio::test]
@@ -175,8 +138,8 @@ async fn test_task_panic_in_multi_task_layer() {
     let source = dag.add_task(Source);
 
     // Create two tasks in the same layer - one panics, one doesn't
-    let _panic_task = dag.add_task(PanicTask).depends_on(source);
-    let _good_task = dag.add_task(GoodTask).depends_on(source);
+    let _panic_task = dag.add_task(PanicTask).depends_on(&source);
+    let _good_task = dag.add_task(GoodTask).depends_on(&source);
 
     // Run the DAG - the panic should be caught
     let result = dag

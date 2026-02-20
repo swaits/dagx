@@ -62,8 +62,8 @@ fn test_task_builder_chain() {
 
     // Test chaining multiple tasks
     let t1 = dag.add_task(TestTask { value: 1 });
-    let t2 = dag.add_task(TestTaskWithInput).depends_on(t1);
-    let t3 = dag.add_task(TestTaskWithInput).depends_on(t2);
+    let t2 = dag.add_task(TestTaskWithInput).depends_on(&t1);
+    let t3 = dag.add_task(TestTaskWithInput).depends_on(&t2);
 
     // All should return TaskHandles
     let _ = t1;
@@ -89,7 +89,7 @@ fn test_multiple_dependencies() {
     let b = dag.add_task(TestTask { value: 20 });
 
     // Test multiple dependencies
-    let sum = dag.add_task(AddTask).depends_on((a, b));
+    let sum = dag.add_task(AddTask).depends_on((&a, &b));
 
     // Should return a TaskHandle
     let _ = sum;

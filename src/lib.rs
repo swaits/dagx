@@ -42,11 +42,11 @@
 //! let y = dag.add_task(Value(3));
 //!
 //! // Add task with dependencies
-//! let sum = dag.add_task(Add).depends_on((x, y));
+//! let sum = dag.add_task(Add).depends_on((&x, &y));
 //!
 //! // Execute and retrieve results
 //!let mut output = dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await.unwrap();
-//! assert_eq!(output.get(sum).unwrap(), 5);
+//! assert_eq!(output.get(sum), 5);
 //! # };
 //! ```
 //!
@@ -184,7 +184,7 @@
 //! # async {
 //! # let mut dag = DagRunner::new();
 //! # let source = dag.add_task(Value(42));
-//! let doubled = dag.add_task(Double).depends_on(source);
+//! let doubled = dag.add_task(Double).depends_on(&source);
 //! # };
 //! ```
 //!
@@ -210,7 +210,7 @@
 //! # let mut dag = DagRunner::new();
 //! # let x = dag.add_task(Value(2));
 //! # let y = dag.add_task(Value(3));
-//! let sum = dag.add_task(Add).depends_on((x, y));
+//! let sum = dag.add_task(Add).depends_on((&x, &y));
 //! # };
 //! ```
 //!
@@ -252,13 +252,13 @@
 //! let mut dag = DagRunner::new();
 //!
 //! let base = dag.add_task(Value(10));
-//! let plus1 = dag.add_task(Add(1)).depends_on(base);
-//! let times2 = dag.add_task(Scale(2)).depends_on(base);
+//! let plus1 = dag.add_task(Add(1)).depends_on(&base);
+//! let times2 = dag.add_task(Scale(2)).depends_on(&base);
 //!
 //!let mut output = dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await.unwrap();
 //!
-//! assert_eq!(output.get(plus1).unwrap(), 11);
-//! assert_eq!(output.get(times2).unwrap(), 20);
+//! assert_eq!(output.get(plus1), 11);
+//! assert_eq!(output.get(times2), 20);
 //! # };
 //! ```
 //!
@@ -310,11 +310,11 @@
 //! let name = dag.add_task(Name("Alice".to_string()));
 //! let age = dag.add_task(Age(30));
 //! let active = dag.add_task(Active(true));
-//! let result = dag.add_task(FormatUser).depends_on((name, age, active));
+//! let result = dag.add_task(FormatUser).depends_on((&name, &age, &active));
 //!
 //!let mut output = dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await.unwrap();
 //!
-//! assert_eq!(output.get(result).unwrap(), "User: Alice, Age: 30, Active: true");
+//! assert_eq!(output.get(result), "User: Alice, Age: 30, Active: true");
 //! # };
 //! ```
 //!
@@ -368,7 +368,7 @@
 //! # let node = dag.add_task(Value(42));
 //! // Simple approach with .unwrap()
 //! let mut output = dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await.unwrap();
-//! let result = output.get(node).unwrap();
+//! let result = output.get(node);
 //! # let mut dag = DagRunner::new();
 //!
 //! // Or handle errors explicitly
@@ -428,9 +428,9 @@
 //! let data = dag.add_task(FetchData);
 //!
 //! // All three tasks get efficient Arc-wrapped sharing automatically
-//! let task1 = dag.add_task(ProcessData).depends_on(data);
-//! let task2 = dag.add_task(ProcessData).depends_on(data);
-//! let task3 = dag.add_task(ProcessData).depends_on(data);
+//! let task1 = dag.add_task(ProcessData).depends_on(&data);
+//! let task2 = dag.add_task(ProcessData).depends_on(&data);
+//! let task3 = dag.add_task(ProcessData).depends_on(&data);
 //!
 //!let mut output = dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await.unwrap();
 //! # };

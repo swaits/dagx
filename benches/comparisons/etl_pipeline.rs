@@ -27,19 +27,19 @@ pub fn bench_etl_pipeline(c: &mut Criterion) {
                     .add_task(task_fn::<Vec<_>, _, _>(|data: &Vec<i32>| {
                         data.iter().map(|x| x * 2).collect::<Vec<_>>()
                     }))
-                    .depends_on(source1);
+                    .depends_on(&source1);
 
                 let transform2 = dag
                     .add_task(task_fn::<Vec<_>, _, _>(|data: &Vec<i32>| {
                         data.iter().map(|x| x * 2).collect::<Vec<_>>()
                     }))
-                    .depends_on(source2);
+                    .depends_on(&source2);
 
                 let transform3 = dag
                     .add_task(task_fn::<Vec<_>, _, _>(|data: &Vec<i32>| {
                         data.iter().map(|x| x * 2).collect::<Vec<_>>()
                     }))
-                    .depends_on(source3);
+                    .depends_on(&source3);
 
                 // Merge all transformed data
                 let merge = dag
@@ -51,7 +51,7 @@ pub fn bench_etl_pipeline(c: &mut Criterion) {
                             result
                         },
                     ))
-                    .depends_on((transform1, transform2, transform3));
+                    .depends_on((&transform1, &transform2, &transform3));
 
                 // Validate
                 let validate = dag
@@ -61,20 +61,20 @@ pub fn bench_etl_pipeline(c: &mut Criterion) {
                             .filter(|&x| x > 0)
                             .collect::<Vec<i32>>()
                     }))
-                    .depends_on(merge);
+                    .depends_on(&merge);
 
                 // Load (compute sum)
                 let load = dag
                     .add_task(task_fn::<Vec<_>, _, _>(|data: &Vec<i32>| {
                         data.iter().sum::<i32>()
                     }))
-                    .depends_on(validate);
+                    .depends_on(&validate);
 
                 let mut output = dag
                     .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
                     .await
                     .unwrap();
-                output.get(load).unwrap()
+                output.get(load)
             })
         });
     });

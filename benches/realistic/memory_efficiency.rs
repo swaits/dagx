@@ -36,7 +36,7 @@ pub fn bench_memory_efficiency(c: &mut Criterion) {
                                     .sum();
                                 black_box(sample_sum)
                             }))
-                            .depends_on(source);
+                            .depends_on(&source);
                         }
 
                         let _output = dag

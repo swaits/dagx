@@ -35,15 +35,15 @@ async fn test_zero_sized_types_throughout() -> DagResult<()> {
             assert_eq!(val, 42);
             "success"
         }))
-        .depends_on(t2);
+        .depends_on(&t2);
 
     let mut output = dag
         .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await?;
 
-    assert_eq!(output.get(t1)?, Empty);
-    assert_eq!(output.get(t2)?, 42);
-    assert_eq!(output.get(t4)?, "success");
+    assert_eq!(output.get(t1), Empty);
+    assert_eq!(output.get(t2), 42);
+    assert_eq!(output.get(t4), "success");
 
     Ok(())
 }
@@ -72,13 +72,13 @@ async fn test_large_value_types() -> DagResult<()> {
         .add_task(task_fn::<usize, _, _>(|&val: &usize| {
             val // Just pass through to verify
         }))
-        .depends_on(t1);
+        .depends_on(&t1);
 
     let mut output = dag
         .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await?;
 
-    assert_eq!(output.get(t2)?, 1042);
+    assert_eq!(output.get(t2), 1042);
 
     Ok(())
 }
@@ -99,13 +99,13 @@ async fn test_reference_wrapper_types() -> DagResult<()> {
 
     let t2 = dag
         .add_task(task_fn::<i32, _, _>(|&val: &i32| val * 2))
-        .depends_on(t1);
+        .depends_on(&t1);
 
     let mut output = dag
         .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await?;
 
-    assert_eq!(output.get(t2)?, 200);
+    assert_eq!(output.get(t2), 200);
 
     Ok(())
 }

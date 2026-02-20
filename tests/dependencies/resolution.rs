@@ -40,7 +40,7 @@ async fn test_dependency_resolution_order() -> DagResult<()> {
             log.lock().unwrap().push(("B_end", x + 1));
             x + 1
         }))
-        .depends_on(a)
+        .depends_on(&a)
     };
 
     let c = {
@@ -52,7 +52,7 @@ async fn test_dependency_resolution_order() -> DagResult<()> {
             log.lock().unwrap().push(("C_end", x + 1));
             x + 1
         }))
-        .depends_on(b)
+        .depends_on(&b)
     };
 
     let d = {
@@ -64,7 +64,7 @@ async fn test_dependency_resolution_order() -> DagResult<()> {
             log.lock().unwrap().push(("D_end", x + 1));
             x + 1
         }))
-        .depends_on(c)
+        .depends_on(&c)
     };
 
     let e = {
@@ -76,14 +76,14 @@ async fn test_dependency_resolution_order() -> DagResult<()> {
             log.lock().unwrap().push(("E_end", x + 1));
             x + 1
         }))
-        .depends_on(d)
+        .depends_on(&d)
     };
 
     let mut output = dag
         .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await?;
 
-    assert_eq!(output.get(e)?, 5);
+    assert_eq!(output.get(e), 5);
 
     // Verify execution order
     let log = execution_log.lock().unwrap();

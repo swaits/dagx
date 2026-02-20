@@ -395,7 +395,7 @@ async fn main() {
             .await
             .unwrap();
 
-        println!("Result 1: {:?}\n", output.get(call1).unwrap());
+        println!("Result 1: {:?}\n", output.get(call1));
 
         // Request 2: Failure (circuit closed, count = 1)
         let mut dag = DagRunner::new();
@@ -410,7 +410,7 @@ async fn main() {
             .await
             .unwrap();
 
-        println!("Result 2: {:?}\n", output.get(call2).unwrap());
+        println!("Result 2: {:?}\n", output.get(call2));
 
         // Request 3: Failure (circuit closed, count = 2)
         let mut dag = DagRunner::new();
@@ -425,7 +425,7 @@ async fn main() {
             .await
             .unwrap();
 
-        println!("Result 3: {:?}\n", output.get(call3).unwrap());
+        println!("Result 3: {:?}\n", output.get(call3));
 
         // Request 4: Failure (circuit closed, count = 3, opens!)
         let mut dag = DagRunner::new();
@@ -440,7 +440,7 @@ async fn main() {
             .await
             .unwrap();
 
-        println!("Result 4: {:?}\n", output.get(call4).unwrap());
+        println!("Result 4: {:?}\n", output.get(call4));
 
         // Request 5: Circuit is now open, fails fast with fallback
         let mut dag = DagRunner::new();
@@ -452,14 +452,14 @@ async fn main() {
 
         let fallback5 = dag
             .add_task(FallbackService::new("ServiceCall-5"))
-            .depends_on(call5);
+            .depends_on(&call5);
 
         let mut output = dag
             .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
             .await
             .unwrap();
 
-        println!("Result 5: {:?}\n", output.get(fallback5).unwrap());
+        println!("Result 5: {:?}\n", output.get(fallback5));
 
         // Example 2: Circuit recovery after timeout
         println!("Example 2: Circuit recovery after timeout\n");
@@ -479,7 +479,7 @@ async fn main() {
             .await
             .unwrap();
 
-        println!("Result 6: {:?}\n", output.get(call6).unwrap());
+        println!("Result 6: {:?}\n", output.get(call6));
 
         // Request 7: Circuit is now closed again, normal operation
         let mut dag = DagRunner::new();
@@ -494,7 +494,7 @@ async fn main() {
             .await
             .unwrap();
 
-        println!("Result 7: {:?}\n", output.get(call7).unwrap());
+        println!("Result 7: {:?}\n", output.get(call7));
     }
 
     println!("=== Circuit Breaker Example Complete ===");

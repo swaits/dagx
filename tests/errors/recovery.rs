@@ -34,7 +34,7 @@ async fn test_retry_pattern_simulation() -> DagResult<()> {
         .await?;
 
     // Task completes with error on first "attempt"
-    assert_eq!(output.get(task)?, Err("Simulated failure"));
+    assert_eq!(output.get(task), Err("Simulated failure"));
 
     Ok(())
 }
@@ -78,7 +78,7 @@ async fn test_circuit_breaker_pattern() -> DagResult<()> {
 
     // First few tasks fail and open circuit
     for task in tasks.into_iter().take(4) {
-        assert!(output.get(task)?.is_err());
+        assert!(output.get(task).is_err());
     }
 
     Ok(())
@@ -120,8 +120,8 @@ async fn test_error_accumulation_pattern() -> DagResult<()> {
     let [first, second] = <[_; 2]>::try_from(tasks).map_err(|_e| ()).unwrap();
 
     // Verify specific results
-    assert!(output.get(first)?.is_err());
-    assert_eq!(output.get(second)?, Ok(1));
+    assert!(output.get(first).is_err());
+    assert_eq!(output.get(second), Ok(1));
 
     Ok(())
 }
@@ -136,29 +136,29 @@ async fn test_error_boundary_isolation() -> DagResult<()> {
         .add_task(task_fn::<i32, _, _>(|_x: &i32| {
             Err::<i32, &str>("Group A error")
         }))
-        .depends_on(a1);
+        .depends_on(&a1);
 
     // Group B: should be isolated from Group A's error
     let b1 = dag.add_task(task_fn::<(), _, _>(|_: ()| 20));
     let b2 = dag
         .add_task(task_fn::<i32, _, _>(|&x: &i32| x * 2))
-        .depends_on(b1);
+        .depends_on(&b1);
 
     // Group C: depends on B but not A
     let c1 = dag
         .add_task(task_fn::<i32, _, _>(|&x: &i32| x + 5))
-        .depends_on(b2);
+        .depends_on(&b2);
 
     let mut output = dag
         .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await?;
 
     // Group A fails (returns Err)
-    assert_eq!(output.get(a2)?, Err("Group A error"));
+    assert_eq!(output.get(a2), Err("Group A error"));
 
     // Groups B and C succeed
-    assert_eq!(output.get(b2)?, 40);
-    assert_eq!(output.get(c1)?, 45);
+    assert_eq!(output.get(b2), 40);
+    assert_eq!(output.get(c1), 45);
 
     Ok(())
 }

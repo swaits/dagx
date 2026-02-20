@@ -1,6 +1,6 @@
 use std::{any::Any, sync::Arc};
 
-use crate::{builder::NodeId, runner::PassThroughHashMap, DagError, DagResult, TaskHandle};
+use crate::{builder::NodeId, runner::PassThroughHashMap, TaskHandle};
 
 pub struct DagOutput {
     outputs: PassThroughHashMap<NodeId, Arc<dyn Any + Send + Sync + 'static>>,
@@ -12,14 +12,11 @@ impl DagOutput {
     /// # Behavior
     ///
     /// All task outputs are stored after execution and can be retrieved via get().
-    /// Each task's output can only be retrieved once, after which it will return `DagError::ResultNotFound`.
     ///
-    /// # Errors
+    /// # Panics
     ///
-    /// Returns `DagError::ResultNotFound` if:
-    /// - The task hasn't been executed yet
-    /// - The handle is invalid
-    /// - The output has already been retrieved
+    /// This function panics if called with a [`TaskHandle`] from a [`crate::DagRunner`] instance other than the
+    /// one which produced this DagOutput.
     ///
     /// # Examples
     ///
@@ -49,26 +46,19 @@ impl DagOutput {
     ///
     /// let mut output = dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await.unwrap();
     ///
-    /// assert_eq!(output.get(task).unwrap(), 42);
+    /// assert_eq!(output.get(task), 42);
     /// # };
     /// ```
-    pub fn get<T: 'static + Send + Sync>(&mut self, handle: TaskHandle<T>) -> DagResult<T> {
-        let arc_output = self
-            .outputs
-            .remove(&handle.id)
-            .ok_or(DagError::ResultNotFound {
-                task_id: handle.id.0,
-            })?;
+    pub fn get<T: 'static + Send + Sync>(&mut self, handle: TaskHandle<T>) -> T {
+        // Because this consumes the task handle, it can only be retrieved once, so is certain to be there
+        let arc_output = self.outputs.remove(&handle.id).unwrap();
 
         // Downcast Arc<dyn Any> to Arc<T>
-        let output = arc_output
-            .downcast::<T>()
-            .map_err(|_| DagError::TypeMismatch {
-                expected: std::any::type_name::<T>(),
-                found: "unknown",
-            })?;
+        let output = arc_output.downcast::<T>().unwrap();
 
-        Ok(Arc::into_inner(output).unwrap())
+        // Because we never give the user access to anything but a reference to the Arc,
+        // we can guarantee that the strong reference count is exactly one here
+        Arc::into_inner(output).unwrap()
     }
 
     pub(super) fn new(

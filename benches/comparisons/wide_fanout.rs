@@ -21,7 +21,7 @@ pub fn bench_wide_fanout(c: &mut Criterion) {
                 // Create 100 tasks that all depend on source
                 for i in 0..100 {
                     dag.add_task(task_fn::<i32, _, _>(move |&x: &i32| x + i))
-                        .depends_on(source);
+                        .depends_on(&source);
                 }
 
                 let _output = dag
