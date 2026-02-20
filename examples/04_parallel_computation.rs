@@ -123,13 +123,15 @@ async fn main() -> DagResult<()> {
         let sum3 = dag.add_task(ComputeSum::new(501, 751, WORK_DELAY));
         let sum4 = dag.add_task(ComputeSum::new(751, 1001, WORK_DELAY));
 
-        let total = dag.add_task(Aggregate).depends_on((sum1, sum2, sum3, sum4));
+        let total = dag
+            .add_task(Aggregate)
+            .depends_on((&sum1, &sum2, &sum3, &sum4));
 
         let mut output = dag
             .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
             .await?;
 
-        let result = output.get(total)?;
+        let result = output.get(total);
         let elapsed = start.elapsed();
 
         println!(

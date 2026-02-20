@@ -33,7 +33,7 @@ async fn test_spawner_actually_spawns_tasks() -> DagResult<()> {
 
     // Verify all tasks were spawned
     for (i, task) in tasks.into_iter().enumerate() {
-        assert_eq!(output.get(task)?, i as i32);
+        assert_eq!(output.get(task), i as i32);
     }
 
     // The spawner should have been called once for each task

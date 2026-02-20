@@ -38,7 +38,7 @@ async fn test_unit_struct_with_state() {
         .await
         .unwrap();
 
-    assert_eq!(output.get(handle).unwrap(), 42);
+    assert_eq!(output.get(handle), 42);
 }
 
 #[test]

@@ -16,12 +16,12 @@ async fn test_linear_error_propagation() {
         .add_task(task_fn::<i32, _, _>(|&x: &i32| -> i32 {
             panic!("Error at t2 with input {}", x);
         }))
-        .depends_on(t1);
+        .depends_on(&t1);
     let t3 = dag
         .add_task(task_fn::<i32, _, _>(|&x: &i32| x + 1))
-        .depends_on(t2);
+        .depends_on(&t2);
     dag.add_task(task_fn::<i32, _, _>(|&x: &i32| x * 2))
-        .depends_on(t3);
+        .depends_on(&t3);
 
     assert!(matches!(
         dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
@@ -44,16 +44,16 @@ async fn test_diamond_error_propagation() {
 
     let left = dag
         .add_task(task_fn::<i32, _, _>(|&x: &i32| x / 2))
-        .depends_on(source);
+        .depends_on(&source);
 
     let right = dag
         .add_task(task_fn::<i32, _, _>(|&x: &i32| {
             panic!("Right path fails with {}", x);
         }))
-        .depends_on(source);
+        .depends_on(&source);
 
     dag.add_task(task_fn::<(i32, i32), _, _>(|(l, r): (&i32, &i32)| l + r))
-        .depends_on((left, right));
+        .depends_on((&left, &right));
 
     assert!(matches!(
         dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
@@ -73,7 +73,7 @@ async fn test_error_in_wide_fanout() {
     // Create wide fanout from failing source
     for i in 0..20 {
         dag.add_task(task_fn::<i32, _, _>(move |&x: &i32| x + i))
-            .depends_on(source);
+            .depends_on(&source);
     }
 
     assert!(matches!(
@@ -102,7 +102,7 @@ async fn test_selective_error_propagation() {
                 }
             },
         ))
-        .depends_on(source);
+        .depends_on(&source);
 
     // Further processing
     let final_task = dag
@@ -113,7 +113,7 @@ async fn test_selective_error_propagation() {
                 format!("Success: {}", val)
             }
         }))
-        .depends_on(handler);
+        .depends_on(&handler);
 
     let mut output = dag
         .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
@@ -121,13 +121,13 @@ async fn test_selective_error_propagation() {
         .unwrap();
 
     // Source returns an Err variant (not a panic)
-    assert_eq!(output.get(source).unwrap(), Err("Source error".to_string()));
+    assert_eq!(output.get(source), Err("Source error".to_string()));
 
     // Handler processes it
-    assert_eq!(output.get(handler).unwrap(), -1);
+    assert_eq!(output.get(handler), -1);
 
     // Final task handles the error case
-    assert_eq!(output.get(final_task).unwrap(), "Handled error case");
+    assert_eq!(output.get(final_task), "Handled error case");
 }
 
 #[tokio::test]
@@ -169,7 +169,7 @@ async fn test_error_propagation_timing() {
         .add_task(T2Task {
             order: propagation_order.clone(),
         })
-        .depends_on(t1);
+        .depends_on(&t1);
 
     let _t3 = dag
         .add_task(task_fn::<i32, _, _>({
@@ -180,7 +180,7 @@ async fn test_error_propagation_timing() {
                 x + 1
             }
         }))
-        .depends_on(t2);
+        .depends_on(&t2);
 
     let _ = dag
         .run(|fut| async move { tokio::spawn(fut).await.unwrap() })

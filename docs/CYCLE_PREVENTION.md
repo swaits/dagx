@@ -11,8 +11,8 @@ Most DAG libraries check for cycles when you execute the graph:
 let mut dag = DagRunner::new();
 let a = dag.add_task(TaskA);
 let b = dag.add_task(TaskB);
-a.depends_on(b);
-b.depends_on(a);  // Compiles fine...
+a.depends_on(&b);
+b.depends_on(&a);  // Compiles fine...
 dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })
 ```
 
@@ -26,12 +26,12 @@ let b_builder = dag.add_task(TaskB);
 
 // To make A depend on B, we need B as a TaskHandle.
 // But calling depends_on() consumes the builder!
-let b_handle = b_builder.depends_on(some_source);
+let b_handle = b_builder.depends_on(&some_source);
 
 // Now we can't make B depend on A because b_builder was moved!
 // This won't compile:
-// a_builder.depends_on(b_handle);  // ✓ OK: A→B
-// b_handle.depends_on(a_handle);   // ❌ ERROR: TaskHandle has no depends_on() method!
+// a_builder.depends_on(&b_handle);  // ✓ OK: A→B
+// b_handle.depends_on(&a_handle);   // ❌ ERROR: TaskHandle has no depends_on() method!
 ```
 
 ## How It Works: The Type-State Pattern
@@ -58,7 +58,7 @@ let b_builder = dag.add_task(TaskB);  // TaskBuilder
 let b_handle = b_builder.into();  // Convert B to TaskHandle (consumes builder)
 
 // To wire B→A, we need A as a TaskHandle
-let a_handle = a_builder.depends_on(b_handle);  // A now depends on B
+let a_handle = a_builder.depends_on(&b_handle);  // A now depends on B
 
 // Now if we try to complete the cycle:
 // a_handle.depends_on(...);  // ❌ ERROR: no method named `depends_on` found

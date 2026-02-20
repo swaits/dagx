@@ -40,7 +40,7 @@ async fn test_parallel_execution_speedup() -> DagResult<()> {
 
     // Verify all tasks completed
     for (i, task) in tasks.into_iter().enumerate() {
-        assert_eq!(output.get(task)?, i);
+        assert_eq!(output.get(task), i);
     }
 
     // If tasks ran sequentially: 10 * 50ms = 500ms
@@ -125,7 +125,7 @@ async fn test_layers_execute_in_parallel() -> DagResult<()> {
                 idx: i,
                 timing: layer_timing.clone(),
             })
-            .depends_on(source)
+            .depends_on(&source)
         })
         .collect();
 
@@ -140,14 +140,14 @@ async fn test_layers_execute_in_parallel() -> DagResult<()> {
                 a + b + c
             },
         ))
-        .depends_on((layer1[0], layer1[1], layer1[2]))
+        .depends_on((&layer1[0], &layer1[1], &layer1[2]))
     };
 
     let mut output = dag
         .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await?;
 
-    assert_eq!(output.get(final_task)?, 33); // (0+1) + (10+1) + (20+1)
+    assert_eq!(output.get(final_task), 33); // (0+1) + (10+1) + (20+1)
 
     // Analyze timing
     let timing = layer_timing.lock().unwrap();

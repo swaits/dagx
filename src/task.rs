@@ -47,9 +47,6 @@ where
 /// TaskInput with the remaining dependencies.
 ///
 /// No dependencies can be retrieved from an empty TaskInput (Input = ()).
-///
-/// **Note:** Calling [`std::mem::forget`] on a `TaskInput` instance will make it impossible to retrieve outputs of dependencies.
-/// There's no reason to ever do this.
 pub struct TaskInput<'inputs, Input: Send> {
     inputs: Iter<'inputs, Arc<dyn Any + Send + Sync + 'static>>,
     phantom: PhantomData<Input>,

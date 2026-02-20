@@ -23,17 +23,17 @@ pub fn bench_mixed_patterns(c: &mut Criterion) {
                     .add_task(task_fn::<Vec<_>, _, _>(|d: &Vec<String>| {
                         d.iter().filter(|s| s.contains("00")).count()
                     }))
-                    .depends_on(data);
+                    .depends_on(&data);
 
                 let analysis2 = dag
                     .add_task(task_fn::<Vec<_>, _, _>(|d: &Vec<String>| {
                         d.iter().map(|s| s.len()).sum::<usize>()
                     }))
-                    .depends_on(data);
+                    .depends_on(&data);
 
                 let analysis3 = dag
                     .add_task(task_fn::<Vec<_>, _, _>(|d: &Vec<String>| d.len()))
-                    .depends_on(data);
+                    .depends_on(&data);
 
                 // Stage 3: Fan-in to aggregate
                 let summary = dag
@@ -42,14 +42,14 @@ pub fn bench_mixed_patterns(c: &mut Criterion) {
                             format!("Matches: {}, Total bytes: {}, Count: {}", a1, a2, a3)
                         },
                     ))
-                    .depends_on((analysis1, analysis2, analysis3));
+                    .depends_on((&analysis1, &analysis2, &analysis3));
 
                 // Stage 4: Fan-out final report to multiple destinations
                 for i in 0..3 {
                     dag.add_task(task_fn::<String, _, _>(move |report: &String| {
                         format!("Destination {}: {}", i, report)
                     }))
-                    .depends_on(summary);
+                    .depends_on(&summary);
                 }
 
                 let _output = dag

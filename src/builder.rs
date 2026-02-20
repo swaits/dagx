@@ -50,11 +50,11 @@ use tracing::debug;
 /// let b = dag.add_task(Multiplier::new(2));
 /// // b is TaskBuilder until we call depends_on()
 ///
-/// let b = b.depends_on(a);
+/// let b = b.depends_on(&a);
 /// // Now b is a TaskHandle<i32>
 ///
 ///let mut output = dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await.unwrap();
-/// assert_eq!(output.get(b).unwrap(), 20);
+/// assert_eq!(output.get(b), 20);
 /// # };
 /// ```
 #[must_use]
@@ -76,10 +76,15 @@ where
     /// Provide all dependencies exactly once as a tuple.
     ///
     /// The dependencies must match the task's `Input` type exactly:
-    /// - `Input = A`: Pass `TaskHandle<A>`
-    /// - `Input = (A, B, ...)`: Pass `(TaskHandle<A>, TaskHandle<B>, ...)`
+    /// - `Input = A`: Pass `&TaskHandle<A>`
+    /// - `Input = (A, B, ...)`: Pass `(&TaskHandle<A>, &TaskHandle<B>, ...)`
     ///
     /// The order of dependencies in the tuple must match the order in `Input`.
+    ///
+    /// # Panics
+    ///
+    /// This function will cause a panic in [`DagRunner::run`] if called with a [`TaskHandle`] from a `DagRunner` instance
+    /// other than the one which created this TaskBuilder.
     ///
     /// # Examples
     ///
@@ -117,10 +122,10 @@ where
     /// let y = dag.add_task(Value(3));
     ///
     /// // Single dependency
-    /// let double = dag.add_task(Scale(2)).depends_on(x);
+    /// let double = dag.add_task(Scale(2)).depends_on(&x);
     ///
     /// // Multiple dependencies: tuple form
-    /// let sum = dag.add_task(Add).depends_on((x, y));
+    /// let sum = dag.add_task(Add).depends_on((&x, &y));
     ///
     ///let mut output = dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await.unwrap();
     /// # };
@@ -188,21 +193,13 @@ pub struct NodeId(pub u32);
 ///
 ///let mut output = dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await.unwrap();
 ///
-/// assert_eq!(output.get(node).unwrap(), 42);
+/// assert_eq!(output.get(node), 42);
 /// # };
 /// ```
 pub struct TaskHandle<T> {
     pub(crate) id: NodeId,
     pub(crate) _phantom: PhantomData<fn() -> T>,
 }
-
-impl<T> Clone for TaskHandle<T> {
-    fn clone(&self) -> Self {
-        *self
-    }
-}
-
-impl<T> Copy for TaskHandle<T> {}
 
 /// Takes a task and converts it to either a TaskBuilder or a TaskHandle,
 /// depending on whether it has inputs or not.
@@ -235,7 +232,6 @@ where
 /// Macro to implement TaskWire for different tuple sizes.
 macro_rules! impl_wire_tuple {
     ($($T:ident),+) => {
-        // For tuples of any combination of &TaskHandle, TaskHandle, and TaskBuilder
         impl<Tk, $($T: Send + Sync + 'static),+> TaskWire<($($T,)+)> for Tk
         where
             Tk: Task<($($T,)+)> + Sync + 'static

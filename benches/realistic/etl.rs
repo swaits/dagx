@@ -46,7 +46,7 @@ pub fn bench_etl_pipeline(c: &mut Criterion) {
                                     })
                                     .count()
                             }))
-                            .depends_on(extract);
+                            .depends_on(&extract);
 
                         // T2: Extract scores
                         let scores = dag
@@ -59,7 +59,7 @@ pub fn bench_etl_pipeline(c: &mut Criterion) {
                                     })
                                     .collect::<Vec<_>>()
                             }))
-                            .depends_on(extract);
+                            .depends_on(&extract);
 
                         // T3: Extract names
                         let names = dag
@@ -73,7 +73,7 @@ pub fn bench_etl_pipeline(c: &mut Criterion) {
                                     })
                                     .collect::<Vec<_>>()
                             }))
-                            .depends_on(extract);
+                            .depends_on(&extract);
 
                         // Load: Aggregate all transformations
                         dag.add_task(task_fn::<(usize, Vec<_>, Vec<_>), _, _>(
@@ -88,7 +88,7 @@ pub fn bench_etl_pipeline(c: &mut Criterion) {
                                 )
                             },
                         ))
-                        .depends_on((validate, scores, names));
+                        .depends_on((&validate, &scores, &names));
 
                         let _output = dag
                             .run(|fut| async move { tokio::spawn(fut).await.unwrap() })

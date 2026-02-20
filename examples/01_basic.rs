@@ -93,8 +93,8 @@ async fn main() {
         .add_task(Add {
             label: "Sum".to_string(),
         })
-        .depends_on((x, y)); // Pass handles as a tuple
-                             // sum is now TaskHandle<i32>
+        .depends_on((&x, &y)); // Pass handles as a tuple
+                               // sum is now TaskHandle<i32>
 
     // Step 6: Execute the DAG
     //
@@ -114,9 +114,9 @@ async fn main() {
     //
     // Use .get() with a TaskHandle to retrieve the output.
     // Results are not cloned, so you can only retrieve them once.
-    println!("\nResult: {}", output.get(sum).unwrap());
+    println!("\nResult: {}", output.get(sum));
 
     // Note: You can also retrieve intermediate results
-    assert_eq!(output.get(x).unwrap(), 2);
-    assert_eq!(output.get(y).unwrap(), 3);
+    assert_eq!(output.get(x), 2);
+    assert_eq!(output.get(y), 3);
 }

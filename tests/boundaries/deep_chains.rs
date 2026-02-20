@@ -20,7 +20,7 @@ async fn test_multiple_parallel_deep_chains() -> DagResult<()> {
         for _ in 0..500 {
             current = dag
                 .add_task(task_fn::<i32, _, _>(|&prev: &i32| prev + 1))
-                .depends_on(current);
+                .depends_on(&current);
         }
 
         chain_ends.push(current);
@@ -41,14 +41,14 @@ async fn test_multiple_parallel_deep_chains() -> DagResult<()> {
             },
         ))
         .depends_on((
-            chain_ends[0],
-            chain_ends[1],
-            chain_ends[2],
-            chain_ends[3],
-            chain_ends[4],
-            chain_ends[5],
-            chain_ends[6],
-            chain_ends[7],
+            &chain_ends[0],
+            &chain_ends[1],
+            &chain_ends[2],
+            &chain_ends[3],
+            &chain_ends[4],
+            &chain_ends[5],
+            &chain_ends[6],
+            &chain_ends[7],
         ));
 
     let mut output = dag
@@ -60,7 +60,7 @@ async fn test_multiple_parallel_deep_chains() -> DagResult<()> {
     // Chain 1: 1000 + 500 = 1500
     // ...
     // Sum = 500*8 + (0+1000+2000+...+7000) = 4000 + 28000 = 32000
-    assert_eq!(output.get(final_task)?, 32000);
+    assert_eq!(output.get(final_task), 32000);
 
     Ok(())
 }
@@ -91,7 +91,7 @@ async fn test_deep_chain_execution_order() -> DagResult<()> {
                     prev + 1
                 }
             }))
-            .depends_on(current);
+            .depends_on(&current);
     }
 
     let mut output = dag
@@ -99,7 +99,7 @@ async fn test_deep_chain_execution_order() -> DagResult<()> {
         .await?;
 
     assert_eq!(order.load(Ordering::SeqCst), 100);
-    assert_eq!(output.get(current)?, 99);
+    assert_eq!(output.get(current), 99);
 
     Ok(())
 }
@@ -120,7 +120,7 @@ async fn test_deep_binary_tree() -> DagResult<()> {
             dag.add_task(task_fn::<(i32, i32), _, _>(move |(l, r): (&i32, &i32)| {
                 l + r
             }))
-            .depends_on((left, right))
+            .depends_on((&left, &right))
         }
     }
 
@@ -132,7 +132,7 @@ async fn test_deep_binary_tree() -> DagResult<()> {
 
     // Sum of all values in a complete binary tree with values 1024..2047
     // This is sum from 2^10 to 2^11-1 = 1024 * 1023 / 2 + 1024 * 512 = 1047552
-    let result = output.get(root)?;
+    let result = output.get(root);
     assert!(result > 0);
 
     Ok(())
@@ -152,7 +152,7 @@ async fn test_fibonacci_chain() -> DagResult<()> {
     for _ in 2..50 {
         let next = dag
             .add_task(task_fn::<(i64, i64), _, _>(|(a, b): (&i64, &i64)| a + b))
-            .depends_on((prev2, prev1));
+            .depends_on((&prev2, &prev1));
 
         prev2 = prev1;
         prev1 = next;
@@ -163,7 +163,7 @@ async fn test_fibonacci_chain() -> DagResult<()> {
         .await?;
 
     // 50th Fibonacci number (0-indexed) = 7778742049
-    assert_eq!(output.get(prev1)?, 7778742049);
+    assert_eq!(output.get(prev1), 7778742049);
 
     Ok(())
 }
@@ -184,25 +184,25 @@ async fn test_zigzag_dependencies() -> DagResult<()> {
             // A depends on B
             chain_a = dag
                 .add_task(task_fn::<i32, _, _>(move |b_val: &i32| b_val + 1))
-                .depends_on(chain_b);
+                .depends_on(&chain_b);
         } else {
             // B depends on A
             chain_b = dag
                 .add_task(task_fn::<i32, _, _>(move |a_val: &i32| a_val + 2))
-                .depends_on(chain_a);
+                .depends_on(&chain_a);
         }
     }
 
     // Final task depends on both chains
     let final_task = dag
         .add_task(task_fn::<(i32, i32), _, _>(|(a, b): (&i32, &i32)| a + b))
-        .depends_on((chain_a, chain_b));
+        .depends_on((&chain_a, &chain_b));
 
     let mut output = dag
         .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await?;
 
-    let result = output.get(final_task)?;
+    let result = output.get(final_task);
     assert!(result > 100);
 
     Ok(())

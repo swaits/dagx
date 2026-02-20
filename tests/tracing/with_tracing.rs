@@ -43,14 +43,14 @@ async fn test_tracing_with_subscriber() {
 
     let a = dag.add_task(Value(2));
     let b = dag.add_task(Value(3));
-    let sum = dag.add_task(Add).depends_on((a, b));
+    let sum = dag.add_task(Add).depends_on((&a, &b));
 
     let mut output = dag
         .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await
         .unwrap();
 
-    assert_eq!(output.get(sum).unwrap(), 5);
+    assert_eq!(output.get(sum), 5);
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -65,8 +65,8 @@ async fn test_tracing_inline_execution() {
 
     // Create a linear chain (should trigger inline execution)
     let a = dag.add_task(Value(1));
-    let b = dag.add_task(Add).depends_on((a, a));
-    let c = dag.add_task(Multiply).depends_on((b, b));
+    let b = dag.add_task(Add).depends_on((&a, &a));
+    let c = dag.add_task(Multiply).depends_on((&b, &b));
 
     let mut output = dag
         .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
@@ -76,5 +76,5 @@ async fn test_tracing_inline_execution() {
     // a = 1
     // b = 1 + 1 = 2
     // c = 2 * 2 = 4
-    assert_eq!(output.get(c).unwrap(), 4);
+    assert_eq!(output.get(c), 4);
 }

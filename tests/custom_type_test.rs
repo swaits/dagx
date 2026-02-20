@@ -54,14 +54,14 @@ async fn test_custom_type_single_dependency() {
     let mut dag = DagRunner::new();
 
     let fetch = dag.add_task(FetchPerson);
-    let process = dag.add_task(ProcessPerson).depends_on(fetch);
+    let process = dag.add_task(ProcessPerson).depends_on(&fetch);
 
     let mut output = dag
         .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await
         .unwrap();
 
-    let result = output.get(process).unwrap();
+    let result = output.get(process);
     assert_eq!(result, "Alice is 30 years old");
 }
 
@@ -70,16 +70,16 @@ async fn test_custom_type_passthrough() {
     let mut dag = DagRunner::new();
 
     let fetch = dag.add_task(FetchPerson);
-    let transform = dag.add_task(PersonToCompany).depends_on(fetch);
-    let process = dag.add_task(ProcessPerson).depends_on(fetch);
+    let transform = dag.add_task(PersonToCompany).depends_on(&fetch);
+    let process = dag.add_task(ProcessPerson).depends_on(&fetch);
 
     let mut output = dag
         .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await
         .unwrap();
 
-    let person_result = output.get(process).unwrap();
-    let company_result = output.get(transform).unwrap();
+    let person_result = output.get(process);
+    let company_result = output.get(transform);
 
     assert_eq!(person_result.as_str(), "Alice is 30 years old");
     assert_eq!(company_result.name, "Alice's Company");
@@ -91,18 +91,18 @@ async fn test_custom_type_fan_out() {
     let mut dag = DagRunner::new();
 
     let fetch = dag.add_task(FetchPerson);
-    let process1 = dag.add_task(ProcessPerson).depends_on(fetch);
-    let process2 = dag.add_task(ProcessPerson).depends_on(fetch);
-    let process3 = dag.add_task(ProcessPerson).depends_on(fetch);
+    let process1 = dag.add_task(ProcessPerson).depends_on(&fetch);
+    let process2 = dag.add_task(ProcessPerson).depends_on(&fetch);
+    let process3 = dag.add_task(ProcessPerson).depends_on(&fetch);
 
     let mut output = dag
         .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await
         .unwrap();
 
-    let result1 = output.get(process1).unwrap();
-    let result2 = output.get(process2).unwrap();
-    let result3 = output.get(process3).unwrap();
+    let result1 = output.get(process1);
+    let result2 = output.get(process2);
+    let result3 = output.get(process3);
 
     assert_eq!(result1, "Alice is 30 years old");
     assert_eq!(result2, "Alice is 30 years old");

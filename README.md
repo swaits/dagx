@@ -79,7 +79,7 @@ async fn main() {
     let mut output = dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() }).await.unwrap();
 
     // Retrieve results
-    assert_eq!(output.get(sum).unwrap(), 5);
+    assert_eq!(output.get(sum), 5);
 }
 ```
 

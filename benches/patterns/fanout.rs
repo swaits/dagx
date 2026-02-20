@@ -15,7 +15,7 @@ pub fn bench_fanout(c: &mut Criterion) {
 
                 for i in 0..100 {
                     dag.add_task(task_fn::<i32, _, _>(move |&x: &i32| x + i))
-                        .depends_on(source);
+                        .depends_on(&source);
                 }
 
                 let _output = dag
@@ -41,7 +41,7 @@ pub fn bench_fanout(c: &mut Criterion) {
                         // Each consumer gets data extracted from Arc
                         data.iter().filter(|s| s.contains(&i.to_string())).count()
                     }))
-                    .depends_on(source);
+                    .depends_on(&source);
                 }
 
                 let _output = dag

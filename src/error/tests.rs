@@ -3,33 +3,6 @@
 use crate::error::DagError;
 
 #[test]
-fn test_dag_error_display_invalid_dependency() {
-    // Test lines 47-54 in error.rs
-    let err = DagError::InvalidDependency { task_id: 42 };
-    let display = format!("{}", err);
-
-    assert!(display.contains("Invalid dependency"));
-    assert!(display.contains("task #42"));
-    assert!(display.contains("does not exist"));
-    assert!(display.contains("Ensure all task handles"));
-}
-
-#[test]
-fn test_dag_error_display_type_mismatch() {
-    // Test lines 56-65 in error.rs
-    let err = DagError::TypeMismatch {
-        expected: "i32",
-        found: "String",
-    };
-    let display = format!("{}", err);
-
-    assert!(display.contains("Type mismatch"));
-    assert!(display.contains("Expected: i32"));
-    assert!(display.contains("Found: String"));
-    assert!(display.contains("Verify that dependency types"));
-}
-
-#[test]
 fn test_dag_error_display_task_panicked() {
     // Test lines 67-77 in error.rs
     let err = DagError::TaskPanicked {
@@ -45,19 +18,12 @@ fn test_dag_error_display_task_panicked() {
 }
 
 #[test]
-fn test_dag_error_display_result_not_found() {
-    let err = DagError::ResultNotFound { task_id: 7 };
-    let display = format!("{}", err);
-
-    assert!(display.contains("Result not found"));
-    assert!(display.contains("task #7"));
-    assert!(display.contains("Call dag.run(|fut| async move { tokio::spawn(fut).await.unwrap() })"));
-}
-
-#[test]
 fn test_dag_error_std_error_impl() {
     // Test that DagError implements std::error::Error
-    let err = DagError::InvalidDependency { task_id: 1 };
+    let err = DagError::TaskPanicked {
+        task_id: 1,
+        panic_message: "test panic".to_string(),
+    };
     let err_ref: &dyn std::error::Error = &err;
 
     // Should be able to call Error trait methods

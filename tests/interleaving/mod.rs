@@ -62,13 +62,13 @@ async fn test_forced_interleaving_with_barriers() -> DagResult<()> {
         .add_task(task_fn::<(i32, i32, i32), _, _>(
             |(a, b, c): (&i32, &i32, &i32)| a + b + c,
         ))
-        .depends_on((t1, t2, t3));
+        .depends_on((&t1, &t2, &t3));
 
     let mut output = dag
         .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await?;
 
-    assert_eq!(output.get(collector)?, 6);
+    assert_eq!(output.get(collector), 6);
 
     // Check interleaving pattern
     let events = order.lock().unwrap().clone();
@@ -178,7 +178,7 @@ async fn test_alternating_execution_pattern() -> DagResult<()> {
                 turn: turn.clone(),
                 idx: i,
             })
-            .depends_on(chain_a);
+            .depends_on(&chain_a);
 
         chain_b = dag
             .add_task(ChainB {
@@ -186,7 +186,7 @@ async fn test_alternating_execution_pattern() -> DagResult<()> {
                 events: events.clone(),
                 idx: i,
             })
-            .depends_on(chain_b);
+            .depends_on(&chain_b);
     }
 
     let _output = dag
@@ -255,7 +255,7 @@ async fn test_layered_interleaving() -> DagResult<()> {
             dag.add_task(Layer23Task {
                 active: layer_active.clone(),
             })
-            .depends_on((layer1[idx], layer1[idx + 1]))
+            .depends_on((&layer1[idx], &layer1[idx + 1]))
         })
         .collect();
 
@@ -264,14 +264,14 @@ async fn test_layered_interleaving() -> DagResult<()> {
         .add_task(Layer23Task {
             active: layer_active.clone(),
         })
-        .depends_on((layer2[0], layer2[1]));
+        .depends_on((&layer2[0], &layer2[1]));
 
     let mut output = dag
         .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await?;
 
     // Sum of 0+1+2+3 = 6
-    assert_eq!(output.get(layer3)?, 6);
+    assert_eq!(output.get(layer3), 6);
 
     Ok(())
 }

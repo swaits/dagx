@@ -19,7 +19,7 @@ async fn test_dag_with_only_source_tasks() -> DagResult<()> {
         .await?;
 
     for (i, task) in tasks.into_iter().enumerate() {
-        assert_eq!(output.get(task)?, i);
+        assert_eq!(output.get(task), i);
     }
 
     Ok(())
@@ -46,7 +46,7 @@ async fn test_single_self_contained_stateful_task() -> DagResult<()> {
         .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await?;
 
-    assert_eq!(output.get(task)?, 42);
+    assert_eq!(output.get(task), 42);
     Ok(())
 }
 
@@ -71,6 +71,6 @@ async fn test_minimal_task_with_minimal_async_work() -> DagResult<()> {
         .run(|fut| async move { tokio::spawn(fut).await.unwrap() })
         .await?;
 
-    assert_eq!(output.get(task)?, 1337);
+    assert_eq!(output.get(task), 1337);
     Ok(())
 }

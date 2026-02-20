@@ -99,11 +99,11 @@ fn test_basic_dag(runner: impl RuntimeTest) {
 
         let x = dag.add_task(Value(2));
         let y = dag.add_task(Value(3));
-        let sum = dag.add_task(Add).depends_on((x, y));
+        let sum = dag.add_task(Add).depends_on((&x, &y));
 
         let mut output = dag.run(spawner).await.unwrap();
 
-        assert_eq!(output.get(sum).unwrap(), 5);
+        assert_eq!(output.get(sum), 5);
     })
 }
 
@@ -122,7 +122,7 @@ fn test_parallel_execution(runner: impl RuntimeTest) {
         let mut output = dag.run(spawner).await.unwrap();
 
         for (i, task) in tasks.into_iter().enumerate() {
-            assert_eq!(output.get(task).unwrap(), i * 2);
+            assert_eq!(output.get(task), i * 2);
         }
     });
 }
@@ -137,13 +137,13 @@ fn test_complex_dependencies(runner: impl RuntimeTest) {
 
         let a = dag.add_task(Value(10));
         let b = dag.add_task(Value(20));
-        let sum = dag.add_task(Add).depends_on((a, b));
+        let sum = dag.add_task(Add).depends_on((&a, &b));
         let double = dag
             .add_task(task_fn::<i32, _, _>(|&x: &i32| x * 2))
-            .depends_on(sum);
+            .depends_on(&sum);
 
         let mut output = dag.run(spawner).await.unwrap();
 
-        assert_eq!(output.get(double).unwrap().clone(), 60);
+        assert_eq!(output.get(double).clone(), 60);
     });
 }
